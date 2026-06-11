@@ -1,4 +1,4 @@
-# uceva-judge — Frontend
+# Goslint Judge — Frontend
 
 > **Monorepo Frontend** | Next.js 16 · TailwindCSS v4 · shadcn/ui · TypeScript · pnpm Workspaces
 
@@ -19,14 +19,14 @@ frontend/
     │   ├── hooks/            ← React hooks personalizados
     │   ├── lib/              ← Utilidades (cn, fetchers, etc.)
     │   ├── public/           ← Assets estáticos
-    │   └── package.json      ← @uceva-judge/student-app
+    │   └── package.json      ← @Goslint Judge/student-app
     │
     └── admin-app/            ← App administrativa (ADMIN/ORGANIZER)
         ├── app/              ← Next.js App Router (rutas y layouts)
         ├── components/       ← Componentes del panel admin
         ├── hooks/            ← React hooks personalizados
         ├── lib/              ← Utilidades
-        └── package.json      ← @uceva-judge/admin-app
+        └── package.json      ← @Goslint Judge/admin-app
 ```
 
 ---

@@ -1,4 +1,4 @@
-# uceva-judge
+# Goslint Judge
 
 > **Sistema de Evaluación Automática de Código Fuente para Maratones de Programación — UCEVA**  
 > Trabajo de Grado · Programa de Ingeniería de Sistemas  
@@ -8,7 +8,7 @@
 
 ## ¿Qué es este proyecto?
 
-El **uceva-judge** es una plataforma de juez en línea (*Online Judge*) institucional que permite a la UCEVA:
+El **Goslint Judge** es una plataforma de juez en línea (*Online Judge*) institucional que permite a la UCEVA:
 
 - Gestionar un repositorio propio de problemas algorítmicos.
 - Diseñar y ejecutar maratones de programación internas.
@@ -21,10 +21,9 @@ El **uceva-judge** es una plataforma de juez en línea (*Online Judge*) instituc
 ## Estructura del Monorepo
 
 ```
-uceva-judge/
+goslint_judge/
 ├── .gitignore
 ├── README.md                 ← Este archivo
-├── Trabajo_de_grado.md       ← Documento de la investigación completa
 │
 ├── backend/                  ← Microservicios Java / Spring Boot
 │   ├── ARCHITECTURE.md       ← 📖 Guía técnica del backend
@@ -52,10 +51,6 @@ uceva-judge/
 ├── infrastructure/           ← Docker Compose, Traefik
 │   ├── docker/               ← docker-compose.yml (BD, colas, reverse proxy)
 │   └── traefik/              ← Configuración del API Gateway
-│
-└── docs/
-    ├── api/                  ← Contratos OpenAPI / Swagger por servicio
-    └── architecture/         ← Diagramas y ADRs
 ```
 
 ---
