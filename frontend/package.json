@@ -1,0 +1,19 @@
+{
+  "name": "uceva-judge-frontend",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Frontend monorepo for uceva-judge — Sistema de Evaluación Automática UCEVA",
+  "scripts": {
+    "dev:student": "pnpm --filter @uceva-judge/student-app dev",
+    "dev:admin": "pnpm --filter @uceva-judge/admin-app dev",
+    "build:student": "pnpm --filter @uceva-judge/student-app build",
+    "build:admin": "pnpm --filter @uceva-judge/admin-app build",
+    "build": "pnpm run build:student && pnpm run build:admin",
+    "lint": "pnpm -r lint",
+    "type-check": "pnpm -r type-check"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}

@@ -1,0 +1,146 @@
+# =============================================================================
+# uceva-judge — .gitignore Raíz del Monorepo
+# =============================================================================
+
+# ===========================================================================
+# BACKEND — Java / Gradle
+# ===========================================================================
+
+# Gradle build outputs y cache
+backend/build/
+backend/.gradle/
+backend/**/build/
+backend/**/.gradle/
+
+# Carpetas bin generadas por el IDE (VSCode Java, Eclipse)
+backend/**/bin/
+
+# Spring Boot local config override
+backend/**/application-local.properties
+backend/**/application-local.yml
+
+# Variables de entorno del backend
+backend/**/.env
+backend/**/.env.local
+
+# Archivos de Spring Boot generados
+backend/**/target/
+
+# ===========================================================================
+# FRONTEND — Node.js / Next.js / pnpm
+# ===========================================================================
+
+# Dependencias instaladas
+frontend/node_modules/
+frontend/apps/**/node_modules/
+frontend/.pnpm-store/
+
+# Next.js build outputs
+frontend/apps/**/.next/
+frontend/apps/**/out/
+frontend/apps/**/dist/
+
+# TypeScript build cache
+frontend/apps/**/*.tsbuildinfo
+frontend/apps/**/next-env.d.ts
+
+# Vercel CI/CD
+frontend/.vercel/
+frontend/apps/**/.vercel/
+
+# Variables de entorno del frontend (contienen URLs y API keys)
+frontend/apps/**/.env
+frontend/apps/**/.env.local
+frontend/apps/**/.env.development.local
+frontend/apps/**/.env.test.local
+frontend/apps/**/.env.production.local
+
+# v0 / sandbox internal artifacts
+frontend/apps/**/__v0_runtime_loader.js
+frontend/apps/**/__v0_devtools.tsx
+frontend/apps/**/__v0_jsx-dev-runtime.ts
+frontend/apps/**/.snowflake/
+frontend/apps/**/.v0-trash/
+
+# ===========================================================================
+# INFRAESTRUCTURA — Docker / Traefik
+# ===========================================================================
+
+# Secrets de Docker y Traefik (nunca al repo)
+infrastructure/docker/.env
+infrastructure/docker/*.env
+infrastructure/traefik/acme.json
+infrastructure/traefik/certs/
+
+# ===========================================================================
+# SISTEMA OPERATIVO
+# ===========================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# ===========================================================================
+# IDEs Y EDITORES
+# ===========================================================================
+
+# IntelliJ IDEA / Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VSCode — guardar solo settings compartidos, no personales
+# .vscode/ se incluye en el repo (contiene settings.json del proyecto)
+
+# Eclipse
+.classpath
+.project
+.settings/
+.factorypath
+
+# NetBeans
+nbproject/
+
+# ===========================================================================
+# LOGS Y TEMPORALES
+# ===========================================================================
+
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===========================================================================
+# SEGURIDAD — NUNCA SUBIR AL REPOSITORIO
+# ===========================================================================
+
+# Claves y secretos
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+.secrets
+
+# Archivos de configuración con credenciales reales
+**/application-prod.properties
+**/application-production.properties
+**/application-prod.yml
+**/application-production.yml

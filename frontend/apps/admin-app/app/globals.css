@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+
+:root {
+  --background: oklch(0.1 0.01 240);
+  --foreground: oklch(0.95 0 0);
+  --primary: oklch(0.75 0.2 145);
+  --primary-foreground: oklch(0.1 0.01 240);
+  --muted-foreground: oklch(0.6 0 0);
+  --border: oklch(0.25 0.02 240);
+  --radius: 0.625rem;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

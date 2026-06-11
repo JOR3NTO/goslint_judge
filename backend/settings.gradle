@@ -1,0 +1,11 @@
+rootProject.name = 'uceva-judge-backend'
+
+include 'shared:common-domain'
+include 'shared:common-infrastructure'
+
+include 'services:auth-service'
+include 'services:problem-service'
+include 'services:submission-service'
+include 'services:judge-service'
+include 'services:feedback-service'
+include 'services:contest-service'

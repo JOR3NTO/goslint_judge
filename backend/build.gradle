@@ -1,0 +1,31 @@
+plugins {
+    id 'org.springframework.boot' version '3.2.4' apply false
+    id 'io.spring.dependency-management' version '1.1.4' apply false
+    id 'java'
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'io.spring.dependency-management'
+
+    group = 'co.uceva.judge'
+    version = '1.0.0'
+    sourceCompatibility = '17'
+
+    repositories {
+        mavenCentral()
+    }
+
+    // Solución: Importar el BOM para definir las versiones automáticamente
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.boot:spring-boot-dependencies:3.2.4"
+        }
+    }
+
+    dependencies {
+        compileOnly 'org.projectlombok:lombok:1.18.30'
+        annotationProcessor 'org.projectlombok:lombok:1.18.30'
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    }
+}

@@ -1,0 +1,4 @@
+dependencies {
+    // Entidades de dominio puras, sin dependencias externas
+    // Lombok ya está configurado en el build.gradle padre
+}
