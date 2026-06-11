@@ -103,8 +103,8 @@ $RECYCLE.BIN/
 *.ipr
 out/
 
-# VSCode — guardar solo settings compartidos, no personales
-# .vscode/ se incluye en el repo (contiene settings.json del proyecto)
+# VSCode — configuraciones locales
+.vscode/
 
 # Eclipse
 .classpath
