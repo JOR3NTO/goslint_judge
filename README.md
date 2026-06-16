@@ -33,7 +33,7 @@ goslint_judge/
 │   │   ├── common-domain/         ← Entidades y eventos compartidos (sin Spring)
 │   │   └── common-infrastructure/ ← Config transversal (excepciones, JWT base)
 │   └── services/
-│       ├── auth-service/          (puerto 8081)
+│       ├── users-service/         (puerto 8081)
 │       ├── problem-service/       (puerto 8082)
 │       ├── submission-service/    (puerto 8083)
 │       ├── judge-service/         (puerto 8084)
@@ -72,7 +72,7 @@ goslint_judge/
 | Java 17        | Lenguaje de desarrollo                               |
 | Spring Boot 3.2| Framework de microservicios                          |
 | Gradle 8.x     | Build system multi-proyecto                          |
-| PostgreSQL      | Persistencia relacional (una BD por servicio)        |
+| PostgreSQL     | Persistencia relacional (una BD por servicio)        |
 | RabbitMQ       | Cola de mensajes (pipeline de evaluación asíncrono)  |
 | Redis          | Caché (scoreboard, rate-limiting)                    |
 | Docker SDK     | Sandboxing de código fuente del estudiante           |
@@ -232,14 +232,14 @@ Los scopes identifican **qué parte del sistema** fue modificada:
 
 ```bash
 # Nueva funcionalidad
-feat(auth): implementar endpoint de registro de usuario con JWT
+feat(users): implementar endpoint de registro de usuario con JWT
 feat(judge): agregar soporte de sandboxing para código Python
 feat(contest): crear caso de uso para inscripción de equipos
 feat(student-app): agregar página de historial de envíos
 
 # Corrección de bugs
 fix(judge): corregir límite de memoria en contenedor Docker
-fix(auth): resolver error 401 al renovar token expirado
+fix(users): resolver error 401 al renovar token expirado
 fix(submission): manejar excepción cuando RabbitMQ no está disponible
 
 # Refactorización
@@ -268,7 +268,7 @@ ci: configurar GitHub Actions para build automático en develop
 Si el commit introduce un cambio que rompe la API existente, agregar `!` al tipo y documentarlo en el footer:
 
 ```bash
-feat(auth)!: cambiar esquema de respuesta del endpoint /login
+feat(users)!: cambiar esquema de respuesta del endpoint /login
 
 BREAKING CHANGE: el campo "token" fue renombrado a "accessToken".
 Todos los clientes deben actualizar su consumo del endpoint /api/auth/login.
