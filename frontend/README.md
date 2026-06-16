@@ -98,7 +98,7 @@ pnpm build
 
 ```
 app/
-├── (auth)/           ← Route group para páginas públicas
+├── (users)/           ← Route group para páginas públicas
 │   ├── login/
 │   └── register/
 ├── (dashboard)/      ← Route group para páginas autenticadas
@@ -129,7 +129,7 @@ app/
 
 ### Variables de entorno (`.env.local`)
 ```env
-NEXT_PUBLIC_API_AUTH_URL=http://localhost:8081
+NEXT_PUBLIC_API_USERS_URL=http://localhost:8081
 NEXT_PUBLIC_API_PROBLEMS_URL=http://localhost:8082
 NEXT_PUBLIC_API_SUBMISSIONS_URL=http://localhost:8083
 NEXT_PUBLIC_API_CONTESTS_URL=http://localhost:8086
