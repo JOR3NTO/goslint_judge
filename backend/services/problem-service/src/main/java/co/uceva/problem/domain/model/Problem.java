@@ -3,14 +3,18 @@ package co.uceva.problem.domain.model;
 import java.time.Instant;
 import java.util.UUID;
 
+import co.uceva.problem.domain.valueobject.Difficulty;
+import co.uceva.problem.domain.valueobject.MemoryLimit;
+import co.uceva.problem.domain.valueobject.TimeLimit;
+
 public class Problem {
     private UUID id;
     private UUID createdBy;
     private String title;
     private String statement;
-    private int timeLimitMs;
-    private int memoryLimitKb;
-    private int difficult;
+    private TimeLimit timeLimitMs;
+    private MemoryLimit memoryLimitKb;
+    private Difficulty difficult;
     private Instant createdAt;
     private String inputFormat;
     private String outputFormat;
@@ -24,9 +28,9 @@ public class Problem {
         this.createdBy = createdBy;
         this.title = title;
         this.statement = statement;
-        this.timeLimitMs = timeLimitMs;
-        this.memoryLimitKb = memoryLimitKb;
-        this.difficult = difficult;
+        this.timeLimitMs = new TimeLimit(timeLimitMs);
+        this.memoryLimitKb = new MemoryLimit(memoryLimitKb);
+        this.difficult = new Difficulty(difficult);
         this.createdAt = createdAt;
         this.inputFormat = inputFormat;
         this.outputFormat = outputFormat;
@@ -65,27 +69,27 @@ public class Problem {
     }
 
     public int getTimeLimitMs() {
-        return timeLimitMs;
+        return timeLimitMs.milliseconds();
     }
 
     public void setTimeLimitMs(int timeLimitMs) {
-        this.timeLimitMs = timeLimitMs;
+        this.timeLimitMs = new TimeLimit(timeLimitMs);
     }
 
     public int getMemoryLimitKb() {
-        return memoryLimitKb;
+        return memoryLimitKb.kilobytes();
     }
 
     public void setMemoryLimitKb(int memoryLimitKb) {
-        this.memoryLimitKb = memoryLimitKb;
+        this.memoryLimitKb = new MemoryLimit(memoryLimitKb);
     }
 
     public int getDifficult() {
-        return difficult;
+        return difficult.difficult();
     }
 
     public void setDifficult(int difficult) {
-        this.difficult = difficult;
+        this.difficult = new Difficulty(difficult);
     }
 
     public Instant getCreatedAt() {
