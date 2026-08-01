@@ -7,7 +7,7 @@ public class Problem {
     private UUID id;
     private UUID createdBy;
     private String title;
-    private String fileUrl;
+    private String statement;
     private int timeLimitMs;
     private int memoryLimitKb;
     private int difficult;
@@ -18,12 +18,12 @@ public class Problem {
     public Problem() {
     }
 
-    public Problem(UUID id, UUID createdBy, String title, String fileUrl, int timeLimitMs, int memoryLimitKb,
+    public Problem(UUID id, UUID createdBy, String title, String statement, int timeLimitMs, int memoryLimitKb,
             int difficult, Instant createdAt, String inputFormat, String outputFormat) {
         this.id = id;
         this.createdBy = createdBy;
         this.title = title;
-        this.fileUrl = fileUrl;
+        this.statement = statement;
         this.timeLimitMs = timeLimitMs;
         this.memoryLimitKb = memoryLimitKb;
         this.difficult = difficult;
@@ -56,12 +56,12 @@ public class Problem {
         this.title = title;
     }
 
-    public String getFileUrl() {
-        return fileUrl;
+    public String getStatement() {
+        return statement;
     }
 
-    public void setFileUrl(String fileUrl) {
-        this.fileUrl = fileUrl;
+    public void setStatement(String statement) {
+        this.statement = statement;
     }
 
     public int getTimeLimitMs() {
