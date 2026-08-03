@@ -5,9 +5,10 @@ import java.util.UUID;
 import co.uceva.problem.domain.model.Problem;
 
 public interface UpdateProblemUseCase {
-    Problem execute(UpdateProblemCommand problem);
+    Problem execute(UpdateProblemCommand command);
     
     record UpdateProblemCommand(
+        UUID problemId,
         String title,
         String statement,
         int timeLimitMs,

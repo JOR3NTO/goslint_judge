@@ -4,6 +4,6 @@ import java.util.List;
 
 import co.uceva.problem.domain.model.Problem;
 
-public interface GetAllProblemsByTitle {
+public interface GetAllProblemsByTitleUseCase {
     List<Problem> execute(String title);
 }

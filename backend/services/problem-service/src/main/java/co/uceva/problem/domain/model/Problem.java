@@ -36,6 +36,33 @@ public class Problem {
         this.outputFormat = outputFormat;
     }
 
+    public static Problem create(UUID createdBy, String title, String statement, int timeLimitMs, int memoryLimitKb,
+            int difficult, String inputFormat, String outputFormat) {
+        return new Problem(
+                UUID.randomUUID(),
+                createdBy,
+                title,
+                statement,
+                timeLimitMs,
+                memoryLimitKb,
+                difficult,
+                Instant.now(),
+                inputFormat,
+                outputFormat
+        );
+    }
+
+    public void update(String title, String statement, TimeLimit timeLimitMs, MemoryLimit memoryLimitKb,
+            Difficulty difficult, String inputFormat, String outputFormat) {
+        this.title = title;
+        this.statement = statement;
+        this.timeLimitMs = timeLimitMs;
+        this.memoryLimitKb = memoryLimitKb;
+        this.difficult = difficult;
+        this.inputFormat = inputFormat;
+        this.outputFormat = outputFormat;
+    }
+
     public UUID getId() {
         return id;
     }

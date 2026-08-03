@@ -5,7 +5,7 @@ import java.util.UUID;
 import co.uceva.problem.domain.model.Problem;
 
 public interface CreateProblemUseCase {
-    Problem execute(CreateProblemCommand problem);
+    Problem execute(CreateProblemCommand command);
 
     record CreateProblemCommand(
         UUID createdBy,
@@ -13,7 +13,7 @@ public interface CreateProblemUseCase {
         String statement,
         int timeLimitMs,
         int memoryLimitKb,
-        int difficultyRating,
+        int difficulty,
         String inputFormat,
         String outputFormat
     ){}

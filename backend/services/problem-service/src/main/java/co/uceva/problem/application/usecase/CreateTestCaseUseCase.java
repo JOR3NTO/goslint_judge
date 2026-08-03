@@ -6,7 +6,7 @@ import java.util.UUID;
 import co.uceva.problem.domain.model.TestCase;
 
 public interface CreateTestCaseUseCase {
-    TestCase execute(CreateTestCaseCommand testCase);
+    TestCase execute(CreateTestCaseCommand command);
 
     record CreateTestCaseCommand(
         UUID problemId,
@@ -14,7 +14,6 @@ public interface CreateTestCaseUseCase {
         int orderIndex,
         boolean isSample,
         String input,
-        String output,
-        Instant createdAt
+        String output
     ) {}
 }

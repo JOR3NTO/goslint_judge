@@ -28,6 +28,29 @@ public class TestCase {
         this.createdAt = createdAt;
     }
 
+    public static TestCase create(UUID problemId, String expectedOutput, int orderIndex, boolean isSample, String input,
+            String output){
+        return new TestCase(
+                UUID.randomUUID(),
+                problemId,
+                expectedOutput,
+                orderIndex,
+                isSample,
+                input,
+                output,
+                Instant.now()
+        );
+    }
+
+    public void update(String expectedOutput, int orderIndex, boolean isSample, String input,
+            String output){
+        this.expectedOutput = expectedOutput;
+        this.orderIndex = orderIndex;
+        this.isSample = isSample;
+        this.input = input;
+        this.output = output;
+    }
+
     public UUID getId() {
         return id;
     }
