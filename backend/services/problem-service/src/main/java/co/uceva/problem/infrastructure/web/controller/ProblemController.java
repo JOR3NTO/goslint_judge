@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
+@CrossOrigin(origins = "*")
 @RequestMapping("/api/v1/problems")
 public class ProblemController {
 
@@ -50,7 +51,7 @@ public class ProblemController {
         return ResponseEntity.ok(ProblemWebMapper.toResponse(problem));
     }
 
-    @GetMapping("/{title}")
+    @GetMapping("/title/{title}")
     public ResponseEntity<List<ProblemResponseDTO>> getAllByTitle(@PathVariable("title") String title) {
         List<Problem> problems = getAllProblemsByTitleUseCase.execute(title);
         List<ProblemResponseDTO> problemsResponce = problems.stream()

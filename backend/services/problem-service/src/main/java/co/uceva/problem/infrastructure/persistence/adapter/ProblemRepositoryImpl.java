@@ -10,7 +10,9 @@ import co.uceva.problem.domain.repository.ProblemRepository;
 import co.uceva.problem.infrastructure.mapper.ProblemEntityMapper;
 import co.uceva.problem.infrastructure.persistence.entity.ProblemEntity;
 import co.uceva.problem.infrastructure.persistence.repository.SpringDataProblemRepository;
+import org.springframework.stereotype.Component;
 
+@Component
 public class ProblemRepositoryImpl implements ProblemRepository {
 
     private final SpringDataProblemRepository springDataRepository;

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
+@CrossOrigin(origins = "*")
 @RequestMapping("/api/v1/problems/test-cases")
 public class TestCaseController {
 
@@ -55,7 +56,7 @@ public class TestCaseController {
         return ResponseEntity.status(HttpStatus.CREATED).body(testCasesResponce);
     }
 
-    @GetMapping("/id")
+    @GetMapping("/{id}")
     public ResponseEntity<TestCaseResponseDTO> getById(@PathVariable("id") UUID id) {
         TestCase testCase = getTestCaseByIdUseCase.execute(id);
         return ResponseEntity.status(HttpStatus.CREATED).body(TestCaseWebMapper.toResponse(testCase));

@@ -4,4 +4,6 @@ plugins {
 
 dependencies {
     implementation project(':shared:common-infrastructure')
+    runtimeOnly 'org.postgresql:postgresql'
+    testRuntimeOnly 'com.h2database:h2'
 }

@@ -2,6 +2,7 @@ plugins {
     id 'org.springframework.boot' version '3.2.4' apply false
     id 'io.spring.dependency-management' version '1.1.4' apply false
     id 'java'
+    id 'jacoco'
 }
 
 subprojects {
@@ -29,5 +30,23 @@ subprojects {
         compileOnly 'org.projectlombok:lombok:1.18.30'
         annotationProcessor 'org.projectlombok:lombok:1.18.30'
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    }
+
+
+    jacoco {
+        toolVersion = "0.8.12"
+    }
+
+    jacocoTestReport {
+        reports {
+            xml.required = true
+            csv.required = false
+            html.required = true
+        }
+    }
+
+    test {
+        useJUnitPlatform()
+        finalizedBy jacocoTestReport
     }
 }
