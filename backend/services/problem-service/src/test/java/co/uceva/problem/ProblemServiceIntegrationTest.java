@@ -1,7 +1,9 @@
 package co.uceva.problem;
 
 import co.uceva.problem.fixtures.ProblemFixtures;
+import co.uceva.problem.infrastructure.web.dto.CreateTestCaseBatchRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.CreateTestCaseRequestDTO;
+import co.uceva.problem.infrastructure.web.dto.DeleteTestCaseBatchRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.ReorderTestCasesRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.UpdateProblemRequestDTO;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -91,6 +93,57 @@ class ProblemServiceIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isNoContent());
 
         // 8. Delete problem
+        mockMvc.perform(delete("/api/v1/problems/{id}", problemId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldExecuteBatchTestCaseOperations() throws Exception {
+        // 1. Create problem
+        MvcResult createResult = mockMvc.perform(post("/api/v1/problems")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ProblemFixtures.createProblemRequest())))
+                .andExpect(status().isCreated())
+                .andReturn();
+        UUID problemId = extractId(createResult);
+
+        // 2. Batch create (replace all)
+        CreateTestCaseBatchRequestDTO batchRequest = ProblemFixtures.createTestCaseBatchRequest();
+        MvcResult batchResult = mockMvc.perform(post("/api/v1/problems/test-cases/{problemId}/batch", problemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(batchRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        JsonNode batchCases = objectMapper.readTree(batchResult.getResponse().getContentAsString());
+        assertThat(batchCases).hasSize(2);
+        UUID firstCaseId = UUID.fromString(batchCases.get(0).get("id").asText());
+        UUID secondCaseId = UUID.fromString(batchCases.get(1).get("id").asText());
+
+        // 3. Verify order
+        MvcResult listResult = mockMvc.perform(get("/api/v1/problems/test-cases/{problemId}/all", problemId))
+                .andExpect(status().isCreated())
+                .andReturn();
+        JsonNode cases = objectMapper.readTree(listResult.getResponse().getContentAsString());
+        assertThat(cases.get(0).get("orderIndex").asInt()).isEqualTo(1);
+        assertThat(cases.get(1).get("orderIndex").asInt()).isEqualTo(2);
+
+        // 4. Batch delete one case
+        DeleteTestCaseBatchRequestDTO deleteRequest = new DeleteTestCaseBatchRequestDTO(List.of(firstCaseId));
+        mockMvc.perform(post("/api/v1/problems/test-cases/batch-delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(deleteRequest)))
+                .andExpect(status().isNoContent());
+
+        // 5. Verify recalculated order
+        MvcResult remainingResult = mockMvc.perform(get("/api/v1/problems/test-cases/{problemId}/all", problemId))
+                .andExpect(status().isCreated())
+                .andReturn();
+        JsonNode remaining = objectMapper.readTree(remainingResult.getResponse().getContentAsString());
+        assertThat(remaining).hasSize(1);
+        assertThat(remaining.get(0).get("id").asText()).isEqualTo(secondCaseId.toString());
+        assertThat(remaining.get(0).get("orderIndex").asInt()).isEqualTo(1);
+
+        // 6. Cleanup
         mockMvc.perform(delete("/api/v1/problems/{id}", problemId))
                 .andExpect(status().isNoContent());
     }

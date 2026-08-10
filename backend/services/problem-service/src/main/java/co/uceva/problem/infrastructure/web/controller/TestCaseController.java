@@ -17,23 +17,29 @@ import java.util.UUID;
 public class TestCaseController {
 
     private final CreateTestCaseUseCase createTestCaseUseCase;
+    private final CreateTestCaseBatchUseCase createTestCaseBatchUseCase;
     private final UpdateTestCaseUseCase updateTestCaseUseCase;
     private final ReorderTestCasesUseCase reorderTestCaseUseCase;
     private final DeleteTestCaseUseCase deleteTestCaseUseCase;
+    private final DeleteTestCaseBatchUseCase deleteTestCaseBatchUseCase;
     private final GetAllTestCaseByProblemIdUseCase getAllTestCaseByProblemIdUseCase;
     private final GetTestCaseByIdUseCase getTestCaseByIdUseCase;
 
     public TestCaseController(
             CreateTestCaseUseCase createTestCaseUseCase,
+            CreateTestCaseBatchUseCase createTestCaseBatchUseCase,
             UpdateTestCaseUseCase updateTestCaseUseCase,
             ReorderTestCasesUseCase reorderTestCaseUseCase,
             DeleteTestCaseUseCase deleteTestCaseUseCase,
+            DeleteTestCaseBatchUseCase deleteTestCaseBatchUseCase,
             GetAllTestCaseByProblemIdUseCase getAllTestCaseByProblemIdUseCase,
             GetTestCaseByIdUseCase getTestCaseByIdUseCase) {
         this.createTestCaseUseCase = createTestCaseUseCase;
+        this.createTestCaseBatchUseCase = createTestCaseBatchUseCase;
         this.updateTestCaseUseCase = updateTestCaseUseCase;
         this.reorderTestCaseUseCase = reorderTestCaseUseCase;
         this.deleteTestCaseUseCase = deleteTestCaseUseCase;
+        this.deleteTestCaseBatchUseCase = deleteTestCaseBatchUseCase;
         this.getAllTestCaseByProblemIdUseCase = getAllTestCaseByProblemIdUseCase;
         this.getTestCaseByIdUseCase = getTestCaseByIdUseCase;
     }
@@ -85,6 +91,24 @@ public class TestCaseController {
             @PathVariable("problemId") UUID problemId,
             @PathVariable("testCaseId") UUID testCaseId) {
         deleteTestCaseUseCase.execute(testCaseId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{problemId}/batch")
+    public ResponseEntity<List<TestCaseResponseDTO>> createBatch(
+            @PathVariable("problemId") UUID problemId,
+            @RequestBody CreateTestCaseBatchRequestDTO request) {
+        var command = TestCaseWebMapper.toCreateBatchCommand(problemId, request);
+        List<TestCase> created = createTestCaseBatchUseCase.execute(command);
+        List<TestCaseResponseDTO> response = created.stream()
+                .map(TestCaseWebMapper::toResponse)
+                .toList();
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/batch-delete")
+    public ResponseEntity<Void> deleteBatch(@RequestBody DeleteTestCaseBatchRequestDTO request) {
+        deleteTestCaseBatchUseCase.execute(request.testCaseIds());
         return ResponseEntity.noContent().build();
     }
 }

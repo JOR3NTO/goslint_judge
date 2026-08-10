@@ -1,9 +1,11 @@
 package co.uceva.problem.infrastructure.web.mapper;
 
+import co.uceva.problem.application.usecase.CreateTestCaseBatchUseCase;
 import co.uceva.problem.application.usecase.CreateTestCaseUseCase.CreateTestCaseCommand;
 import co.uceva.problem.application.usecase.UpdateTestCaseUseCase.UpdateTestCaseCommand;
 import co.uceva.problem.domain.model.TestCase;
 import co.uceva.problem.fixtures.ProblemFixtures;
+import co.uceva.problem.infrastructure.web.dto.CreateTestCaseBatchRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.CreateTestCaseRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.TestCaseResponseDTO;
 import co.uceva.problem.infrastructure.web.dto.UpdateTestCaseRequestDTO;
@@ -50,5 +52,18 @@ class TestCaseWebMapperTest {
         assertThat(response.problemId()).isEqualTo(testCase.getProblemId());
         assertThat(response.orderIndex()).isEqualTo(testCase.getOrderIndex());
         assertThat(response.isSample()).isEqualTo(testCase.isSample());
+    }
+
+    @Test
+    void shouldMapBatchCreateRequestToCommand() {
+        UUID problemId = UUID.randomUUID();
+        CreateTestCaseBatchRequestDTO dto = ProblemFixtures.createTestCaseBatchRequest();
+
+        CreateTestCaseBatchUseCase.CreateTestCaseBatchCommand command = TestCaseWebMapper.toCreateBatchCommand(problemId, dto);
+
+        assertThat(command.problemId()).isEqualTo(problemId);
+        assertThat(command.testCases()).hasSize(2);
+        assertThat(command.testCases().get(0).orderIndex()).isEqualTo(1);
+        assertThat(command.testCases().get(1).orderIndex()).isEqualTo(2);
     }
 }

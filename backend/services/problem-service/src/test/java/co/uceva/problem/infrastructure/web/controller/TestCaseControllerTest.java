@@ -3,7 +3,9 @@ package co.uceva.problem.infrastructure.web.controller;
 import co.uceva.problem.application.usecase.*;
 import co.uceva.problem.domain.model.TestCase;
 import co.uceva.problem.fixtures.ProblemFixtures;
+import co.uceva.problem.infrastructure.web.dto.CreateTestCaseBatchRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.CreateTestCaseRequestDTO;
+import co.uceva.problem.infrastructure.web.dto.DeleteTestCaseBatchRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.ReorderTestCasesRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.UpdateTestCaseRequestDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,6 +39,9 @@ class TestCaseControllerTest {
     private CreateTestCaseUseCase createTestCaseUseCase;
 
     @MockBean
+    private CreateTestCaseBatchUseCase createTestCaseBatchUseCase;
+
+    @MockBean
     private UpdateTestCaseUseCase updateTestCaseUseCase;
 
     @MockBean
@@ -44,6 +49,9 @@ class TestCaseControllerTest {
 
     @MockBean
     private DeleteTestCaseUseCase deleteTestCaseUseCase;
+
+    @MockBean
+    private DeleteTestCaseBatchUseCase deleteTestCaseBatchUseCase;
 
     @MockBean
     private GetAllTestCaseByProblemIdUseCase getAllTestCaseByProblemIdUseCase;
@@ -119,6 +127,33 @@ class TestCaseControllerTest {
         doNothing().when(deleteTestCaseUseCase).execute(testCaseId);
 
         mockMvc.perform(delete("/api/v1/problems/test-cases/{problemId}/{testCaseId}", problemId, testCaseId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldCreateTestCaseBatch() throws Exception {
+        CreateTestCaseBatchRequestDTO request = ProblemFixtures.createTestCaseBatchRequest();
+        TestCase testCase1 = ProblemFixtures.aTestCase(problemId, 1);
+        testCase1.setId(UUID.randomUUID());
+        TestCase testCase2 = ProblemFixtures.aTestCase(problemId, 2);
+        testCase2.setId(UUID.randomUUID());
+        when(createTestCaseBatchUseCase.execute(any())).thenReturn(List.of(testCase1, testCase2));
+
+        mockMvc.perform(post("/api/v1/problems/test-cases/{problemId}/batch", problemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void shouldDeleteTestCaseBatch() throws Exception {
+        DeleteTestCaseBatchRequestDTO request = ProblemFixtures.deleteTestCaseBatchRequest(List.of(testCaseId));
+        doNothing().when(deleteTestCaseBatchUseCase).execute(any());
+
+        mockMvc.perform(post("/api/v1/problems/test-cases/batch-delete")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNoContent());
     }
 }

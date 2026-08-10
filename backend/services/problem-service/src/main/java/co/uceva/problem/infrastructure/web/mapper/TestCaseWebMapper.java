@@ -1,12 +1,15 @@
 package co.uceva.problem.infrastructure.web.mapper;
 
+import co.uceva.problem.application.usecase.CreateTestCaseBatchUseCase;
 import co.uceva.problem.application.usecase.CreateTestCaseUseCase.CreateTestCaseCommand;
 import co.uceva.problem.application.usecase.UpdateTestCaseUseCase.UpdateTestCaseCommand;
 import co.uceva.problem.domain.model.TestCase;
+import co.uceva.problem.infrastructure.web.dto.CreateTestCaseBatchRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.CreateTestCaseRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.TestCaseResponseDTO;
 import co.uceva.problem.infrastructure.web.dto.UpdateTestCaseRequestDTO;
 
+import java.util.List;
 import java.util.UUID;
 
 public class TestCaseWebMapper {
@@ -44,5 +47,12 @@ public class TestCaseWebMapper {
                 domain.isSample(),
                 domain.getCreatedAt()
         );
+    }
+
+    public static CreateTestCaseBatchUseCase.CreateTestCaseBatchCommand toCreateBatchCommand(UUID problemId, CreateTestCaseBatchRequestDTO request) {
+        List<CreateTestCaseCommand> commands = request.testCases().stream()
+                .map(tc -> toCommand(problemId, tc))
+                .toList();
+        return new CreateTestCaseBatchUseCase.CreateTestCaseBatchCommand(problemId, commands);
     }
 }

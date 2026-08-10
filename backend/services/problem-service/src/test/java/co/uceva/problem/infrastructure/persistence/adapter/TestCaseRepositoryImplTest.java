@@ -97,6 +97,45 @@ class TestCaseRepositoryImplTest extends AbstractIntegrationTest {
         assertThat(repository.findById(testCase.getId())).isEmpty();
     }
 
+    @Test
+    void shouldSaveAllTestCases() {
+        UUID problemId = UUID.randomUUID();
+        TestCase first = aTestCase(problemId, 1);
+        TestCase second = aTestCase(problemId, 2);
+
+        List<TestCase> saved = repository.saveAll(List.of(first, second));
+
+        assertThat(saved).hasSize(2);
+        assertThat(repository.findAllByProblemId(problemId)).hasSize(2);
+    }
+
+    @Test
+    void shouldDeleteAllById() {
+        UUID problemId = UUID.randomUUID();
+        TestCase first = aTestCase(problemId, 1);
+        TestCase second = aTestCase(problemId, 2);
+        repository.save(first);
+        repository.save(second);
+
+        repository.deleteAllById(List.of(first.getId(), second.getId()));
+
+        assertThat(repository.findAllByProblemId(problemId)).isEmpty();
+    }
+
+    @Test
+    void shouldDeleteByProblemId() {
+        UUID problemId = UUID.randomUUID();
+        TestCase first = aTestCase(problemId, 1);
+        TestCase second = aTestCase(problemId, 2);
+        repository.save(first);
+        repository.save(second);
+        repository.save(aTestCase(UUID.randomUUID(), 1));
+
+        repository.deleteByProblemId(problemId);
+
+        assertThat(repository.findAllByProblemId(problemId)).isEmpty();
+    }
+
     private TestCase aTestCase(UUID problemId, int orderIndex) {
         return new TestCase(
                 UUID.randomUUID(), problemId, "3", orderIndex, true, "1 2", "3", Instant.now()

@@ -31,6 +31,7 @@ public class TestCaseRepositoryImpl implements TestCaseRepository {
         return TestCaseEntityMapper.toDomain(saved);
     }
 
+    @Override
     public List<TestCase> saveAll(List<TestCase> testCases) {
         List<TestCaseEntity> entities = testCases.stream()
                 .map(TestCaseEntityMapper::toEntity)
@@ -59,6 +60,18 @@ public class TestCaseRepositoryImpl implements TestCaseRepository {
     @Override
     public void deleteById(UUID testCaseId) {
         springDataRepository.deleteById(testCaseId);
+    }
+
+    @Override
+    public void deleteAllById(List<UUID> testCaseIds) {
+        if (testCaseIds != null && !testCaseIds.isEmpty()) {
+            springDataRepository.deleteAllById(testCaseIds);
+        }
+    }
+
+    @Override
+    public void deleteByProblemId(UUID problemId) {
+        springDataRepository.deleteByProblemId(problemId);
     }
 
     @Override

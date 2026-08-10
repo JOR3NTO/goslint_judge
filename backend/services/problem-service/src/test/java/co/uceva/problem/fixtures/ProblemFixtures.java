@@ -7,10 +7,13 @@ import co.uceva.problem.application.usecase.UpdateTestCaseUseCase.UpdateTestCase
 import co.uceva.problem.domain.model.Problem;
 import co.uceva.problem.domain.model.TestCase;
 import co.uceva.problem.infrastructure.web.dto.CreateProblemRequestDTO;
+import co.uceva.problem.infrastructure.web.dto.CreateTestCaseBatchRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.CreateTestCaseRequestDTO;
+import co.uceva.problem.infrastructure.web.dto.DeleteTestCaseBatchRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.UpdateProblemRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.UpdateTestCaseRequestDTO;
 
+import java.util.List;
 import java.util.UUID;
 
 public final class ProblemFixtures {
@@ -149,5 +152,16 @@ public final class ProblemFixtures {
                 "5",
                 false
         );
+    }
+
+    public static CreateTestCaseBatchRequestDTO createTestCaseBatchRequest() {
+        return new CreateTestCaseBatchRequestDTO(List.of(
+                new CreateTestCaseRequestDTO(1, "1 2", "3", "3", true),
+                new CreateTestCaseRequestDTO(2, "3 4", "7", "7", false)
+        ));
+    }
+
+    public static DeleteTestCaseBatchRequestDTO deleteTestCaseBatchRequest(List<UUID> testCaseIds) {
+        return new DeleteTestCaseBatchRequestDTO(testCaseIds);
     }
 }
