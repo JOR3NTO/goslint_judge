@@ -9,8 +9,18 @@ import co.uceva.problem.infrastructure.web.dto.UpdateProblemRequestDTO;
 
 import java.util.UUID;
 
+/**
+ * Mapper encargado de convertir entre DTOs de la capa web y comandos/entidades
+ * de la capa de aplicación y dominio para los problemas.
+ */
 public class ProblemWebMapper {
 
+    /**
+     * Convierte un DTO de creación en un comando de aplicación.
+     *
+     * @param request DTO con los datos de creación.
+     * @return Comando listo para ser ejecutado por el caso de uso.
+     */
     public static CreateProblemCommand toCommand(CreateProblemRequestDTO request) {
         return new CreateProblemCommand(
                 request.createdBy(),
@@ -24,6 +34,13 @@ public class ProblemWebMapper {
         );
     }
 
+    /**
+     * Convierte un DTO de actualización y el identificador del problema en un comando de aplicación.
+     *
+     * @param problemId Identificador del problema a actualizar.
+     * @param request   DTO con los datos de actualización.
+     * @return Comando listo para ser ejecutado por el caso de uso.
+     */
     public static UpdateProblemCommand toCommand(UUID problemId, UpdateProblemRequestDTO request) {
         return new UpdateProblemCommand(
                 problemId,
@@ -37,6 +54,12 @@ public class ProblemWebMapper {
         );
     }
 
+    /**
+     * Convierte una entidad de dominio en un DTO de respuesta.
+     *
+     * @param domain Entidad {@link Problem}.
+     * @return DTO con los datos expuestos al cliente.
+     */
     public static ProblemResponseDTO toResponse(Problem domain) {
         return new ProblemResponseDTO(
                 domain.getId(),
