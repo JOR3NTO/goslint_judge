@@ -56,12 +56,15 @@ public class ProblemController {
 
     /**
      * Endpoint para crear un nuevo problema.
+     * <p>
+     * Requiere rol {@code ADMIN} u {@code ORGANIZER}.
+     * </p>
      *
      * @param request DTO con los datos del problema.
      * @return 201 CREATED con el problema creado.
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
     public ResponseEntity<ProblemResponseDTO> create(@RequestBody CreateProblemRequestDTO request) {
         // Convertir el DTO a comando de aplicación
         var command = ProblemWebMapper.toCommand(request);
@@ -73,6 +76,9 @@ public class ProblemController {
 
     /**
      * Endpoint para obtener un problema por su identificador.
+     * <p>
+     * Acceso público.
+     * </p>
      *
      * @param id Identificador del problema.
      * @return 200 OK con el problema encontrado.
@@ -85,6 +91,9 @@ public class ProblemController {
 
     /**
      * Endpoint para buscar problemas por título.
+     * <p>
+     * Acceso público.
+     * </p>
      *
      * @param title Título o fragmento a buscar.
      * @return 200 OK con la lista de problemas coincidentes.
@@ -100,6 +109,9 @@ public class ProblemController {
 
     /**
      * Endpoint para obtener todos los problemas registrados.
+     * <p>
+     * Acceso público.
+     * </p>
      *
      * @return 200 OK con la lista de problemas.
      */
@@ -114,13 +126,16 @@ public class ProblemController {
 
     /**
      * Endpoint para actualizar un problema existente.
+     * <p>
+     * Requiere rol {@code ADMIN} u {@code ORGANIZER}.
+     * </p>
      *
      * @param id      Identificador del problema a actualizar.
      * @param request DTO con los nuevos datos.
      * @return 200 OK con el problema actualizado.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
     public ResponseEntity<ProblemResponseDTO> update(
             @PathVariable("id") UUID id,
             @RequestBody UpdateProblemRequestDTO request) {
@@ -134,12 +149,15 @@ public class ProblemController {
 
     /**
      * Endpoint para eliminar un problema.
+     * <p>
+     * Requiere rol {@code ADMIN} u {@code ORGANIZER}.
+     * </p>
      *
      * @param id Identificador del problema a eliminar.
      * @return 204 NO CONTENT.
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
     public ResponseEntity<Void> delete(@PathVariable("id") UUID id) {
         deleteProblemUseCase.execute(id);
         return ResponseEntity.noContent().build();

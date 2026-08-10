@@ -135,4 +135,15 @@ class ProblemControllerTest {
                 .isInstanceOf(ServletException.class)
                 .hasCauseInstanceOf(ProblemNotFoundException.class);
     }
+
+    @Test
+    @WithMockUser(roles = "SERVICE")
+    void shouldDenyServiceRoleToCreateProblem() throws Exception {
+        CreateProblemRequestDTO request = ProblemFixtures.createProblemRequest();
+
+        mockMvc.perform(post("/api/v1/problems")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
 }

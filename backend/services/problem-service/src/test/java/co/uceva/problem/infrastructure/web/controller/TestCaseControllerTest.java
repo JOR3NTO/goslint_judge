@@ -182,4 +182,38 @@ class TestCaseControllerTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(sampleTestCase.getId().toString()));
     }
+
+    @Test
+    @WithMockUser(roles = "SERVICE")
+    void shouldAllowServiceRoleToGetAllTestCasesByProblemId() throws Exception {
+        TestCase testCase = ProblemFixtures.aTestCase(problemId, 1);
+        when(getAllTestCaseByProblemIdUseCase.execute(problemId)).thenReturn(List.of(testCase));
+
+        mockMvc.perform(get("/api/v1/problems/test-cases/{problemId}/all", problemId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "SERVICE")
+    void shouldAllowServiceRoleToGetTestCaseById() throws Exception {
+        TestCase testCase = ProblemFixtures.aTestCase(problemId, 1);
+        testCase.setId(testCaseId);
+        when(getTestCaseByIdUseCase.execute(testCaseId)).thenReturn(testCase);
+
+        mockMvc.perform(get("/api/v1/problems/test-cases/{id}", testCaseId))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(testCaseId.toString()));
+    }
+
+    @Test
+    @WithMockUser(roles = "SERVICE")
+    void shouldDenyServiceRoleToCreateTestCase() throws Exception {
+        CreateTestCaseRequestDTO request = ProblemFixtures.createTestCaseRequest();
+
+        mockMvc.perform(post("/api/v1/problems/test-cases/{problemId}", problemId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
 }
