@@ -4,14 +4,17 @@ import co.uceva.problem.application.usecase.*;
 import co.uceva.problem.domain.exception.ProblemNotFoundException;
 import co.uceva.problem.domain.model.Problem;
 import co.uceva.problem.fixtures.ProblemFixtures;
+import co.uceva.problem.infrastructure.config.SecurityConfig;
 import co.uceva.problem.infrastructure.web.dto.CreateProblemRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.UpdateProblemRequestDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import jakarta.servlet.ServletException;
 
@@ -27,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ProblemController.class)
+@Import(SecurityConfig.class)
 class ProblemControllerTest {
 
     @Autowired
@@ -56,6 +60,7 @@ class ProblemControllerTest {
     private final UUID problemId = UUID.randomUUID();
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldCreateProblem() throws Exception {
         CreateProblemRequestDTO request = ProblemFixtures.createProblemRequest();
         when(createProblemUseCase.execute(any())).thenReturn(ProblemFixtures.aProblem(problemId, "Suma"));
@@ -101,6 +106,7 @@ class ProblemControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldUpdateProblem() throws Exception {
         UpdateProblemRequestDTO request = ProblemFixtures.updateProblemRequest();
         when(updateProblemUseCase.execute(any())).thenReturn(ProblemFixtures.aProblem(problemId, "Actualizado"));
@@ -113,6 +119,7 @@ class ProblemControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldDeleteProblem() throws Exception {
         doNothing().when(deleteProblemUseCase).execute(problemId);
 

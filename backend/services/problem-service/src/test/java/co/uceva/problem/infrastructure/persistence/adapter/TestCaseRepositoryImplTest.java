@@ -143,6 +143,25 @@ class TestCaseRepositoryImplTest extends AbstractIntegrationTest {
         assertThat(repository.findAllByProblemId(problemId)).isEmpty();
     }
 
+    @Test
+    void shouldFindOnlySampleTestCasesByProblemIdOrderedByOrderIndex() {
+        UUID problemId = UUID.randomUUID();
+        TestCase sampleFirst = aTestCase(problemId, 2);
+        TestCase sampleSecond = aTestCase(problemId, 1);
+        TestCase nonSample = aNonSampleTestCase(problemId, 3);
+        repository.save(sampleFirst);
+        repository.save(sampleSecond);
+        repository.save(nonSample);
+        repository.save(aTestCase(UUID.randomUUID(), 1));
+
+        List<TestCase> found = repository.findAllSampleByProblemId(problemId);
+
+        assertThat(found).hasSize(2);
+        assertThat(found.get(0).getOrderIndex()).isEqualTo(1);
+        assertThat(found.get(1).getOrderIndex()).isEqualTo(2);
+        assertThat(found).allMatch(TestCase::isSample);
+    }
+
     private TestCase aTestCase(UUID problemId, int orderIndex) {
         return TestCase.builder()
                 .id(UUID.randomUUID())
@@ -152,6 +171,19 @@ class TestCaseRepositoryImplTest extends AbstractIntegrationTest {
                 .isSample(true)
                 .input("1 2")
                 .output("3")
+                .createdAt(Instant.now())
+                .build();
+    }
+
+    private TestCase aNonSampleTestCase(UUID problemId, int orderIndex) {
+        return TestCase.builder()
+                .id(UUID.randomUUID())
+                .problemId(problemId)
+                .expectedOutput("5")
+                .orderIndex(orderIndex)
+                .isSample(false)
+                .input("2 3")
+                .output("5")
                 .createdAt(Instant.now())
                 .build();
     }

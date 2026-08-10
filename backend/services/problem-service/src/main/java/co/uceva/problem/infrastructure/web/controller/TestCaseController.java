@@ -6,6 +6,7 @@ import co.uceva.problem.infrastructure.web.dto.*;
 import co.uceva.problem.infrastructure.web.mapper.TestCaseWebMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,19 +29,21 @@ public class TestCaseController {
     private final DeleteTestCaseUseCase deleteTestCaseUseCase;
     private final DeleteTestCaseBatchUseCase deleteTestCaseBatchUseCase;
     private final GetAllTestCaseByProblemIdUseCase getAllTestCaseByProblemIdUseCase;
+    private final GetAllSampleTestCasesByProblemIdUseCase getAllSampleTestCasesByProblemIdUseCase;
     private final GetTestCaseByIdUseCase getTestCaseByIdUseCase;
 
     /**
      * Inyección de dependencias para obtener los orquestadores de cada caso de uso.
      *
-     * @param createTestCaseUseCase            Caso de uso de creación de caso de prueba.
-     * @param createTestCaseBatchUseCase       Caso de uso de creación masiva de casos de prueba.
-     * @param updateTestCaseUseCase            Caso de uso de actualización de caso de prueba.
-     * @param reorderTestCaseUseCase           Caso de uso de reordenamiento de casos de prueba.
-     * @param deleteTestCaseUseCase            Caso de uso de eliminación de caso de prueba.
-     * @param deleteTestCaseBatchUseCase       Caso de uso de eliminación masiva de casos de prueba.
-     * @param getAllTestCaseByProblemIdUseCase Caso de uso de consulta de casos por problema.
-     * @param getTestCaseByIdUseCase           Caso de uso de consulta de caso por ID.
+     * @param createTestCaseUseCase                 Caso de uso de creación de caso de prueba.
+     * @param createTestCaseBatchUseCase            Caso de uso de creación masiva de casos de prueba.
+     * @param updateTestCaseUseCase                 Caso de uso de actualización de caso de prueba.
+     * @param reorderTestCaseUseCase                Caso de uso de reordenamiento de casos de prueba.
+     * @param deleteTestCaseUseCase                 Caso de uso de eliminación de caso de prueba.
+     * @param deleteTestCaseBatchUseCase            Caso de uso de eliminación masiva de casos de prueba.
+     * @param getAllTestCaseByProblemIdUseCase      Caso de uso de consulta de casos por problema.
+     * @param getAllSampleTestCasesByProblemIdUseCase Caso de uso de consulta de casos de ejemplo por problema.
+     * @param getTestCaseByIdUseCase                Caso de uso de consulta de caso por ID.
      */
     public TestCaseController(
             CreateTestCaseUseCase createTestCaseUseCase,
@@ -50,6 +53,7 @@ public class TestCaseController {
             DeleteTestCaseUseCase deleteTestCaseUseCase,
             DeleteTestCaseBatchUseCase deleteTestCaseBatchUseCase,
             GetAllTestCaseByProblemIdUseCase getAllTestCaseByProblemIdUseCase,
+            GetAllSampleTestCasesByProblemIdUseCase getAllSampleTestCasesByProblemIdUseCase,
             GetTestCaseByIdUseCase getTestCaseByIdUseCase) {
         this.createTestCaseUseCase = createTestCaseUseCase;
         this.createTestCaseBatchUseCase = createTestCaseBatchUseCase;
@@ -58,6 +62,7 @@ public class TestCaseController {
         this.deleteTestCaseUseCase = deleteTestCaseUseCase;
         this.deleteTestCaseBatchUseCase = deleteTestCaseBatchUseCase;
         this.getAllTestCaseByProblemIdUseCase = getAllTestCaseByProblemIdUseCase;
+        this.getAllSampleTestCasesByProblemIdUseCase = getAllSampleTestCasesByProblemIdUseCase;
         this.getTestCaseByIdUseCase = getTestCaseByIdUseCase;
     }
 
@@ -69,6 +74,7 @@ public class TestCaseController {
      * @return 201 CREATED con el caso de prueba creado.
      */
     @PostMapping("/{problemId}")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<TestCaseResponseDTO> create(
             @PathVariable("problemId") UUID problemId,
             @RequestBody CreateTestCaseRequestDTO request) {
@@ -87,6 +93,7 @@ public class TestCaseController {
      * @return 201 CREATED con la lista de casos de prueba.
      */
     @GetMapping("/{problemId}/all")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<List<TestCaseResponseDTO>> getAll(@PathVariable("problemId") UUID problemId) {
         List<TestCase> testCases = getAllTestCaseByProblemIdUseCase.execute(problemId);
         List<TestCaseResponseDTO> testCasesResponce = testCases.stream()
@@ -102,6 +109,7 @@ public class TestCaseController {
      * @return 201 CREATED con el caso de prueba encontrado.
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<TestCaseResponseDTO> getById(@PathVariable("id") UUID id) {
         TestCase testCase = getTestCaseByIdUseCase.execute(id);
         return ResponseEntity.status(HttpStatus.CREATED).body(TestCaseWebMapper.toResponse(testCase));
@@ -116,6 +124,7 @@ public class TestCaseController {
      * @return 200 OK con el caso de prueba actualizado.
      */
     @PutMapping("/{problemId}/{testCaseId}")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<TestCaseResponseDTO> update(
             @PathVariable("problemId") UUID problemId,
             @PathVariable("testCaseId") UUID testCaseId,
@@ -136,6 +145,7 @@ public class TestCaseController {
      * @return 204 NO CONTENT.
      */
     @PutMapping("/{problemId}/reorder")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<Void> reorder(
             @PathVariable("problemId") UUID problemId,
             @RequestBody ReorderTestCasesRequestDTO request) {
@@ -151,6 +161,7 @@ public class TestCaseController {
      * @return 204 NO CONTENT.
      */
     @DeleteMapping("/{problemId}/{testCaseId}")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<Void> delete(
             @PathVariable("problemId") UUID problemId,
             @PathVariable("testCaseId") UUID testCaseId) {
@@ -166,6 +177,7 @@ public class TestCaseController {
      * @return 201 CREATED con la lista de casos de prueba creados.
      */
     @PostMapping("/{problemId}/batch")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<List<TestCaseResponseDTO>> createBatch(
             @PathVariable("problemId") UUID problemId,
             @RequestBody CreateTestCaseBatchRequestDTO request) {
@@ -187,8 +199,25 @@ public class TestCaseController {
      * @return 204 NO CONTENT.
      */
     @PostMapping("/batch-delete")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<Void> deleteBatch(@RequestBody DeleteTestCaseBatchRequestDTO request) {
         deleteTestCaseBatchUseCase.execute(request.testCaseIds());
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Endpoint público para obtener los casos de prueba de ejemplo
+     * ({@code isSample = true}) de un problema.
+     *
+     * @param problemId Identificador del problema.
+     * @return 200 OK con la lista de casos de prueba de ejemplo.
+     */
+    @GetMapping("/{problemId}/samples")
+    public ResponseEntity<List<TestCaseResponseDTO>> getAllSamples(@PathVariable("problemId") UUID problemId) {
+        List<TestCase> testCases = getAllSampleTestCasesByProblemIdUseCase.execute(problemId);
+        List<TestCaseResponseDTO> testCasesResponse = testCases.stream()
+                .map(TestCaseWebMapper::toResponse)
+                .toList();
+        return ResponseEntity.ok(testCasesResponse);
     }
 }

@@ -80,6 +80,19 @@ public class TestCaseRepositoryImpl implements TestCaseRepository {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * Recupera únicamente los casos de prueba de ejemplo asociados a un problema,
+     * ordenados por su índice de orden ascendente.
+     */
+    @Override
+    public List<TestCase> findAllSampleByProblemId(UUID problemId) {
+        return springDataRepository.findByProblemIdAndIsSampleTrueOrderByOrderIndexAsc(problemId).stream()
+                .map(TestCaseEntityMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
     /** {@inheritDoc} */
     @Override
     public void deleteById(UUID testCaseId) {

@@ -26,6 +26,14 @@ public interface TestCaseRepository {
     Optional<TestCase> findById(UUID testCaseId);
     /** Recupera todos los casos de prueba asociados a un problema. */
     List<TestCase> findAllByProblemId(UUID problemId);
+    /**
+     * Recupera únicamente los casos de prueba marcados como ejemplo
+     * ({@code isSample = true}) asociados a un problema.
+     *
+     * @param problemId Identificador del problema.
+     * @return Lista de casos de prueba de ejemplo del problema.
+     */
+    List<TestCase> findAllSampleByProblemId(UUID problemId);
     /** Actualiza los índices de orden de una lista de casos de prueba. */
     void updateOrderIndexes(Map<UUID, Integer> newOrders);
 }

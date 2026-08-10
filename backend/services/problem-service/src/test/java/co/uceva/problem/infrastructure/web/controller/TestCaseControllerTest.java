@@ -3,6 +3,7 @@ package co.uceva.problem.infrastructure.web.controller;
 import co.uceva.problem.application.usecase.*;
 import co.uceva.problem.domain.model.TestCase;
 import co.uceva.problem.fixtures.ProblemFixtures;
+import co.uceva.problem.infrastructure.config.SecurityConfig;
 import co.uceva.problem.infrastructure.web.dto.CreateTestCaseBatchRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.CreateTestCaseRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.DeleteTestCaseBatchRequestDTO;
@@ -12,8 +13,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -27,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TestCaseController.class)
+@Import(SecurityConfig.class)
 class TestCaseControllerTest {
 
     @Autowired
@@ -57,12 +61,16 @@ class TestCaseControllerTest {
     private GetAllTestCaseByProblemIdUseCase getAllTestCaseByProblemIdUseCase;
 
     @MockBean
+    private GetAllSampleTestCasesByProblemIdUseCase getAllSampleTestCasesByProblemIdUseCase;
+
+    @MockBean
     private GetTestCaseByIdUseCase getTestCaseByIdUseCase;
 
     private final UUID problemId = UUID.randomUUID();
     private final UUID testCaseId = UUID.randomUUID();
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldCreateTestCase() throws Exception {
         CreateTestCaseRequestDTO request = ProblemFixtures.createTestCaseRequest();
         TestCase testCase = ProblemFixtures.aTestCase(problemId, 1);
@@ -77,6 +85,7 @@ class TestCaseControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldGetAllTestCasesByProblemId() throws Exception {
         TestCase testCase = ProblemFixtures.aTestCase(problemId, 1);
         when(getAllTestCaseByProblemIdUseCase.execute(problemId)).thenReturn(List.of(testCase));
@@ -87,6 +96,7 @@ class TestCaseControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldGetTestCaseById() throws Exception {
         TestCase testCase = ProblemFixtures.aTestCase(problemId, 1);
         testCase.setId(testCaseId);
@@ -98,6 +108,7 @@ class TestCaseControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldUpdateTestCase() throws Exception {
         UpdateTestCaseRequestDTO request = ProblemFixtures.updateTestCaseRequest();
         TestCase testCase = ProblemFixtures.aTestCase(problemId, 2);
@@ -112,6 +123,7 @@ class TestCaseControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReorderTestCases() throws Exception {
         ReorderTestCasesRequestDTO request = new ReorderTestCasesRequestDTO(List.of(UUID.randomUUID(), UUID.randomUUID()));
         doNothing().when(reorderTestCaseUseCase).execute(any(), any());
@@ -123,6 +135,7 @@ class TestCaseControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldDeleteTestCase() throws Exception {
         doNothing().when(deleteTestCaseUseCase).execute(testCaseId);
 
@@ -131,6 +144,7 @@ class TestCaseControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldCreateTestCaseBatch() throws Exception {
         CreateTestCaseBatchRequestDTO request = ProblemFixtures.createTestCaseBatchRequest();
         TestCase testCase1 = ProblemFixtures.aTestCase(problemId, 1);
@@ -147,6 +161,7 @@ class TestCaseControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldDeleteTestCaseBatch() throws Exception {
         DeleteTestCaseBatchRequestDTO request = ProblemFixtures.deleteTestCaseBatchRequest(List.of(testCaseId));
         doNothing().when(deleteTestCaseBatchUseCase).execute(any());
@@ -155,5 +170,16 @@ class TestCaseControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldGetSampleTestCasesByProblemId() throws Exception {
+        TestCase sampleTestCase = ProblemFixtures.aTestCase(problemId, 1);
+        when(getAllSampleTestCasesByProblemIdUseCase.execute(problemId)).thenReturn(List.of(sampleTestCase));
+
+        mockMvc.perform(get("/api/v1/problems/test-cases/{problemId}/samples", problemId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(sampleTestCase.getId().toString()));
     }
 }

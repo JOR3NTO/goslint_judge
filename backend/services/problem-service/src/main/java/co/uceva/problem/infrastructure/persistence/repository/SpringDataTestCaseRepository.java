@@ -13,6 +13,15 @@ public interface SpringDataTestCaseRepository extends JpaRepository<TestCaseEnti
     /** Busca los casos de prueba de un problema ordenados por índice ascendente. */
     List<TestCaseEntity> findByProblemIdOrderByOrderIndexAsc(UUID problemId);
 
+    /**
+     * Busca los casos de prueba de ejemplo ({@code isSample = true}) de un problema,
+     * ordenados por índice ascendente.
+     *
+     * @param problemId Identificador del problema.
+     * @return Lista de casos de prueba de ejemplo.
+     */
+    List<TestCaseEntity> findByProblemIdAndIsSampleTrueOrderByOrderIndexAsc(UUID problemId);
+
     /** Elimina todos los casos de prueba asociados a un problema. */
     void deleteByProblemId(UUID problemId);
 }
