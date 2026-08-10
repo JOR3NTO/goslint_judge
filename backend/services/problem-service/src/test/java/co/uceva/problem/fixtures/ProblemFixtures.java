@@ -30,18 +30,18 @@ public final class ProblemFixtures {
     }
 
     public static Problem aProblem(UUID id, String title) {
-        return new Problem(
-                id,
-                USER_ID,
-                title,
-                "Dados dos enteros, imprime su suma.",
-                1000,
-                65536,
-                800,
-                java.time.Instant.parse("2024-01-01T00:00:00Z"),
-                "Dos enteros separados por espacio.",
-                "Un entero con la suma."
-        );
+        return Problem.builder()
+                .id(id)
+                .createdBy(USER_ID)
+                .title(title)
+                .statement("Dados dos enteros, imprime su suma.")
+                .timeLimitMs(1000)
+                .memoryLimitKb(65536)
+                .difficult(800)
+                .createdAt(java.time.Instant.parse("2024-01-01T00:00:00Z"))
+                .inputFormat("Dos enteros separados por espacio.")
+                .outputFormat("Un entero con la suma.")
+                .build();
     }
 
     public static TestCase aTestCase() {
@@ -49,16 +49,16 @@ public final class ProblemFixtures {
     }
 
     public static TestCase aTestCase(UUID problemId, int orderIndex) {
-        return new TestCase(
-                TEST_CASE_ID,
-                problemId,
-                "3",
-                orderIndex,
-                true,
-                "1 2",
-                "3",
-                java.time.Instant.parse("2024-01-01T00:00:00Z")
-        );
+        return TestCase.builder()
+                .id(TEST_CASE_ID)
+                .problemId(problemId)
+                .expectedOutput("3")
+                .orderIndex(orderIndex)
+                .isSample(true)
+                .input("1 2")
+                .output("3")
+                .createdAt(java.time.Instant.parse("2024-01-01T00:00:00Z"))
+                .build();
     }
 
     public static CreateProblemCommand createProblemCommand() {

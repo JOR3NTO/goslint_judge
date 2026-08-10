@@ -31,10 +31,18 @@ class ProblemRepositoryImplTest extends AbstractIntegrationTest {
     @Test
     void shouldSaveAndFindProblemById() {
         UUID id = UUID.randomUUID();
-        Problem problem = new Problem(
-                id, UUID.randomUUID(), "Suma", "Statement",
-                1000, 65536, 800, Instant.now(), "input", "output"
-        );
+        Problem problem = Problem.builder()
+                .id(id)
+                .createdBy(UUID.randomUUID())
+                .title("Suma")
+                .statement("Statement")
+                .timeLimitMs(1000)
+                .memoryLimitKb(65536)
+                .difficult(800)
+                .createdAt(Instant.now())
+                .inputFormat("input")
+                .outputFormat("output")
+                .build();
 
         repository.save(problem);
         Optional<Problem> found = repository.findById(id);
@@ -98,9 +106,17 @@ class ProblemRepositoryImplTest extends AbstractIntegrationTest {
     }
 
     private Problem aProblem(UUID createdBy, String title) {
-        return new Problem(
-                UUID.randomUUID(), createdBy, title, "Statement",
-                1000, 65536, 800, Instant.now(), "input", "output"
-        );
+        return Problem.builder()
+                .id(UUID.randomUUID())
+                .createdBy(createdBy)
+                .title(title)
+                .statement("Statement")
+                .timeLimitMs(1000)
+                .memoryLimitKb(65536)
+                .difficult(800)
+                .createdAt(Instant.now())
+                .inputFormat("input")
+                .outputFormat("output")
+                .build();
     }
 }

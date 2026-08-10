@@ -47,9 +47,9 @@ class ReorderTestCasesUseCaseImplTest {
         UUID second = UUID.randomUUID();
         UUID third = UUID.randomUUID();
         List<TestCase> current = List.of(
-                new TestCase(first, problemId, "a", 3, true, "in", "out", Instant.now()),
-                new TestCase(second, problemId, "b", 1, false, "in", "out", Instant.now()),
-                new TestCase(third, problemId, "c", 2, false, "in", "out", Instant.now())
+                TestCase.builder().id(first).problemId(problemId).expectedOutput("a").orderIndex(3).isSample(true).input("in").output("out").createdAt(Instant.now()).build(),
+                TestCase.builder().id(second).problemId(problemId).expectedOutput("b").orderIndex(1).isSample(false).input("in").output("out").createdAt(Instant.now()).build(),
+                TestCase.builder().id(third).problemId(problemId).expectedOutput("c").orderIndex(2).isSample(false).input("in").output("out").createdAt(Instant.now()).build()
         );
         List<UUID> ordered = List.of(second, third, first);
 

@@ -33,9 +33,16 @@ class TestCaseRepositoryImplTest extends AbstractIntegrationTest {
     void shouldSaveAndFindTestCaseById() {
         UUID id = UUID.randomUUID();
         UUID problemId = UUID.randomUUID();
-        TestCase testCase = new TestCase(
-                id, problemId, "3", 1, true, "1 2", "3", Instant.now()
-        );
+        TestCase testCase = TestCase.builder()
+                .id(id)
+                .problemId(problemId)
+                .expectedOutput("3")
+                .orderIndex(1)
+                .isSample(true)
+                .input("1 2")
+                .output("3")
+                .createdAt(Instant.now())
+                .build();
 
         repository.save(testCase);
         Optional<TestCase> found = repository.findById(id);
@@ -137,8 +144,15 @@ class TestCaseRepositoryImplTest extends AbstractIntegrationTest {
     }
 
     private TestCase aTestCase(UUID problemId, int orderIndex) {
-        return new TestCase(
-                UUID.randomUUID(), problemId, "3", orderIndex, true, "1 2", "3", Instant.now()
-        );
+        return TestCase.builder()
+                .id(UUID.randomUUID())
+                .problemId(problemId)
+                .expectedOutput("3")
+                .orderIndex(orderIndex)
+                .isSample(true)
+                .input("1 2")
+                .output("3")
+                .createdAt(Instant.now())
+                .build();
     }
 }
