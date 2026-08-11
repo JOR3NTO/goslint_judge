@@ -27,6 +27,15 @@ public interface SubmissionRepository {
     /** Recupera todos los envíos realizados por un equipo específico. */
     List<Submission> findByTeamId(UUID teamId);
 
+    /**
+     * Recupera los envíos realizados por un equipo específico para un problema específico.
+     *
+     * @param problemId Identificador del problema.
+     * @param teamId    Identificador del equipo.
+     * @return Lista de envíos del equipo en el problema indicado.
+     */
+    List<Submission> findByProblemIdAndTeamId(UUID problemId, UUID teamId);
+
     /** Recupera todos los envíos registrados en el sistema. */
     List<Submission> findAll();
 

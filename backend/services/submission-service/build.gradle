@@ -5,4 +5,7 @@ plugins {
 dependencies {
     implementation project(':shared:common-domain')
     implementation project(':shared:common-infrastructure')
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.flywaydb:flyway-core'
 }
