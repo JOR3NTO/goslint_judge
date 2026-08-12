@@ -162,6 +162,15 @@ Candidatos a residir aquí:
 | `User`             | id, username, email, passwordHash, role (ADMIN/STUDENT/ORGANIZER), institution, isActive |
 | `Token`            | JWT emitido al autenticarse |
 
+**Roles del sistema:**
+
+| Rol         | Descripción                                                                 |
+|-------------|------------------------------------------------------------------------------|
+| `ADMIN`     | Administrador del sistema. Acceso total a problemas, concursos y usuarios.  |
+| `ORGANIZER` | Organizador de maratones. Puede gestionar problemas y concursos.            |
+| `STUDENT`   | Estudiante o competidor. Solo lectura pública de problemas y envíos propios.|
+| `SERVICE`   | Rol técnico para comunicación **microservicio-a-microservicio**. No es un usuario humano; se utiliza en JWTs emitidos por otros servicios (por ejemplo, `judge-service`) para consumir endpoints internos. |
+
 **Casos de uso principales:**
 - `RegisterUserUseCase` — Registro de nuevos usuarios
 - `AuthenticateUserUseCase` — Login → devuelve JWT
@@ -180,9 +189,32 @@ Candidatos a residir aquí:
 | `TestCase`         | id, problemId, expectedOutput, input, output, orderIndex, isSample |
 
 **Casos de uso principales:**
-- `CreateProblemUseCase` — Solo ADMIN/ORGANIZER
-- `UploadTestCasesUseCase` — Carga de archivos de entrada/salida
-- `GetProblemUseCase` — Lectura pública de enunciados
+- `CreateProblemUseCase` / `UpdateProblemUseCase` / `DeleteProblemUseCase` — Solo ADMIN/ORGANIZER
+- `GetProblemByIdUseCase` / `GetAllProblemsUseCase` / `GetAllProblemsByTitleUseCase` — Lectura pública
+- `CreateTestCaseUseCase` / `UpdateTestCaseUseCase` / `DeleteTestCaseUseCase` / `ReorderTestCasesUseCase` — Solo ADMIN/ORGANIZER
+- `GetAllTestCaseByProblemIdUseCase` — ADMIN/ORGANIZER/SERVICE (incluye casos privados; necesario para `judge-service`)
+- `GetTestCaseByIdUseCase` — ADMIN/ORGANIZER/SERVICE (necesario para `judge-service`)
+- `GetAllSampleTestCasesByProblemIdUseCase` — Público; retorna únicamente los casos de prueba donde `isSample = true`
+
+**Endpoints destacados:**
+
+| Método | Endpoint | Acceso | Notas |
+|--------|----------|--------|-------|
+| GET    | `/api/v1/problems/{id}` | Público | Lectura del enunciado |
+| GET    | `/api/v1/problems/all` | Público | Lista de problemas |
+| GET    | `/api/v1/problems/title/{title}` | Público | Búsqueda por título |
+| POST   | `/api/v1/problems` | ADMIN/ORGANIZER | Crear problema |
+| PUT    | `/api/v1/problems/{id}` | ADMIN/ORGANIZER | Actualizar problema |
+| DELETE | `/api/v1/problems/{id}` | ADMIN/ORGANIZER | Eliminar problema |
+| GET    | `/api/v1/problems/test-cases/{problemId}/all` | ADMIN/ORGANIZER/SERVICE | Lista **todos** los test cases (privados y ejemplos) |
+| GET    | `/api/v1/problems/test-cases/{id}` | ADMIN/ORGANIZER/SERVICE | Obtener un test case por ID |
+| GET    | `/api/v1/problems/test-cases/{problemId}/samples` | Público | Lista solo los test cases donde `isSample = true` |
+| POST   | `/api/v1/problems/test-cases/{problemId}` | ADMIN/ORGANIZER | Crear test case |
+| POST   | `/api/v1/problems/test-cases/{problemId}/batch` | ADMIN/ORGANIZER | Crear test cases en lote |
+| PUT    | `/api/v1/problems/test-cases/{problemId}/{testCaseId}` | ADMIN/ORGANIZER | Actualizar test case |
+| PUT    | `/api/v1/problems/test-cases/{problemId}/reorder` | ADMIN/ORGANIZER | Reordenar test cases |
+| DELETE | `/api/v1/problems/test-cases/{problemId}/{testCaseId}` | ADMIN/ORGANIZER | Eliminar test case |
+| POST   | `/api/v1/problems/test-cases/batch-delete` | ADMIN/ORGANIZER | Eliminar test cases en lote |
 
 **Tablas BD:** `problems`, `test_cases`
 
@@ -271,7 +303,73 @@ Candidatos a residir aquí:
 
 ---
 
-## 6. Flujo de datos principal (envío de código)
+## 6. Seguridad y autorización
+
+La seguridad se implementa con **Spring Security** y **JWT** de forma stateless. Cada microservicio hereda la dependencia `spring-boot-starter-security` desde `shared/common-infrastructure` y define su propia configuración de seguridad.
+
+### 6.1 Modelo de roles
+
+Los roles actuales del sistema son:
+
+| Rol         | Tipo de actor | Permisos principales |
+|-------------|---------------|----------------------|
+| `ADMIN`     | Usuario humano | Acceso total a problemas, concursos y usuarios. |
+| `ORGANIZER` | Usuario humano | Gestión de problemas y concursos. |
+| `STUDENT`   | Usuario humano | Lectura pública de problemas, envío de soluciones y consulta de propios envíos. |
+| `SERVICE`   | Microservicio  | Rol técnico para comunicación **servicio-a-servicio**. No representa un usuario humano. |
+
+### 6.2 Restricción de endpoints con `@PreAuthorize`
+
+Los controladores REST usan la anotación `@PreAuthorize` de Spring Security para declarar los roles permitidos en cada método:
+
+```java
+@PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
+@PostMapping("/{problemId}")
+public ResponseEntity<TestCaseResponseDTO> create(...) { ... }
+```
+
+Spring Security evalúa esta expresión comparando las **authorities** del `Authentication` actual. `hasAnyRole('ADMIN','ORGANIZER','SERVICE')` busca las authorities `ROLE_ADMIN`, `ROLE_ORGANIZER` o `ROLE_SERVICE` en el contexto de seguridad.
+
+### 6.3 El rol `SERVICE` y los endpoints GET de test cases
+
+El rol `SERVICE` existe para permitir que otros microservicios consuman datos protegidos sin necesidad de un usuario humano autenticado. **No se usa en operaciones de escritura**: crear, actualizar o eliminar problemas y test cases solo pueden hacerlo usuarios humanos con rol `ADMIN` u `ORGANIZER`.
+
+#### Caso de uso: `judge-service` necesita leer los test cases
+
+Cuando `judge-service` evalúa una solución enviada por un estudiante, debe ejecutar el código contra **todos** los casos de prueba del problema, incluyendo los casos privados que los estudiantes no deben ver. Para ello, `judge-service` se autenticará con un JWT propio que contenga el claim:
+
+```json
+{
+  "role": "SERVICE"
+}
+```
+
+Este JWT será validado por el futuro filtro de seguridad de `problem-service`, que convertirá el claim `role=SERVICE` en la authority `ROLE_SERVICE`. Por eso, los únicos endpoints de `problem-service` que aceptan el rol `SERVICE` son los de **lectura** de test cases:
+
+```
+GET /api/v1/problems/test-cases/{problemId}/all
+GET /api/v1/problems/test-cases/{id}
+```
+
+Ambos están restringidos a `@PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")`, permitiendo que `judge-service` (y solo él, con el JWT correcto) recupere los test cases necesarios para la evaluación.
+
+#### Test cases de ejemplo (samples): endpoint público
+
+Los estudiantes necesitan ver al menos algunos casos de prueba para entender el problema. El campo `isSample` de `TestCase` marca cuáles son públicos. El endpoint:
+
+```
+GET /api/v1/problems/test-cases/{problemId}/samples
+```
+
+**no lleva `@PreAuthorize`** y es accesible sin autenticación. Retorna únicamente los casos donde `isSample = true`, filtrados desde la base de datos mediante el caso de uso `GetAllSampleTestCasesByProblemIdUseCase`.
+
+### 6.4 Estado actual de la seguridad
+
+- **JWT aún no está implementado**: por ahora `problem-service` tiene una configuración de seguridad mínima (`SecurityConfig`) que habilita `@EnableMethodSecurity` y permite todas las requests a nivel de filtro HTTP (`anyRequest().permitAll()`).
+- **Las restricciones por rol ya están escritas** en los controllers y se activarán completamente cuando se agregue el filtro JWT que extraiga el rol del token y lo convierta a `ROLE_*`.
+- El rol `SERVICE` **no está en el enum `Role` del `auth-service`** porque no es un rol de usuario humano. Cuando se implemente la generación de JWTs para microservicios, el claim `role=SERVICE` se mapeará directamente a la authority `ROLE_SERVICE`.
+
+## 7. Flujo de datos principal (envío de código)
 
 ```
 [Estudiante]
