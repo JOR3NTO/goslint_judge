@@ -36,25 +36,6 @@ subprojects {
         testImplementation 'org.springframework.security:spring-security-test'
     }
 
-
-    jacoco {
-        toolVersion = "0.8.12"
-    }
-
-    jacocoTestReport {
-        reports {
-            xml.required = true
-            csv.required = false
-            html.required = true
-        }
-    }
-
-    test {
-        useJUnitPlatform()
-        finalizedBy jacocoTestReport
-        testImplementation 'org.springframework.security:spring-security-test'
-    }
-
     jacoco {
         toolVersion = "0.8.12"
     }
