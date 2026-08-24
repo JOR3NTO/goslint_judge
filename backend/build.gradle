@@ -3,7 +3,6 @@ plugins {
     id 'io.spring.dependency-management' version '1.1.4' apply false
     id 'java'
     id 'jacoco'
-    id 'jacoco'
 }
 
 subprojects {
