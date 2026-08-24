@@ -1,0 +1,194 @@
+package co.uceva.submission.infrastructure.web.controller;
+
+import co.uceva.submission.application.usecase.DeleteSubmissionUseCase;
+import co.uceva.submission.application.usecase.GetAllSubmissionsUseCase;
+import co.uceva.submission.application.usecase.GetSubmissionByIdUseCase;
+import co.uceva.submission.application.usecase.GetSubmissionHistoryUseCase;
+import co.uceva.submission.application.usecase.GetSubmissionMetricsUseCase;
+import co.uceva.submission.application.usecase.GetSubmissionMetricsUseCase.SubmissionMetrics;
+import co.uceva.submission.application.usecase.GetSubmissionsByProblemUseCase;
+import co.uceva.submission.application.usecase.GetSubmissionsByTeamUseCase;
+import co.uceva.submission.application.usecase.SubmitCodeUseCase;
+import co.uceva.submission.domain.exception.SubmissionNotFoundException;
+import co.uceva.submission.domain.model.Submission;
+import co.uceva.submission.fixtures.SubmissionFixtures;
+import co.uceva.submission.infrastructure.config.SecurityConfig;
+import co.uceva.submission.infrastructure.web.dto.SubmitCodeRequestDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.web.servlet.MockMvc;
+import jakarta.servlet.ServletException;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(SubmissionController.class)
+@Import(SecurityConfig.class)
+class SubmissionControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @MockBean
+    private SubmitCodeUseCase submitCodeUseCase;
+
+    @MockBean
+    private GetSubmissionByIdUseCase getSubmissionByIdUseCase;
+
+    @MockBean
+    private GetAllSubmissionsUseCase getAllSubmissionsUseCase;
+
+    @MockBean
+    private GetSubmissionsByProblemUseCase getSubmissionsByProblemUseCase;
+
+    @MockBean
+    private GetSubmissionsByTeamUseCase getSubmissionsByTeamUseCase;
+
+    @MockBean
+    private GetSubmissionHistoryUseCase getSubmissionHistoryUseCase;
+
+    @MockBean
+    private GetSubmissionMetricsUseCase getSubmissionMetricsUseCase;
+
+    @MockBean
+    private DeleteSubmissionUseCase deleteSubmissionUseCase;
+
+    private final UUID submissionId = UUID.randomUUID();
+    private final UUID problemId = UUID.randomUUID();
+    private final UUID teamId = UUID.randomUUID();
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void shouldCreateSubmission() throws Exception {
+        SubmitCodeRequestDTO request = SubmissionFixtures.submitCodeRequest();
+        when(submitCodeUseCase.execute(any())).thenReturn(SubmissionFixtures.aSubmission(submissionId));
+
+        mockMvc.perform(post("/api/v1/submissions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(submissionId.toString()))
+                .andExpect(jsonPath("$.verdict").value("PENDING"));
+    }
+
+    @Test
+    @WithMockUser(roles = "SERVICE")
+    void shouldDenyServiceRoleToCreateSubmission() throws Exception {
+        SubmitCodeRequestDTO request = SubmissionFixtures.submitCodeRequest();
+
+        mockMvc.perform(post("/api/v1/submissions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldGetSubmissionById() throws Exception {
+        when(getSubmissionByIdUseCase.execute(submissionId)).thenReturn(SubmissionFixtures.aSubmission(submissionId));
+
+        mockMvc.perform(get("/api/v1/submissions/{id}", submissionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(submissionId.toString()));
+    }
+
+    @Test
+    void shouldPropagateNotFoundException() {
+        when(getSubmissionByIdUseCase.execute(submissionId)).thenThrow(new SubmissionNotFoundException(submissionId));
+
+        assertThatThrownBy(() -> mockMvc.perform(get("/api/v1/submissions/{id}", submissionId)))
+                .isInstanceOf(ServletException.class)
+                .hasCauseInstanceOf(SubmissionNotFoundException.class);
+    }
+
+    @Test
+    void shouldGetAllSubmissions() throws Exception {
+        when(getAllSubmissionsUseCase.execute()).thenReturn(List.of(
+                SubmissionFixtures.aSubmission(UUID.randomUUID()),
+                SubmissionFixtures.aSubmission(UUID.randomUUID())
+        ));
+
+        mockMvc.perform(get("/api/v1/submissions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void shouldGetSubmissionsByProblem() throws Exception {
+        when(getSubmissionsByProblemUseCase.execute(problemId)).thenReturn(List.of(
+                SubmissionFixtures.aSubmission(UUID.randomUUID())
+        ));
+
+        mockMvc.perform(get("/api/v1/submissions/problem/{problemId}", problemId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void shouldGetSubmissionsByTeam() throws Exception {
+        when(getSubmissionsByTeamUseCase.execute(teamId)).thenReturn(List.of(
+                SubmissionFixtures.aSubmission(UUID.randomUUID())
+        ));
+
+        mockMvc.perform(get("/api/v1/submissions/team/{teamId}", teamId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void shouldGetSubmissionHistory() throws Exception {
+        when(getSubmissionHistoryUseCase.execute(any())).thenReturn(List.of(
+                SubmissionFixtures.aSubmission(UUID.randomUUID())
+        ));
+
+        mockMvc.perform(get("/api/v1/submissions/history")
+                        .param("problemId", problemId.toString())
+                        .param("teamId", teamId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    void shouldGetMetrics() throws Exception {
+        when(getSubmissionMetricsUseCase.execute(submissionId)).thenReturn(
+                new SubmissionMetrics(submissionId, co.uceva.shared.domain.VerdictStatus.ACCEPTED, 100, 2048, 512)
+        );
+
+        mockMvc.perform(get("/api/v1/submissions/{id}/metrics", submissionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.submissionId").value(submissionId.toString()))
+                .andExpect(jsonPath("$.verdict").value("ACCEPTED"));
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldDeleteSubmission() throws Exception {
+        doNothing().when(deleteSubmissionUseCase).execute(submissionId);
+
+        mockMvc.perform(delete("/api/v1/submissions/{id}", submissionId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void shouldDenyStudentRoleToDeleteSubmission() throws Exception {
+        mockMvc.perform(delete("/api/v1/submissions/{id}", submissionId))
+                .andExpect(status().isForbidden());
+    }
+}
