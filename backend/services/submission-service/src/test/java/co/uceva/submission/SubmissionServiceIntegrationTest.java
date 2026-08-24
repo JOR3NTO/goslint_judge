@@ -46,29 +46,35 @@ class SubmissionServiceIntegrationTest extends AbstractIntegrationTest {
         UUID submissionId = extractId(createResult);
 
         // 2. Get by id
-        mockMvc.perform(get("/api/v1/submissions/{id}", submissionId))
+        mockMvc.perform(get("/api/v1/submissions/{id}", submissionId)
+                        .with(user("student").roles("STUDENT")))
                 .andExpect(status().isOk());
 
-        // 3. Get all
-        mockMvc.perform(get("/api/v1/submissions"))
+        // 3. Get all (ADMIN)
+        mockMvc.perform(get("/api/v1/submissions")
+                        .with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk());
 
-        // 4. Get by problem
-        mockMvc.perform(get("/api/v1/submissions/problem/{problemId}", problemId))
+        // 4. Get by problem (ADMIN)
+        mockMvc.perform(get("/api/v1/submissions/problem/{problemId}", problemId)
+                        .with(user("admin").roles("ADMIN")))
                 .andExpect(status().isOk());
 
         // 5. Get by team
-        mockMvc.perform(get("/api/v1/submissions/team/{teamId}", teamId))
+        mockMvc.perform(get("/api/v1/submissions/team/{teamId}", teamId)
+                        .with(user("student").roles("STUDENT")))
                 .andExpect(status().isOk());
 
         // 6. Get history
         mockMvc.perform(get("/api/v1/submissions/history")
                         .param("problemId", problemId.toString())
-                        .param("teamId", teamId.toString()))
+                        .param("teamId", teamId.toString())
+                        .with(user("student").roles("STUDENT")))
                 .andExpect(status().isOk());
 
         // 7. Get metrics
-        mockMvc.perform(get("/api/v1/submissions/{id}/metrics", submissionId))
+        mockMvc.perform(get("/api/v1/submissions/{id}/metrics", submissionId)
+                        .with(user("student").roles("STUDENT")))
                 .andExpect(status().isOk());
 
         // 8. Delete

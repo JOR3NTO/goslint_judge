@@ -84,13 +84,14 @@ public class SubmissionController {
     /**
      * Endpoint para obtener un envío por su identificador.
      * <p>
-     * Acceso público.
+     * Requiere rol {@code STUDENT}, {@code ADMIN}, {@code ORGANIZER} o {@code SERVICE}.
      * </p>
      *
      * @param id Identificador del envío.
      * @return 200 OK con el envío encontrado.
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<SubmissionResponseDTO> getById(@PathVariable("id") UUID id) {
         Submission submission = getSubmissionByIdUseCase.execute(id);
         return ResponseEntity.ok(SubmissionWebMapper.toResponse(submission));
@@ -99,12 +100,13 @@ public class SubmissionController {
     /**
      * Endpoint para obtener todos los envíos registrados.
      * <p>
-     * Acceso público.
+     * Requiere rol {@code ADMIN} u {@code ORGANIZER}.
      * </p>
      *
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
     public ResponseEntity<List<SubmissionResponseDTO>> getAll() {
         List<Submission> submissions = getAllSubmissionsUseCase.execute();
         List<SubmissionResponseDTO> response = submissions.stream()
@@ -116,13 +118,14 @@ public class SubmissionController {
     /**
      * Endpoint para obtener todos los envíos de un problema específico.
      * <p>
-     * Acceso público.
+     * Requiere rol {@code ADMIN}, {@code ORGANIZER} o {@code SERVICE}.
      * </p>
      *
      * @param problemId Identificador del problema.
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping("/problem/{problemId}")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<List<SubmissionResponseDTO>> getByProblem(@PathVariable("problemId") UUID problemId) {
         List<Submission> submissions = getSubmissionsByProblemUseCase.execute(problemId);
         List<SubmissionResponseDTO> response = submissions.stream()
@@ -134,13 +137,14 @@ public class SubmissionController {
     /**
      * Endpoint para obtener todos los envíos de un equipo específico.
      * <p>
-     * Acceso público.
+     * Requiere rol {@code STUDENT}, {@code ADMIN} u {@code ORGANIZER}.
      * </p>
      *
      * @param teamId Identificador del equipo.
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping("/team/{teamId}")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER')")
     public ResponseEntity<List<SubmissionResponseDTO>> getByTeam(@PathVariable("teamId") UUID teamId) {
         List<Submission> submissions = getSubmissionsByTeamUseCase.execute(teamId);
         List<SubmissionResponseDTO> response = submissions.stream()
@@ -152,7 +156,7 @@ public class SubmissionController {
     /**
      * Endpoint para obtener el historial de envíos de un equipo en un problema.
      * <p>
-     * Acceso público.
+     * Requiere rol {@code STUDENT}, {@code ADMIN} u {@code ORGANIZER}.
      * </p>
      *
      * @param problemId Identificador del problema.
@@ -160,6 +164,7 @@ public class SubmissionController {
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping("/history")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER')")
     public ResponseEntity<List<SubmissionResponseDTO>> getHistory(
             @RequestParam("problemId") UUID problemId,
             @RequestParam("teamId") UUID teamId) {
@@ -174,13 +179,14 @@ public class SubmissionController {
     /**
      * Endpoint para obtener las métricas de evaluación de un envío.
      * <p>
-     * Acceso público.
+     * Requiere rol {@code STUDENT}, {@code ADMIN}, {@code ORGANIZER} o {@code SERVICE}.
      * </p>
      *
      * @param id Identificador del envío.
      * @return 200 OK con las métricas del envío.
      */
     @GetMapping("/{id}/metrics")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<SubmissionMetricsResponseDTO> getMetrics(@PathVariable("id") UUID id) {
         SubmissionMetrics metrics = getSubmissionMetricsUseCase.execute(id);
         return ResponseEntity.ok(SubmissionWebMapper.toResponse(metrics));

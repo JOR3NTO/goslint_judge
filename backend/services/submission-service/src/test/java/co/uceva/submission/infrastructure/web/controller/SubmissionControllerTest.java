@@ -100,6 +100,7 @@ class SubmissionControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "STUDENT")
     void shouldGetSubmissionById() throws Exception {
         when(getSubmissionByIdUseCase.execute(submissionId)).thenReturn(SubmissionFixtures.aSubmission(submissionId));
 
@@ -109,6 +110,14 @@ class SubmissionControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "GUEST")
+    void shouldDenyGuestRoleToGetSubmissionById() throws Exception {
+        mockMvc.perform(get("/api/v1/submissions/{id}", submissionId))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
     void shouldPropagateNotFoundException() {
         when(getSubmissionByIdUseCase.execute(submissionId)).thenThrow(new SubmissionNotFoundException(submissionId));
 
@@ -118,6 +127,7 @@ class SubmissionControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldGetAllSubmissions() throws Exception {
         when(getAllSubmissionsUseCase.execute()).thenReturn(List.of(
                 SubmissionFixtures.aSubmission(UUID.randomUUID()),
@@ -130,6 +140,14 @@ class SubmissionControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "STUDENT")
+    void shouldDenyStudentRoleToGetAllSubmissions() throws Exception {
+        mockMvc.perform(get("/api/v1/submissions"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldGetSubmissionsByProblem() throws Exception {
         when(getSubmissionsByProblemUseCase.execute(problemId)).thenReturn(List.of(
                 SubmissionFixtures.aSubmission(UUID.randomUUID())
@@ -141,6 +159,14 @@ class SubmissionControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "STUDENT")
+    void shouldDenyStudentRoleToGetSubmissionsByProblem() throws Exception {
+        mockMvc.perform(get("/api/v1/submissions/problem/{problemId}", problemId))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
     void shouldGetSubmissionsByTeam() throws Exception {
         when(getSubmissionsByTeamUseCase.execute(teamId)).thenReturn(List.of(
                 SubmissionFixtures.aSubmission(UUID.randomUUID())
@@ -152,6 +178,14 @@ class SubmissionControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "SERVICE")
+    void shouldDenyServiceRoleToGetSubmissionsByTeam() throws Exception {
+        mockMvc.perform(get("/api/v1/submissions/team/{teamId}", teamId))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
     void shouldGetSubmissionHistory() throws Exception {
         when(getSubmissionHistoryUseCase.execute(any())).thenReturn(List.of(
                 SubmissionFixtures.aSubmission(UUID.randomUUID())
@@ -165,6 +199,16 @@ class SubmissionControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "SERVICE")
+    void shouldDenyServiceRoleToGetSubmissionHistory() throws Exception {
+        mockMvc.perform(get("/api/v1/submissions/history")
+                        .param("problemId", problemId.toString())
+                        .param("teamId", teamId.toString()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
     void shouldGetMetrics() throws Exception {
         when(getSubmissionMetricsUseCase.execute(submissionId)).thenReturn(
                 new SubmissionMetrics(submissionId, co.uceva.shared.domain.VerdictStatus.ACCEPTED, 100, 2048, 512)
@@ -174,6 +218,13 @@ class SubmissionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.submissionId").value(submissionId.toString()))
                 .andExpect(jsonPath("$.verdict").value("ACCEPTED"));
+    }
+
+    @Test
+    @WithMockUser(roles = "GUEST")
+    void shouldDenyGuestRoleToGetMetrics() throws Exception {
+        mockMvc.perform(get("/api/v1/submissions/{id}/metrics", submissionId))
+                .andExpect(status().isForbidden());
     }
 
     @Test
