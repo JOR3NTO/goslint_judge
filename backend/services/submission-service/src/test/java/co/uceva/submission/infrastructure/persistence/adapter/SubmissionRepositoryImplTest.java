@@ -104,14 +104,27 @@ class SubmissionRepositoryImplTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldCheckExistenceByTeamIdAndProblemIdAndSourceCode() {
+    void shouldCheckExistenceByTeamIdAndProblemIdAndSourceCodeAndLanguage() {
         UUID teamId = UUID.randomUUID();
         UUID problemId = UUID.randomUUID();
         String sourceCode = "print(1)";
         repository.save(aSubmission(UUID.randomUUID(), teamId, problemId, sourceCode));
 
-        assertThat(repository.existsByTeamIdAndProblemIdAndSourceCode(teamId, problemId, sourceCode)).isTrue();
-        assertThat(repository.existsByTeamIdAndProblemIdAndSourceCode(teamId, problemId, "other")).isFalse();
+        assertThat(repository.existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
+                teamId, problemId, sourceCode, co.uceva.shared.domain.ProgrammingLanguage.PYTHON)).isTrue();
+        assertThat(repository.existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
+                teamId, problemId, "other", co.uceva.shared.domain.ProgrammingLanguage.PYTHON)).isFalse();
+    }
+
+    @Test
+    void shouldNotConsiderSubmissionDuplicateWhenLanguageDiffers() {
+        UUID teamId = UUID.randomUUID();
+        UUID problemId = UUID.randomUUID();
+        String sourceCode = "print(1)";
+        repository.save(aSubmission(UUID.randomUUID(), teamId, problemId, sourceCode));
+
+        assertThat(repository.existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
+                teamId, problemId, sourceCode, co.uceva.shared.domain.ProgrammingLanguage.JAVA)).isFalse();
     }
 
     private Submission aSubmission(UUID id, UUID teamId, UUID problemId, String sourceCode) {

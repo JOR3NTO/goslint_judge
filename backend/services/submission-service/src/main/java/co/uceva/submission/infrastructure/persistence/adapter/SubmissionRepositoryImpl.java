@@ -1,5 +1,6 @@
 package co.uceva.submission.infrastructure.persistence.adapter;
 
+import co.uceva.shared.domain.ProgrammingLanguage;
 import co.uceva.submission.domain.model.Submission;
 import co.uceva.submission.domain.repository.SubmissionRepository;
 import co.uceva.submission.infrastructure.mapper.SubmissionEntityMapper;
@@ -90,7 +91,9 @@ public class SubmissionRepositoryImpl implements SubmissionRepository {
 
     /** {@inheritDoc} */
     @Override
-    public boolean existsByTeamIdAndProblemIdAndSourceCode(UUID teamId, UUID problemId, String sourceCode) {
-        return springDataRepository.existsByTeamIdAndProblemIdAndSourceCode(teamId, problemId, sourceCode);
+    public boolean existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
+            UUID teamId, UUID problemId, String sourceCode, ProgrammingLanguage language) {
+        return springDataRepository.existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
+                teamId, problemId, sourceCode, language);
     }
 }

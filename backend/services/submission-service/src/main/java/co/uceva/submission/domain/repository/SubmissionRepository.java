@@ -1,5 +1,6 @@
 package co.uceva.submission.domain.repository;
 
+import co.uceva.shared.domain.ProgrammingLanguage;
 import co.uceva.submission.domain.model.Submission;
 
 import java.util.List;
@@ -44,12 +45,15 @@ public interface SubmissionRepository {
 
     /**
      * Verifica si ya existe un envío idéntico realizado por el mismo equipo
-     * para el mismo problema y con el mismo código fuente.
+     * para el mismo problema, con el mismo código fuente y en el mismo lenguaje
+     * de programación.
      *
      * @param teamId     Identificador del equipo.
      * @param problemId  Identificador del problema.
      * @param sourceCode Código fuente en texto plano.
+     * @param language   Lenguaje de programación del código fuente.
      * @return {@code true} si ya existe un envío duplicado; {@code false} en caso contrario.
      */
-    boolean existsByTeamIdAndProblemIdAndSourceCode(UUID teamId, UUID problemId, String sourceCode);
+    boolean existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
+            UUID teamId, UUID problemId, String sourceCode, ProgrammingLanguage language);
 }

@@ -50,9 +50,9 @@ public class SubmitCodeUseCaseImpl implements SubmitCodeUseCase {
     @Transactional
     public Submission execute(SubmitCodeCommand command) {
         // Validar que no exista un envío duplicado
-        if (submissionRepository.existsByTeamIdAndProblemIdAndSourceCode(
-                command.teamId(), command.problemId(), command.sourceCode())) {
-            throw new DuplicateSubmissionException(command.teamId(), command.problemId());
+        if (submissionRepository.existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
+                command.teamId(), command.problemId(), command.sourceCode(), command.language())) {
+            throw new DuplicateSubmissionException(command.teamId(), command.problemId(), command.language());
         }
 
         // Construir la entidad de dominio usando el factory method

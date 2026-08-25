@@ -1,5 +1,7 @@
 package co.uceva.submission.domain.exception;
 
+import co.uceva.shared.domain.ProgrammingLanguage;
+
 import java.util.UUID;
 
 /**
@@ -17,9 +19,11 @@ public class DuplicateSubmissionException extends RuntimeException {
      *
      * @param teamId    Identificador del equipo que realizó el envío duplicado.
      * @param problemId Identificador del problema asociado al envío duplicado.
+     * @param language  Lenguaje de programación del envío duplicado.
      */
-    public DuplicateSubmissionException(UUID teamId, UUID problemId) {
+    public DuplicateSubmissionException(UUID teamId, UUID problemId, ProgrammingLanguage language) {
         super("Ya existe un envío idéntico para el problema con ID '" + problemId
-                + "' realizado por el equipo con ID '" + teamId + "'.");
+                + "' realizado por el equipo con ID '" + teamId
+                + "' en el lenguaje '" + language + "'.");
     }
 }

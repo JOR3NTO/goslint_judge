@@ -9,11 +9,13 @@ import co.uceva.submission.application.usecase.GetSubmissionMetricsUseCase.Submi
 import co.uceva.submission.application.usecase.GetSubmissionsByProblemUseCase;
 import co.uceva.submission.application.usecase.GetSubmissionsByTeamUseCase;
 import co.uceva.submission.application.usecase.SubmitCodeUseCase;
+import co.uceva.submission.domain.exception.DuplicateSubmissionException;
 import co.uceva.submission.domain.exception.SubmissionNotFoundException;
 import co.uceva.submission.domain.model.Submission;
 import co.uceva.submission.fixtures.SubmissionFixtures;
 import co.uceva.submission.infrastructure.config.SecurityConfig;
 import co.uceva.submission.infrastructure.web.dto.SubmitCodeRequestDTO;
+import co.uceva.submission.infrastructure.web.exception.SubmissionExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,12 +25,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
-import jakarta.servlet.ServletException;
 
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(SubmissionController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, SubmissionExceptionHandler.class})
 class SubmissionControllerTest {
 
     @Autowired
@@ -118,12 +118,26 @@ class SubmissionControllerTest {
 
     @Test
     @WithMockUser(roles = "STUDENT")
-    void shouldPropagateNotFoundException() {
+    void shouldReturnNotFoundWhenSubmissionDoesNotExist() throws Exception {
         when(getSubmissionByIdUseCase.execute(submissionId)).thenThrow(new SubmissionNotFoundException(submissionId));
 
-        assertThatThrownBy(() -> mockMvc.perform(get("/api/v1/submissions/{id}", submissionId)))
-                .isInstanceOf(ServletException.class)
-                .hasCauseInstanceOf(SubmissionNotFoundException.class);
+        mockMvc.perform(get("/api/v1/submissions/{id}", submissionId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void shouldReturnConflictWhenSubmissionIsDuplicate() throws Exception {
+        SubmitCodeRequestDTO request = SubmissionFixtures.submitCodeRequest();
+        when(submitCodeUseCase.execute(any())).thenThrow(
+                new DuplicateSubmissionException(teamId, problemId, co.uceva.shared.domain.ProgrammingLanguage.PYTHON));
+
+        mockMvc.perform(post("/api/v1/submissions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test

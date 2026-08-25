@@ -28,7 +28,7 @@ public record SourceCode(String content, ProgrammingLanguage language) {
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("El código fuente no puede estar vacío.");
         }
-        if (content.getBytes().length > MAX_SIZE_BYTES) {
+        if (content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > MAX_SIZE_BYTES) {
             throw new IllegalArgumentException(
                 "El código fuente excede el tamaño máximo permitido de " + MAX_SIZE_BYTES + " bytes."
             );

@@ -36,8 +36,8 @@ class SubmitCodeUseCaseImplTest {
     @Test
     void shouldCreateAndPublishSubmission() {
         SubmitCodeCommand command = SubmissionFixtures.submitCodeCommand();
-        when(submissionRepository.existsByTeamIdAndProblemIdAndSourceCode(
-                command.teamId(), command.problemId(), command.sourceCode())).thenReturn(false);
+        when(submissionRepository.existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
+                command.teamId(), command.problemId(), command.sourceCode(), command.language())).thenReturn(false);
         when(submissionRepository.save(any(Submission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Submission result = useCase.execute(command);
@@ -53,8 +53,8 @@ class SubmitCodeUseCaseImplTest {
     @Test
     void shouldThrowWhenDuplicateExists() {
         SubmitCodeCommand command = SubmissionFixtures.submitCodeCommand();
-        when(submissionRepository.existsByTeamIdAndProblemIdAndSourceCode(
-                command.teamId(), command.problemId(), command.sourceCode())).thenReturn(true);
+        when(submissionRepository.existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
+                command.teamId(), command.problemId(), command.sourceCode(), command.language())).thenReturn(true);
 
         assertThatThrownBy(() -> useCase.execute(command))
                 .isInstanceOf(DuplicateSubmissionException.class);
