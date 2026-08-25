@@ -221,18 +221,61 @@ Candidatos a residir aquí:
 ---
 
 ### `submission-service` — Puerto `8083`
-**Responsabilidad:** Recibir envíos de código de los estudiantes, persistirlos y publicar eventos a la cola de juicio.
+**Responsabilidad:** Recibir envíos de código de los estudiantes, persistirlos y entregarlos al motor de evaluación a través de RabbitMQ.
 
 | Entidad de dominio | Descripción |
 |--------------------|-------------|
-| `Submission`       | id, teamId, problemId, language, sourceCode, verdict, executionTimeMs, memoryUsedKb, codeSizeBytes, submittedAt |
+| `Submission`       | id, teamId, problemId, language, sourceCode, verdict, **status**, executionTimeMs, memoryUsedKb, codeSizeBytes, submittedAt |
 
 **Casos de uso principales:**
-- `SubmitCodeUseCase` — Valida, persiste y publica `SubmissionReceivedEvent` en RabbitMQ
-- `GetSubmissionHistoryUseCase` — Historial por usuario/problema
+- `SubmitCodeUseCase` — Valida, detecta duplicados y persiste el envío
+- `EnqueueSubmissionUseCase` — Publica `SubmissionReceivedEvent` en RabbitMQ y marca el envío como encolado
+- `GetSubmissionHistoryUseCase` — Historial por equipo/problema
 - `GetSubmissionMetricsUseCase` — Tiempo y memoria de ejecución
 
+#### Estado del envío (`SubmissionStatus`)
+
+`status` es **ortogonal** a `verdict`: el veredicto dice *cómo resultó evaluado* el envío, el estado dice *dónde está* dentro del flujo. Mientras el juez trabaja, lo normal es `status = QUEUED` con `verdict = PENDING`.
+
+| Estado    | Significado                                                          |
+|-----------|----------------------------------------------------------------------|
+| `PENDING` | Persistido, pero aún no entregado al motor de evaluación             |
+| `QUEUED`  | Entrega confirmada por el broker (publisher confirms)                |
+| `JUDGING` | El motor de evaluación tomó el envío y lo está procesando            |
+| `JUDGED`  | El motor finalizó y emitió un veredicto                              |
+
+El estado vive en la propia tabla, no en memoria: por eso una fila en `PENDING` representa trabajo de entrega sin completar y `PendingSubmissionRetryScheduler` puede recogerla y reintentar el encolamiento, incluso después de un reinicio del servicio o una caída del broker.
+
+#### Topología de mensajería
+
+Los nombres se declaran una sola vez en `application.properties` (`app.messaging.submission.*`); `RabbitConfig` declara la topología a partir de ellas y el publicador envía a esos mismos valores. Son también el **contrato con `judge-service`**.
+
+| Propiedad | Valor por defecto | Rol |
+|-----------|-------------------|-----|
+| `app.messaging.submission.exchange` | `submission.exchange` | Topic exchange duradero |
+| `app.messaging.submission.routing-key` | `submission.evaluate` | Routing key de los envíos por evaluar |
+| `app.messaging.submission.queue` | `submission.evaluate` | Cola que consume `judge-service` |
+| `app.messaging.submission.dead-letter-exchange` | `submission.dlx` | Destino de los mensajes rechazados |
+| `app.messaging.submission.dead-letter-queue` | `submission.evaluate.dlq` | Retención de los envíos que no se pudieron procesar |
+
+`app.messaging.enabled=false` permite levantar el servicio sin broker (pruebas, desarrollo local): se usa un publicador *no-op* y no se declara la topología.
+
 **Tablas BD:** `submissions`
+
+#### Esquema y migraciones
+
+El servicio arranca con `spring.jpa.hibernate.ddl-auto=validate`: **Hibernate no crea ni modifica nada**, solo comprueba que la tabla coincide con `SubmissionEntity` y aborta el arranque si no es así. El esquema lo define Flyway en `src/main/resources/db/migration/`:
+
+| Migración | Qué hace |
+|-----------|----------|
+| `V1__crear_tabla_submissions.sql` | Línea base de la tabla `submissions` (tal y como existía antes del encolamiento) más los índices de las consultas por equipo y por problema |
+| `V2__agregar_status_a_submissions.sql` | Agrega `status` en tres pasos (columna nullable → relleno del histórico → `NOT NULL`), su `CHECK` contra `SubmissionStatus` y el índice parcial que alimenta el reintento de encolamiento |
+
+Detalles que conviene conocer antes de desplegar sobre una base de datos ya existente:
+
+- **Relleno del histórico:** los envíos anteriores a `V2` nunca pasaron por el encolamiento, así que su estado se deduce del veredicto — `verdict = 'PENDING'` → `status = 'PENDING'`, cualquier otro veredicto → `status = 'JUDGED'`. Las filas que queden en `PENDING` serán reencoladas por el barrido de reintentos en el primer arranque, que es justo lo que se quiere: son envíos que nunca llegaron al juez.
+- **Base de datos compartida:** todos los microservicios comparten la misma BD, por eso el servicio lleva su propio historial (`spring.flyway.table=flyway_schema_history_submission`) y toma como línea base la versión `0` (`spring.flyway.baseline-on-migrate=true`, `spring.flyway.baseline-version=0`). Sin `baseline-version=0`, Flyway daría `V1` por aplicada solo porque el esquema no está vacío por culpa de otro servicio.
+- **Idempotencia:** `V1` y `V2` usan `IF NOT EXISTS` para tolerar entornos donde la tabla ya la creó `ddl-auto` en su día.
 
 > ⚠️ **Importante:** `submission-service` **no juzga** el código. Solo orquesta la entrada. El juicio es responsabilidad de `judge-service`.
 
@@ -377,24 +420,32 @@ GET /api/v1/problems/test-cases/{problemId}/samples
     ▼
 [submission-service]
     │  1. Valida JWT con auth-service
-    │  2. Persiste Submission (estado: PENDING)
-    │  3. Publica → RabbitMQ: queue "submission.evaluate"
+    │  2. Persiste Submission (status: PENDING, verdict: PENDING)
+    │  3. Publica → RabbitMQ: exchange "submission.exchange",
+    │     routing key "submission.evaluate" → cola "submission.evaluate"
+    │  4. Con la confirmación del broker, marca la Submission como QUEUED
+    │     (si no llega, la fila sigue en PENDING y el barrido la reintenta)
     │
     ▼
 [judge-service]  ← Consumidor de "submission.evaluate"
-    │  4. Recupera test cases desde problem-service
-    │  5. Compila el código en contenedor Docker
-    │  6. Ejecuta vs. cada test case (sandbox)
-    │  7. Determina veredicto
-    │  8. Publica → RabbitMQ: queue "submission.judged"
+    │  5. Recupera test cases desde problem-service
+    │  6. Compila el código en contenedor Docker
+    │  7. Ejecuta vs. cada test case (sandbox)
+    │  8. Determina veredicto
+    │  9. Publica → RabbitMQ: queue "submission.judged"
     │
-    ├─▶ [submission-service] ← Actualiza Submission con veredicto
+    ├─▶ [submission-service] ← Actualiza Submission con veredicto (status: JUDGED)
     │
     └─▶ [feedback-service] ← Si no es ACCEPTED:
-            9. Llama API LLM con prompt
-           10. Persiste Feedback
-           11. Notifica al cliente (WebSocket / polling)
+           10. Llama API LLM con prompt
+           11. Persiste Feedback
+           12. Notifica al cliente (WebSocket / polling)
 ```
+
+> El envío **nunca se pierde por un fallo de mensajería**: si el paso 3 no obtiene
+> confirmación del broker, la fila se queda en `PENDING` y
+> `PendingSubmissionRetryScheduler` la vuelve a encolar periódicamente. Por eso el
+> estado se persiste en la tabla `submissions` y no solo en memoria.
 
 ---
 
@@ -500,6 +551,8 @@ El proyecto no tiene Gradle Wrapper inicializado. Para agregarlo:
 | 6 | **`shared/common-domain` y `shared/common-infrastructure`** sin código fuente | 🟡 Media | Crear la estructura de carpetas `src/main/java/co/uceva/shared/` |
 | 7 | **`docker-compose.yml` y `traefik.yml` vacíos** | 🟡 Media | Completar con la configuración de infraestructura |
 | 8 | **Sin Gradle Wrapper**, el CI/CD no puede construir el proyecto | 🔴 Alta | Resolver el punto 1 primero |
+| 9 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
+| 10 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que el esquema deje de depender de lo que Hibernate decida en cada arranque |
 
 ---
 

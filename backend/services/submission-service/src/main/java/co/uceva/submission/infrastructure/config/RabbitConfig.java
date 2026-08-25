@@ -29,67 +29,112 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * Se activa con {@code app.messaging.enabled}, que permite ejecutar el servicio
  * sin broker (por ejemplo en pruebas o en desarrollo local).
  * </p>
+ * <p>
+ * Los nombres del exchange, las colas y las routing keys se leen de
+ * {@code app.messaging.submission.*}, las mismas propiedades que usa
+ * {@code RabbitSubmissionEventPublisherAdapter} para publicar. Así, cambiar una
+ * propiedad mueve a la vez lo que se declara y lo que se envía, en lugar de dejar
+ * el publicador apuntando a un exchange que nadie declaró. Esas propiedades son
+ * también el contrato con el consumidor ({@code judge-service}).
+ * </p>
  */
 @Configuration
 @EnableScheduling
 @ConditionalOnProperty(prefix = "app.messaging", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class RabbitConfig {
 
-    /** Exchange principal por el que se enrutan los eventos de envíos. */
-    public static final String SUBMISSION_EXCHANGE = "submission.exchange";
-    /** Cola que consume el motor de evaluación. */
-    public static final String SUBMISSION_EVALUATE_QUEUE = "submission.evaluate";
-    /** Routing key de los envíos pendientes de evaluar. */
-    public static final String SUBMISSION_EVALUATE_ROUTING_KEY = "submission.evaluate";
-    /** Exchange de mensajes muertos. */
-    public static final String SUBMISSION_DLX = "submission.dlx";
-    /** Cola de mensajes muertos asociada a la cola de evaluación. */
-    public static final String SUBMISSION_EVALUATE_DLQ = "submission.evaluate.dlq";
-
-    /** Exchange principal, duradero para sobrevivir a reinicios del broker. */
+    /**
+     * Exchange principal, duradero para sobrevivir a reinicios del broker.
+     *
+     * @param exchange Nombre del exchange por el que se enrutan los envíos.
+     * @return Exchange principal declarado en el broker al arrancar.
+     */
     @Bean
-    public TopicExchange submissionExchange() {
-        return new TopicExchange(SUBMISSION_EXCHANGE, true, false);
+    public TopicExchange submissionExchange(
+            @Value("${app.messaging.submission.exchange}") String exchange) {
+        return new TopicExchange(exchange, true, false);
     }
 
-    /** Exchange al que RabbitMQ reenvía los mensajes rechazados o expirados. */
+    /**
+     * Exchange al que RabbitMQ reenvía los mensajes rechazados o expirados.
+     *
+     * @param deadLetterExchange Nombre del exchange de mensajes muertos.
+     * @return Exchange de mensajes muertos.
+     */
     @Bean
-    public DirectExchange submissionDeadLetterExchange() {
-        return new DirectExchange(SUBMISSION_DLX, true, false);
+    public DirectExchange submissionDeadLetterExchange(
+            @Value("${app.messaging.submission.dead-letter-exchange}") String deadLetterExchange) {
+        return new DirectExchange(deadLetterExchange, true, false);
     }
 
     /**
      * Cola duradera de la que consume {@code judge-service}. Los mensajes que el
      * consumidor rechace definitivamente se derivan al exchange de mensajes muertos.
+     *
+     * @param queue              Nombre de la cola de evaluación.
+     * @param deadLetterExchange Exchange al que derivar los mensajes rechazados.
+     * @param deadLetterQueue    Routing key con la que se derivan, igual al nombre de la DLQ.
+     * @return Cola de evaluación con su política de mensajes muertos.
      */
     @Bean
-    public Queue submissionEvaluateQueue() {
-        return QueueBuilder.durable(SUBMISSION_EVALUATE_QUEUE)
-                .deadLetterExchange(SUBMISSION_DLX)
-                .deadLetterRoutingKey(SUBMISSION_EVALUATE_DLQ)
+    public Queue submissionEvaluateQueue(
+            @Value("${app.messaging.submission.queue}") String queue,
+            @Value("${app.messaging.submission.dead-letter-exchange}") String deadLetterExchange,
+            @Value("${app.messaging.submission.dead-letter-queue}") String deadLetterQueue) {
+        return QueueBuilder.durable(queue)
+                .deadLetterExchange(deadLetterExchange)
+                .deadLetterRoutingKey(deadLetterQueue)
                 .build();
     }
 
-    /** Cola donde quedan retenidos los envíos que no pudieron procesarse. */
+    /**
+     * Cola donde quedan retenidos los envíos que no pudieron procesarse.
+     *
+     * @param deadLetterQueue Nombre de la cola de mensajes muertos.
+     * @return Cola de mensajes muertos.
+     */
     @Bean
-    public Queue submissionEvaluateDeadLetterQueue() {
-        return QueueBuilder.durable(SUBMISSION_EVALUATE_DLQ).build();
+    public Queue submissionEvaluateDeadLetterQueue(
+            @Value("${app.messaging.submission.dead-letter-queue}") String deadLetterQueue) {
+        return QueueBuilder.durable(deadLetterQueue).build();
     }
 
-    /** Enlaza la cola de evaluación con el exchange principal. */
+    /**
+     * Enlaza la cola de evaluación con el exchange principal.
+     * <p>
+     * La routing key es la misma que publica el adaptador, de modo que el mensaje
+     * siempre encuentra la cola.
+     * </p>
+     *
+     * @param submissionEvaluateQueue Cola de evaluación.
+     * @param submissionExchange      Exchange principal.
+     * @param routingKey              Routing key de los envíos pendientes de evaluar.
+     * @return Binding entre el exchange principal y la cola de evaluación.
+     */
     @Bean
-    public Binding submissionEvaluateBinding() {
-        return BindingBuilder.bind(submissionEvaluateQueue())
-                .to(submissionExchange())
-                .with(SUBMISSION_EVALUATE_ROUTING_KEY);
+    public Binding submissionEvaluateBinding(Queue submissionEvaluateQueue,
+            TopicExchange submissionExchange,
+            @Value("${app.messaging.submission.routing-key}") String routingKey) {
+        return BindingBuilder.bind(submissionEvaluateQueue)
+                .to(submissionExchange)
+                .with(routingKey);
     }
 
-    /** Enlaza la cola de mensajes muertos con su exchange. */
+    /**
+     * Enlaza la cola de mensajes muertos con su exchange.
+     *
+     * @param submissionEvaluateDeadLetterQueue Cola de mensajes muertos.
+     * @param submissionDeadLetterExchange      Exchange de mensajes muertos.
+     * @param deadLetterQueue                   Routing key usada al derivar, igual al nombre de la DLQ.
+     * @return Binding entre el exchange de mensajes muertos y su cola.
+     */
     @Bean
-    public Binding submissionEvaluateDeadLetterBinding() {
-        return BindingBuilder.bind(submissionEvaluateDeadLetterQueue())
-                .to(submissionDeadLetterExchange())
-                .with(SUBMISSION_EVALUATE_DLQ);
+    public Binding submissionEvaluateDeadLetterBinding(Queue submissionEvaluateDeadLetterQueue,
+            DirectExchange submissionDeadLetterExchange,
+            @Value("${app.messaging.submission.dead-letter-queue}") String deadLetterQueue) {
+        return BindingBuilder.bind(submissionEvaluateDeadLetterQueue)
+                .to(submissionDeadLetterExchange)
+                .with(deadLetterQueue);
     }
 
     /**
