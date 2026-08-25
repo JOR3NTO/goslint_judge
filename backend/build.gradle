@@ -7,6 +7,7 @@ plugins {
 
 subprojects {
     apply plugin: 'java'
+    apply plugin: 'jacoco'
     apply plugin: 'io.spring.dependency-management'
 
     group = 'co.uceva.judge'
@@ -32,7 +33,6 @@ subprojects {
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
         testImplementation 'org.springframework.security:spring-security-test'
     }
-
 
     jacoco {
         toolVersion = "0.8.12"
