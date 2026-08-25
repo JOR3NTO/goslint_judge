@@ -25,4 +25,9 @@ public class SubmissionExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleDuplicateSubmission(DuplicateSubmissionException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponseDTO(ex.getMessage()));
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponseDTO> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponseDTO(ex.getMessage()));
+    }
 }
