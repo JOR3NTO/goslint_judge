@@ -7,7 +7,9 @@ dependencies {
     implementation project(':shared:common-infrastructure')
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'   // RabbitMQ
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'org.flywaydb:flyway-core'
+    testImplementation 'org.springframework.amqp:spring-rabbit-test'
     testRuntimeOnly 'com.h2database:h2'
 }

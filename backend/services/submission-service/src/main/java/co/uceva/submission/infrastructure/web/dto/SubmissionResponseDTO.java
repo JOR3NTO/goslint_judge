@@ -1,6 +1,7 @@
 package co.uceva.submission.infrastructure.web.dto;
 
 import co.uceva.shared.domain.ProgrammingLanguage;
+import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.shared.domain.VerdictStatus;
 
 import java.time.Instant;
@@ -15,6 +16,7 @@ import java.util.UUID;
  * @param language        Lenguaje de programación del código fuente.
  * @param sourceCode      Código fuente enviado.
  * @param verdict         Veredicto actual de la evaluación.
+ * @param status          Estado del envío en el flujo de evaluación.
  * @param executionTimeMs Tiempo de ejecución en milisegundos.
  * @param memoryUsedKb    Memoria utilizada en kilobytes.
  * @param codeSizeBytes   Tamaño del código fuente en bytes.
@@ -27,6 +29,7 @@ public record SubmissionResponseDTO(
         ProgrammingLanguage language,
         String sourceCode,
         VerdictStatus verdict,
+        SubmissionStatus status,
         int executionTimeMs,
         int memoryUsedKb,
         long codeSizeBytes,

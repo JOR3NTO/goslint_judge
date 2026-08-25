@@ -1,5 +1,6 @@
 package co.uceva.submission.infrastructure.web.controller;
 
+import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.submission.application.usecase.DeleteSubmissionUseCase;
 import co.uceva.submission.application.usecase.GetAllSubmissionsUseCase;
 import co.uceva.submission.application.usecase.GetSubmissionByIdUseCase;
@@ -86,6 +87,20 @@ class SubmissionControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(submissionId.toString()))
                 .andExpect(jsonPath("$.verdict").value("PENDING"));
+    }
+
+    @Test
+    @WithMockUser(roles = "STUDENT")
+    void shouldExposeTheQueueStateToTheStudent() throws Exception {
+        SubmitCodeRequestDTO request = SubmissionFixtures.submitCodeRequest();
+        when(submitCodeUseCase.execute(any()))
+                .thenReturn(SubmissionFixtures.aSubmission(submissionId, SubmissionStatus.QUEUED));
+
+        mockMvc.perform(post("/api/v1/submissions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("QUEUED"));
     }
 
     @Test

@@ -1,9 +1,12 @@
 package co.uceva.submission.infrastructure.persistence.repository;
 
 import co.uceva.shared.domain.ProgrammingLanguage;
+import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.submission.infrastructure.persistence.entity.SubmissionEntity;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,4 +32,11 @@ public interface SpringDataSubmissionRepository extends JpaRepository<Submission
      */
     boolean existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
             UUID teamId, UUID problemId, String sourceCode, ProgrammingLanguage language);
+
+    /**
+     * Recupera los envíos en un estado dado recibidos antes de un instante,
+     * del más antiguo al más reciente. El {@link Pageable} acota el tamaño del lote.
+     */
+    List<SubmissionEntity> findByStatusAndSubmittedAtBeforeOrderBySubmittedAtAsc(
+            SubmissionStatus status, Instant submittedBefore, Pageable pageable);
 }

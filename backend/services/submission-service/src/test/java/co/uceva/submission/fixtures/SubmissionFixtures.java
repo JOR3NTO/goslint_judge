@@ -1,6 +1,7 @@
 package co.uceva.submission.fixtures;
 
 import co.uceva.shared.domain.ProgrammingLanguage;
+import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.shared.domain.VerdictStatus;
 import co.uceva.submission.application.usecase.SubmitCodeUseCase.SubmitCodeCommand;
 import co.uceva.submission.domain.model.Submission;
@@ -28,6 +29,14 @@ public final class SubmissionFixtures {
     }
 
     public static Submission aSubmission(UUID id, VerdictStatus verdict) {
+        return aSubmission(id, verdict, SubmissionStatus.PENDING);
+    }
+
+    public static Submission aSubmission(UUID id, SubmissionStatus status) {
+        return aSubmission(id, VerdictStatus.PENDING, status);
+    }
+
+    public static Submission aSubmission(UUID id, VerdictStatus verdict, SubmissionStatus status) {
         return Submission.builder()
                 .id(id)
                 .teamId(TEAM_ID)
@@ -35,6 +44,7 @@ public final class SubmissionFixtures {
                 .language(ProgrammingLanguage.PYTHON)
                 .sourceCode(SOURCE_CODE)
                 .verdict(verdict)
+                .status(status)
                 .executionTimeMs(0)
                 .memoryUsedKb(0)
                 .submittedAt(Instant.parse("2024-01-01T00:00:00Z"))
@@ -49,6 +59,7 @@ public final class SubmissionFixtures {
                 .language(ProgrammingLanguage.PYTHON)
                 .sourceCode(SOURCE_CODE)
                 .verdict(VerdictStatus.PENDING)
+                .status(SubmissionStatus.PENDING)
                 .executionTimeMs(0)
                 .memoryUsedKb(0)
                 .submittedAt(Instant.parse("2024-01-01T00:00:00Z"))

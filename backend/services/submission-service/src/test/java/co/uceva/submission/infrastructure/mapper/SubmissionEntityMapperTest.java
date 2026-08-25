@@ -1,6 +1,7 @@
 package co.uceva.submission.infrastructure.mapper;
 
 import co.uceva.shared.domain.ProgrammingLanguage;
+import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.shared.domain.VerdictStatus;
 import co.uceva.submission.domain.model.Submission;
 import co.uceva.submission.infrastructure.persistence.entity.SubmissionEntity;
@@ -22,6 +23,7 @@ class SubmissionEntityMapperTest {
                 .language(ProgrammingLanguage.JAVA)
                 .sourceCode("class Main {}")
                 .verdict(VerdictStatus.PENDING)
+                .status(SubmissionStatus.QUEUED)
                 .executionTimeMs(0)
                 .memoryUsedKb(0)
                 .submittedAt(Instant.now())
@@ -36,6 +38,8 @@ class SubmissionEntityMapperTest {
         assertThat(mapped.getLanguage()).isEqualTo(domain.getLanguage());
         assertThat(mapped.getSourceCode()).isEqualTo(domain.getSourceCode());
         assertThat(mapped.getVerdict()).isEqualTo(domain.getVerdict());
+        assertThat(mapped.getStatus()).isEqualTo(domain.getStatus());
+        assertThat(entity.getStatus()).isEqualTo(SubmissionStatus.QUEUED);
         assertThat(mapped.getExecutionTimeMs()).isEqualTo(domain.getExecutionTimeMs());
         assertThat(mapped.getMemoryUsedKb()).isEqualTo(domain.getMemoryUsedKb());
         assertThat(mapped.getCodeSizeBytes()).isEqualTo(domain.getCodeSizeBytes());

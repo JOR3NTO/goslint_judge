@@ -42,6 +42,7 @@ public class SubmissionWebMapper {
                 domain.getLanguage(),
                 domain.getSourceCode(),
                 domain.getVerdict(),
+                domain.getStatus(),
                 domain.getExecutionTimeMs(),
                 domain.getMemoryUsedKb(),
                 domain.getCodeSizeBytes(),
