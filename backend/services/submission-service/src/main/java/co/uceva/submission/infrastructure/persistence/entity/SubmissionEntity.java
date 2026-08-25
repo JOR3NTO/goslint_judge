@@ -1,6 +1,7 @@
 package co.uceva.submission.infrastructure.persistence.entity;
 
 import co.uceva.shared.domain.ProgrammingLanguage;
+import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.shared.domain.VerdictStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -57,6 +58,11 @@ public class SubmissionEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "verdict", nullable = false)
     private VerdictStatus verdict;
+
+    /** Estado del envío dentro del flujo de evaluación. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private SubmissionStatus status;
 
     /** Tiempo de ejecución en milisegundos reportado por el juez. */
     @Column(name = "execution_time_ms", nullable = false)

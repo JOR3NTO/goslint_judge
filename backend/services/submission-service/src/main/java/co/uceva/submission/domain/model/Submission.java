@@ -1,6 +1,7 @@
 package co.uceva.submission.domain.model;
 
 import co.uceva.shared.domain.ProgrammingLanguage;
+import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.shared.domain.VerdictStatus;
 import co.uceva.submission.domain.valueobject.SourceCode;
 import lombok.Builder;
@@ -36,6 +37,8 @@ public class Submission {
     private SourceCode sourceCode;
     /** Veredicto actual de la evaluación. */
     private VerdictStatus verdict;
+    /** Estado del envío dentro del flujo de evaluación. */
+    private SubmissionStatus status;
     /** Tiempo de ejecución en milisegundos reportado por el juez. */
     private int executionTimeMs;
     /** Memoria utilizada en kilobytes reportada por el juez. */
@@ -56,19 +59,22 @@ public class Submission {
      * @param language        Lenguaje de programación.
      * @param sourceCode      Código fuente en texto plano.
      * @param verdict         Veredicto de evaluación.
+     * @param status          Estado del envío en el flujo de evaluación.
      * @param executionTimeMs Tiempo de ejecución en milisegundos.
      * @param memoryUsedKb    Memoria utilizada en kilobytes.
      * @param submittedAt     Fecha de recepción del envío.
      */
     @Builder
     private Submission(UUID id, UUID teamId, UUID problemId, ProgrammingLanguage language, String sourceCode,
-            VerdictStatus verdict, int executionTimeMs, int memoryUsedKb, Instant submittedAt) {
+            VerdictStatus verdict, SubmissionStatus status, int executionTimeMs, int memoryUsedKb,
+            Instant submittedAt) {
         this.id = id;
         this.teamId = teamId;
         this.problemId = problemId;
         this.language = language;
         this.sourceCode = new SourceCode(sourceCode, language);
         this.verdict = verdict;
+        this.status = status;
         this.executionTimeMs = executionTimeMs;
         this.memoryUsedKb = memoryUsedKb;
         this.codeSizeBytes = this.sourceCode.sizeInBytes();
@@ -78,7 +84,8 @@ public class Submission {
     /**
      * Factory method para crear un nuevo envío con valores por defecto.
      * Agrupa la lógica de inicialización y asigna un identificador único,
-     * un veredicto inicial {@code PENDING} y la fecha actual.
+     * un veredicto inicial {@code PENDING}, un estado inicial {@code PENDING}
+     * (aún no entregado al motor de evaluación) y la fecha actual.
      *
      * @param teamId     Identificador del equipo que envía la solución.
      * @param problemId  Identificador del problema a resolver.
@@ -94,6 +101,7 @@ public class Submission {
                 .language(language)
                 .sourceCode(sourceCode)
                 .verdict(VerdictStatus.PENDING)
+                .status(SubmissionStatus.PENDING)
                 .executionTimeMs(0)
                 .memoryUsedKb(0)
                 .submittedAt(Instant.now())
@@ -101,8 +109,23 @@ public class Submission {
     }
 
     /**
+     * Marca el envío como encolado, una vez que el motor de evaluación ha
+     * confirmado la recepción del mensaje.
+     * <p>
+     * La operación es idempotente y nunca retrocede el estado: si el envío ya
+     * avanzó más allá de {@code PENDING} (porque un acuse de recibo tardío
+     * provocó un reintento redundante), la llamada no tiene efecto.
+     * </p>
+     */
+    public void markQueued() {
+        if (this.status == SubmissionStatus.PENDING) {
+            this.status = SubmissionStatus.QUEUED;
+        }
+    }
+
+    /**
      * Actualiza el veredicto del envío una vez que el juez ha completado
-     * la evaluación.
+     * la evaluación, dando por cerrado su ciclo de vida.
      *
      * @param verdict         Nuevo veredicto emitido.
      * @param executionTimeMs Tiempo de ejecución medido en milisegundos.
@@ -110,6 +133,7 @@ public class Submission {
      */
     public void updateVerdict(VerdictStatus verdict, int executionTimeMs, int memoryUsedKb) {
         this.verdict = verdict;
+        this.status = SubmissionStatus.JUDGED;
         this.executionTimeMs = executionTimeMs;
         this.memoryUsedKb = memoryUsedKb;
     }

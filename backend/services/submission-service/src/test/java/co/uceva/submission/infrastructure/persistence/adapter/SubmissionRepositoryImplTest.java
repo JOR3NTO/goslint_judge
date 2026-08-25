@@ -1,5 +1,6 @@
 package co.uceva.submission.infrastructure.persistence.adapter;
 
+import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.submission.AbstractIntegrationTest;
 import co.uceva.submission.domain.model.Submission;
 import co.uceva.submission.domain.repository.SubmissionRepository;
@@ -127,7 +128,62 @@ class SubmissionRepositoryImplTest extends AbstractIntegrationTest {
                 teamId, problemId, sourceCode, co.uceva.shared.domain.ProgrammingLanguage.JAVA)).isFalse();
     }
 
+    @Test
+    void shouldFindStalePendingSubmissions() {
+        Instant hace1Minuto = Instant.now().minusSeconds(60);
+        repository.save(aSubmission(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "a",
+                SubmissionStatus.PENDING, hace1Minuto));
+        repository.save(aSubmission(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "b",
+                SubmissionStatus.PENDING, hace1Minuto));
+
+        List<Submission> results = repository.findStalePending(Instant.now(), 50);
+
+        assertThat(results).hasSize(2);
+    }
+
+    @Test
+    void shouldExcludeSubmissionsThatWereAlreadyQueued() {
+        Instant hace1Minuto = Instant.now().minusSeconds(60);
+        repository.save(aSubmission(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "pendiente",
+                SubmissionStatus.PENDING, hace1Minuto));
+        repository.save(aSubmission(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "encolado",
+                SubmissionStatus.QUEUED, hace1Minuto));
+
+        List<Submission> results = repository.findStalePending(Instant.now(), 50);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).getSourceCode()).isEqualTo("pendiente");
+    }
+
+    @Test
+    void shouldExcludeRecentSubmissionsStillWithinTheGracePeriod() {
+        repository.save(aSubmission(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "reciente",
+                SubmissionStatus.PENDING, Instant.now()));
+
+        List<Submission> results = repository.findStalePending(Instant.now().minusSeconds(15), 50);
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    void shouldLimitTheNumberOfStalePendingSubmissionsReturned() {
+        Instant hace1Minuto = Instant.now().minusSeconds(60);
+        for (int i = 0; i < 5; i++) {
+            repository.save(aSubmission(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "code" + i,
+                    SubmissionStatus.PENDING, hace1Minuto));
+        }
+
+        List<Submission> results = repository.findStalePending(Instant.now(), 3);
+
+        assertThat(results).hasSize(3);
+    }
+
     private Submission aSubmission(UUID id, UUID teamId, UUID problemId, String sourceCode) {
+        return aSubmission(id, teamId, problemId, sourceCode, SubmissionStatus.PENDING, Instant.now());
+    }
+
+    private Submission aSubmission(UUID id, UUID teamId, UUID problemId, String sourceCode,
+            SubmissionStatus status, Instant submittedAt) {
         return Submission.builder()
                 .id(id)
                 .teamId(teamId)
@@ -135,9 +191,10 @@ class SubmissionRepositoryImplTest extends AbstractIntegrationTest {
                 .language(co.uceva.shared.domain.ProgrammingLanguage.PYTHON)
                 .sourceCode(sourceCode)
                 .verdict(co.uceva.shared.domain.VerdictStatus.PENDING)
+                .status(status)
                 .executionTimeMs(0)
                 .memoryUsedKb(0)
-                .submittedAt(Instant.now())
+                .submittedAt(submittedAt)
                 .build();
     }
 }

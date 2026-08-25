@@ -1,13 +1,16 @@
 package co.uceva.submission.infrastructure.persistence.adapter;
 
 import co.uceva.shared.domain.ProgrammingLanguage;
+import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.submission.domain.model.Submission;
 import co.uceva.submission.domain.repository.SubmissionRepository;
 import co.uceva.submission.infrastructure.mapper.SubmissionEntityMapper;
 import co.uceva.submission.infrastructure.persistence.entity.SubmissionEntity;
 import co.uceva.submission.infrastructure.persistence.repository.SpringDataSubmissionRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -95,5 +98,14 @@ public class SubmissionRepositoryImpl implements SubmissionRepository {
             UUID teamId, UUID problemId, String sourceCode, ProgrammingLanguage language) {
         return springDataRepository.existsByTeamIdAndProblemIdAndSourceCodeAndLanguage(
                 teamId, problemId, sourceCode, language);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public List<Submission> findStalePending(Instant submittedBefore, int limit) {
+        return springDataRepository.findByStatusAndSubmittedAtBeforeOrderBySubmittedAtAsc(
+                        SubmissionStatus.PENDING, submittedBefore, PageRequest.of(0, limit)).stream()
+                .map(SubmissionEntityMapper::toDomain)
+                .collect(Collectors.toList());
     }
 }

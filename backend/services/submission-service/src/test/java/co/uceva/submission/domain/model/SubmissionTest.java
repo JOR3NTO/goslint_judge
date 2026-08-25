@@ -1,6 +1,7 @@
 package co.uceva.submission.domain.model;
 
 import co.uceva.shared.domain.ProgrammingLanguage;
+import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.shared.domain.VerdictStatus;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,7 @@ class SubmissionTest {
         assertThat(submission.getLanguage()).isEqualTo(ProgrammingLanguage.JAVA);
         assertThat(submission.getSourceCode()).isEqualTo("class Main {}");
         assertThat(submission.getVerdict()).isEqualTo(VerdictStatus.PENDING);
+        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.PENDING);
         assertThat(submission.getExecutionTimeMs()).isEqualTo(0);
         assertThat(submission.getMemoryUsedKb()).isEqualTo(0);
         assertThat(submission.getCodeSizeBytes()).isGreaterThan(0);
@@ -40,8 +42,45 @@ class SubmissionTest {
         submission.updateVerdict(VerdictStatus.ACCEPTED, 120, 8192);
 
         assertThat(submission.getVerdict()).isEqualTo(VerdictStatus.ACCEPTED);
+        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.JUDGED);
         assertThat(submission.getExecutionTimeMs()).isEqualTo(120);
         assertThat(submission.getMemoryUsedKb()).isEqualTo(8192);
+    }
+
+    @Test
+    void shouldMarkSubmissionAsQueued() {
+        Submission submission = Submission.create(
+                UUID.randomUUID(), UUID.randomUUID(), ProgrammingLanguage.PYTHON, "print(1)"
+        );
+
+        submission.markQueued();
+
+        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.QUEUED);
+    }
+
+    @Test
+    void shouldKeepQueuedStatusWhenMarkedTwice() {
+        Submission submission = Submission.create(
+                UUID.randomUUID(), UUID.randomUUID(), ProgrammingLanguage.PYTHON, "print(1)"
+        );
+
+        submission.markQueued();
+        submission.markQueued();
+
+        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.QUEUED);
+    }
+
+    @Test
+    void shouldNotRollBackAJudgedSubmissionToQueued() {
+        Submission submission = Submission.create(
+                UUID.randomUUID(), UUID.randomUUID(), ProgrammingLanguage.PYTHON, "print(1)"
+        );
+        submission.updateVerdict(VerdictStatus.ACCEPTED, 10, 1024);
+
+        // Un reintento tardío no debe deshacer el trabajo ya completado por el juez.
+        submission.markQueued();
+
+        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.JUDGED);
     }
 
     @Test

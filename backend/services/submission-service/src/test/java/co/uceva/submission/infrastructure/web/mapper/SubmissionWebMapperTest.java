@@ -41,6 +41,7 @@ class SubmissionWebMapperTest {
         assertThat(response.language()).isEqualTo(submission.getLanguage());
         assertThat(response.sourceCode()).isEqualTo(submission.getSourceCode());
         assertThat(response.verdict()).isEqualTo(submission.getVerdict());
+        assertThat(response.status()).isEqualTo(submission.getStatus());
         assertThat(response.executionTimeMs()).isEqualTo(submission.getExecutionTimeMs());
         assertThat(response.memoryUsedKb()).isEqualTo(submission.getMemoryUsedKb());
         assertThat(response.codeSizeBytes()).isEqualTo(submission.getCodeSizeBytes());

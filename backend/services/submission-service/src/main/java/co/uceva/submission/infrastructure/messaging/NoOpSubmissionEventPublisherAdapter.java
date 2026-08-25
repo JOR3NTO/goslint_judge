@@ -2,31 +2,39 @@ package co.uceva.submission.infrastructure.messaging;
 
 import co.uceva.submission.application.port.out.SubmissionEventPublisher;
 import co.uceva.submission.domain.model.Submission;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
  * Adaptador de infraestructura que implementa {@link SubmissionEventPublisher}
  * sin publicar realmente el evento.
  * <p>
- * Se utiliza como implementación temporal mientras se define la tecnología de
- * mensajería definitiva (RabbitMQ). De esta forma la capa de aplicación puede
- * depender del puerto de salida y compilar correctamente, y en el futuro solo
- * será necesario reemplazar este adaptador por uno real sin tocar el dominio
- * ni los casos de uso.
+ * Solo se activa cuando la mensajería está desactivada mediante
+ * {@code app.messaging.enabled=false}, lo que permite levantar el servicio y
+ * ejecutar las pruebas sin necesidad de un broker en marcha. En ejecución normal
+ * el bean activo es {@link RabbitSubmissionEventPublisherAdapter}.
  * </p>
  */
 @Component
+@ConditionalOnProperty(prefix = "app.messaging", name = "enabled", havingValue = "false")
 public class NoOpSubmissionEventPublisherAdapter implements SubmissionEventPublisher {
 
+    private static final Logger log = LoggerFactory.getLogger(NoOpSubmissionEventPublisherAdapter.class);
+
     /**
-     * No realiza ninguna acción. El evento de envío recibido se descarta
-     * intencionalmente hasta que se conecte un broker de mensajería.
+     * Da la entrega por confirmada sin contactar con ningún broker.
+     * <p>
+     * No lanza excepción a propósito: con la mensajería desactivada, dejar los
+     * envíos atrapados en estado pendiente y reintentándolos indefinidamente no
+     * aportaría nada.
+     * </p>
      *
-     * @param submission Envío recibido (ignorado en esta implementación).
+     * @param submission Envío recibido (no se publica en esta implementación).
      */
     @Override
     public void publishSubmissionReceived(Submission submission) {
-        // Implementación intencionalmente vacía.
-        // TODO: reemplazar por adaptador RabbitMQ cuando se implemente la mensajería.
+        log.debug("Mensajería desactivada: el envío {} no se publica en el broker.", submission.getId());
     }
 }
