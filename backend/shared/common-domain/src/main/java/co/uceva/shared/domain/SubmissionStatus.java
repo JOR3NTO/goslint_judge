@@ -17,5 +17,17 @@ public enum SubmissionStatus {
     /** El motor de evaluación tomó el envío y lo está procesando. */
     JUDGING,
     /** El motor de evaluación finalizó y emitió un veredicto. */
-    JUDGED
+    JUDGED,
+    /**
+     * El envío no pudo evaluarse por un fallo del propio sistema, agotados todos
+     * los reintentos.
+     * <p>
+     * Es un estado terminal y excepcional: no dice nada sobre la corrección del
+     * código del estudiante (su {@code verdict} sigue siendo {@code PENDING}),
+     * sino que la plataforma no consiguió emitir un veredicto. Se distingue de
+     * {@code JUDGING} o {@code QUEUED} precisamente para que un envío averiado no
+     * se quede indefinidamente aparentando estar en curso.
+     * </p>
+     */
+    SYSTEM_ERROR
 }

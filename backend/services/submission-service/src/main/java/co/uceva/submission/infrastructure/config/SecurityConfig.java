@@ -18,6 +18,14 @@ import org.springframework.security.web.SecurityFilterChain;
  * por ahora todos los requests son permitidos a nivel de filtro HTTP para no
  * romper el comportamiento actual mientras se agregan las restricciones por rol.
  * </p>
+ * <p>
+ * El canal WebSocket es la excepción y ya autentica de verdad, pero no a través de
+ * esta cadena: lo hace {@code JwtHandshakeInterceptor}, que valida el token durante
+ * el handshake y rechaza la conexión antes de aceptarla. Un canal que empuja datos
+ * de un usuario concreto no puede quedar abierto esperando a que el filtro HTTP
+ * llegue en una historia futura. El validador que ambos compartirán se declara en
+ * {@link JwtConfig}.
+ * </p>
  */
 @Configuration
 @EnableWebSecurity

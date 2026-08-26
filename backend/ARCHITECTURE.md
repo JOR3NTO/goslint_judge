@@ -411,6 +411,39 @@ GET /api/v1/problems/test-cases/{problemId}/samples
 - **JWT aún no está implementado**: por ahora `problem-service` tiene una configuración de seguridad mínima (`SecurityConfig`) que habilita `@EnableMethodSecurity` y permite todas las requests a nivel de filtro HTTP (`anyRequest().permitAll()`).
 - **Las restricciones por rol ya están escritas** en los controllers y se activarán completamente cuando se agregue el filtro JWT que extraiga el rol del token y lo convierta a `ROLE_*`.
 - El rol `SERVICE` **no está en el enum `Role` del `auth-service`** porque no es un rol de usuario humano. Cuando se implemente la generación de JWTs para microservicios, el claim `role=SERVICE` se mapeará directamente a la authority `ROLE_SERVICE`.
+- **El canal WebSocket ya autentica de verdad.** `JwtTokenValidator` (en `shared/common-infrastructure`) verifica firma, emisor y vigencia, y `JwtHandshakeInterceptor` lo aplica durante el handshake: una conexión sin token válido se rechaza con `401` y nunca llega a abrirse. El mismo bean servirá al futuro filtro JWT de los endpoints HTTP, de modo que ambos lados validen igual.
+- **La emisión de tokens sigue pendiente**: `auth-service` solo expone `/register`. El WebSocket únicamente consume un token ya emitido; el login es una historia aparte y siempre HTTP.
+
+### 6.5 Canal de notificación en tiempo real
+
+`submission-service` expone un WebSocket en `/ws/submissions` para empujar los cambios de estado de los envíos.
+
+| Aspecto | Decisión |
+|---------|----------|
+| Sentido | **Unidireccional.** El servidor empuja; lo que el cliente envíe se descarta sin interpretarlo. No hay comandos, ni suscripciones, ni STOMP. |
+| Autenticación | JWT validado en el handshake, en este orden: subprotocolo `bearer.<token>`, cabecera `Authorization: Bearer`, o query param `token`. |
+| Alcance | El servidor asocia la conexión al `sub` del token y solo entrega envíos cuyo equipo dueño incluye a ese usuario. |
+| Destinatarios | Se resuelven vía `TeamMembershipPort`. Mientras `contest-service` no exista, `NoOpTeamMembershipAdapter` trata cada equipo como individual. |
+
+Los navegadores no permiten fijar cabeceras al abrir un WebSocket, de ahí el subprotocolo. El cliente anuncia dos y el servidor confirma solo el fijo:
+
+```js
+new WebSocket("wss://.../ws/submissions", ["goslint-judge", `bearer.${token}`]);
+```
+
+Mensaje emitido (`SubmissionStatusEventDTO`):
+
+```json
+{
+  "type": "SUBMISSION_STATUS_UPDATED",
+  "submissionId": "…", "problemId": "…", "teamId": "…",
+  "status": "JUDGED", "verdict": "ACCEPTED",
+  "executionTimeMs": 120, "memoryUsedKb": 2048,
+  "occurredAt": "2026-08-25T18:30:00Z"
+}
+```
+
+No incluye el código fuente: ya está en poder de quien lo envió y no tiene por qué recorrer la red otra vez.
 
 ## 7. Flujo de datos principal (envío de código)
 
@@ -432,15 +465,27 @@ GET /api/v1/problems/test-cases/{problemId}/samples
     │  6. Compila el código en contenedor Docker
     │  7. Ejecuta vs. cada test case (sandbox)
     │  8. Determina veredicto
-    │  9. Publica → RabbitMQ: queue "submission.judged"
+    │  9. Publica → RabbitMQ: exchange "submission.exchange",
+    │     routing key "submission.judged" → cola "submission.judged"
     │
-    ├─▶ [submission-service] ← Actualiza Submission con veredicto (status: JUDGED)
+    ├─▶ [submission-service] ← Consumidor de "submission.judged"
+    │     10. Actualiza Submission: veredicto + executionTimeMs + memoryUsedKb
+    │         (status: JUDGED)
+    │     11. Tras el commit, empuja el nuevo estado por WebSocket al dueño
+    │         del envío → la pantalla se actualiza sin recargar ni hacer polling
     │
     └─▶ [feedback-service] ← Si no es ACCEPTED:
-           10. Llama API LLM con prompt
-           11. Persiste Feedback
-           12. Notifica al cliente (WebSocket / polling)
+           12. Llama API LLM con prompt
+           13. Persiste Feedback
 ```
+
+> Si el envío no puede completar su recorrido —el juez agota los reintentos, o el
+> veredicto no consigue registrarse— el mensaje acaba en la cola de mensajes
+> muertos correspondiente (`submission.evaluate.dlq` / `submission.judged.dlq`).
+> `ExhaustedSubmissionDeadLetterListener` lo recoge y cierra el envío con estado
+> `SYSTEM_ERROR`, que se notifica por el mismo WebSocket. Sin ese cierre el envío
+> se quedaría para siempre aparentando estar en cola y el estudiante esperando un
+> veredicto que nadie va a emitir.
 
 > El envío **nunca se pierde por un fallo de mensajería**: si el paso 3 no obtiene
 > confirmación del broker, la fila se queda en `PENDING` y
