@@ -37,6 +37,13 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * el publicador apuntando a un exchange que nadie declaró. Esas propiedades son
  * también el contrato con el consumidor ({@code judge-service}).
  * </p>
+ * <p>
+ * La topología cubre los dos sentidos del diálogo con el motor de evaluación: la
+ * cola de evaluación por la que salen los envíos, y la cola de veredictos por la
+ * que vuelven ya juzgados. Ambas tienen su propia cola de mensajes muertos, de
+ * modo que un envío que no pueda completar su recorrido acabe en un sitio
+ * conocido en lugar de desaparecer.
+ * </p>
  */
 @Configuration
 @EnableScheduling
@@ -135,6 +142,81 @@ public class RabbitConfig {
         return BindingBuilder.bind(submissionEvaluateDeadLetterQueue)
                 .to(submissionDeadLetterExchange)
                 .with(deadLetterQueue);
+    }
+
+    /**
+     * Cola duradera por la que {@code judge-service} devuelve los veredictos.
+     * <p>
+     * Un veredicto que este servicio no consiga registrar tras los reintentos se
+     * deriva a su cola de mensajes muertos, donde
+     * {@code ExhaustedSubmissionDeadLetterListener} lo recoge para cerrar el envío
+     * con un estado de error del sistema.
+     * </p>
+     *
+     * @param judgedQueue           Nombre de la cola de veredictos.
+     * @param deadLetterExchange    Exchange al que derivar los mensajes rechazados.
+     * @param judgedDeadLetterQueue Routing key con la que se derivan, igual al nombre de la DLQ.
+     * @return Cola de veredictos con su política de mensajes muertos.
+     */
+    @Bean
+    public Queue submissionJudgedQueue(
+            @Value("${app.messaging.submission.judged-queue}") String judgedQueue,
+            @Value("${app.messaging.submission.dead-letter-exchange}") String deadLetterExchange,
+            @Value("${app.messaging.submission.judged-dead-letter-queue}") String judgedDeadLetterQueue) {
+        return QueueBuilder.durable(judgedQueue)
+                .deadLetterExchange(deadLetterExchange)
+                .deadLetterRoutingKey(judgedDeadLetterQueue)
+                .build();
+    }
+
+    /**
+     * Cola donde quedan retenidos los veredictos que no pudieron registrarse.
+     *
+     * @param judgedDeadLetterQueue Nombre de la cola de mensajes muertos de veredictos.
+     * @return Cola de mensajes muertos de veredictos.
+     */
+    @Bean
+    public Queue submissionJudgedDeadLetterQueue(
+            @Value("${app.messaging.submission.judged-dead-letter-queue}") String judgedDeadLetterQueue) {
+        return QueueBuilder.durable(judgedDeadLetterQueue).build();
+    }
+
+    /**
+     * Enlaza la cola de veredictos con el exchange principal.
+     * <p>
+     * La routing key es la que {@code judge-service} debe usar al publicar el
+     * resultado de la evaluación: es el contrato entre ambos servicios.
+     * </p>
+     *
+     * @param submissionJudgedQueue Cola de veredictos.
+     * @param submissionExchange    Exchange principal.
+     * @param judgedRoutingKey      Routing key de los envíos ya evaluados.
+     * @return Binding entre el exchange principal y la cola de veredictos.
+     */
+    @Bean
+    public Binding submissionJudgedBinding(Queue submissionJudgedQueue,
+            TopicExchange submissionExchange,
+            @Value("${app.messaging.submission.judged-routing-key}") String judgedRoutingKey) {
+        return BindingBuilder.bind(submissionJudgedQueue)
+                .to(submissionExchange)
+                .with(judgedRoutingKey);
+    }
+
+    /**
+     * Enlaza la cola de veredictos fallidos con el exchange de mensajes muertos.
+     *
+     * @param submissionJudgedDeadLetterQueue Cola de mensajes muertos de veredictos.
+     * @param submissionDeadLetterExchange    Exchange de mensajes muertos.
+     * @param judgedDeadLetterQueue           Routing key usada al derivar, igual al nombre de la DLQ.
+     * @return Binding entre el exchange de mensajes muertos y la cola de veredictos fallidos.
+     */
+    @Bean
+    public Binding submissionJudgedDeadLetterBinding(Queue submissionJudgedDeadLetterQueue,
+            DirectExchange submissionDeadLetterExchange,
+            @Value("${app.messaging.submission.judged-dead-letter-queue}") String judgedDeadLetterQueue) {
+        return BindingBuilder.bind(submissionJudgedDeadLetterQueue)
+                .to(submissionDeadLetterExchange)
+                .with(judgedDeadLetterQueue);
     }
 
     /**

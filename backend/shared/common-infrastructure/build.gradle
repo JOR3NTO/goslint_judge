@@ -9,6 +9,13 @@ dependencies {
     api 'org.springframework.boot:spring-boot-starter-web'
     api 'org.springframework.boot:spring-boot-starter-validation'
     api 'org.springframework.boot:spring-boot-starter-security'
+
+    // Firma y verificacion de JWT. El BOM de Spring Boot no gestiona jjwt, asi que
+    // la version se fija aqui, en un unico sitio, para que todos los servicios
+    // validen los tokens con exactamente la misma implementacion.
+    api 'io.jsonwebtoken:jjwt-api:0.12.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
     
     // Lombok y tests ya están configurados en el padre
 }
