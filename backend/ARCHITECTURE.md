@@ -13,6 +13,7 @@
 3. [Arquitectura Limpia — La regla de dependencia](#3-arquitectura-limpia--la-regla-de-dependencia)
 4. [Módulos compartidos (shared)](#4-módulos-compartidos-shared)
 5. [Microservicios — Responsabilidades y dominio](#5-microservicios--responsabilidades-y-dominio)
+   - [Estado de implementación](#estado-de-implementación)
 6. [Flujo de datos principal (envío de código)](#6-flujo-de-datos-principal-envío-de-código)
 7. [Convenciones de paquetes Java](#7-convenciones-de-paquetes-java)
 8. [Configuración de Gradle](#8-configuración-de-gradle)
@@ -154,6 +155,26 @@ Candidatos a residir aquí:
 
 ## 5. Microservicios — Responsabilidades y dominio
 
+### Estado de implementación
+
+| Servicio | Puerto | Estado | Qué hay hoy |
+|----------|--------|--------|-------------|
+| `auth-service` | 8081 | 🟡 Parcial | Registro de usuarios (`POST /api/v1/auth/register`). **La emisión de JWT sigue pendiente**: no hay login, y sin él ningún otro servicio puede autenticar de verdad una petición HTTP. Esquema aún con `ddl-auto=update`, sin Flyway |
+| `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Falta el filtro JWT y su migración base de Flyway |
+| `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción del envío, encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Esquema versionado con Flyway (`V1`–`V3`). Es el único servicio que **autentica de verdad**, y solo en el handshake del WebSocket |
+| `judge-service` | 8084 | 🔴 Esqueleto | Solo la clase de arranque. Su papel lo simula hoy [`testing/ws-judge-simulator/`](../testing/ws-judge-simulator/README.md) |
+| `feedback-service` | 8085 | 🔴 Esqueleto | Solo la clase de arranque |
+| `contest-service` | 8086 | 🔴 Esqueleto | Solo la clase de arranque. Mientras no exista, `submission-service` resuelve cada equipo como individual mediante `NoOpTeamMembershipAdapter` |
+
+**Documentación detallada por subsistema:**
+
+| Documento | Contenido |
+|-----------|-----------|
+| [`services/submission-service/docs/RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md) | Topología, contrato de mensajes con `judge-service`, garantías de entrega, DLQ y reintentos |
+| [`services/submission-service/docs/WEBSOCKET.md`](./services/submission-service/docs/WEBSOCKET.md) | Canal `/ws/submissions`: autenticación en el handshake, contrato del mensaje, alcance por equipo y limitaciones |
+
+---
+
 ### `auth-service` — Puerto `8081`
 **Responsabilidad:** Gestión de identidad y autenticación.
 
@@ -276,6 +297,10 @@ Detalles que conviene conocer antes de desplegar sobre una base de datos ya exis
 - **Relleno del histórico:** los envíos anteriores a `V2` nunca pasaron por el encolamiento, así que su estado se deduce del veredicto — `verdict = 'PENDING'` → `status = 'PENDING'`, cualquier otro veredicto → `status = 'JUDGED'`. Las filas que queden en `PENDING` serán reencoladas por el barrido de reintentos en el primer arranque, que es justo lo que se quiere: son envíos que nunca llegaron al juez.
 - **Base de datos compartida:** todos los microservicios comparten la misma BD, por eso el servicio lleva su propio historial (`spring.flyway.table=flyway_schema_history_submission`) y toma como línea base la versión `0` (`spring.flyway.baseline-on-migrate=true`, `spring.flyway.baseline-version=0`). Sin `baseline-version=0`, Flyway daría `V1` por aplicada solo porque el esquema no está vacío por culpa de otro servicio.
 - **Idempotencia:** `V1` y `V2` usan `IF NOT EXISTS` para tolerar entornos donde la tabla ya la creó `ddl-auto` en su día.
+
+> 📖 El detalle completo de la mensajería —garantías de entrega, colas de mensajes
+> muertos, reintentos y contrato con `judge-service`— está en
+> [`services/submission-service/docs/RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md).
 
 > ⚠️ **Importante:** `submission-service` **no juzga** el código. Solo orquesta la entrada. El juicio es responsabilidad de `judge-service`.
 
@@ -445,6 +470,11 @@ Mensaje emitido (`SubmissionStatusEventDTO`):
 
 No incluye el código fuente: ya está en poder de quien lo envió y no tiene por qué recorrer la red otra vez.
 
+> 📖 El detalle del canal —las tres vías de las que se extrae el token, el registro
+> de sesiones, cómo se resuelven los destinatarios y las limitaciones conocidas al
+> escalar— está en
+> [`services/submission-service/docs/WEBSOCKET.md`](./services/submission-service/docs/WEBSOCKET.md).
+
 ## 7. Flujo de datos principal (envío de código)
 
 ```
@@ -574,13 +604,10 @@ dependencies {
 }
 ```
 
-> ⚠️ **Problema actual:** Ningún microservicio tiene `id 'org.springframework.boot'` en su `build.gradle` propio ni las dependencias reales (JPA, RabbitMQ, etc.). Deben añadirse cuando se empiece a implementar cada servicio.
+> Todos los servicios aplican ya el plugin. Los que siguen siendo esqueleto (`judge`, `feedback`, `contest`) aún no declaran sus dependencias reales (Docker client, cliente HTTP del LLM, etc.): se añaden al implementarlos.
 
-### Gradle Wrapper (pendiente)
-El proyecto no tiene Gradle Wrapper inicializado. Para agregarlo:
-1. Instala Gradle (≥ 8.x): https://gradle.org/install/
-2. Desde la carpeta `backend/`: `gradle wrapper --gradle-version 8.9`
-3. Commitea los archivos generados: `gradlew`, `gradlew.bat`, `gradle/wrapper/`
+### Gradle Wrapper
+Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` desde `backend/`; no hace falta Gradle instalado globalmente.
 
 ---
 
@@ -588,16 +615,17 @@ El proyecto no tiene Gradle Wrapper inicializado. Para agregarlo:
 
 | # | Problema | Criticidad | Acción requerida |
 |---|----------|-----------|------------------|
-| 1 | **No hay Gradle Wrapper** en el repositorio | 🔴 Alta | Inicializar con `gradle wrapper` |
-| 2 | **Microservicios sin plugin `org.springframework.boot`** en su `build.gradle` individual | 🔴 Alta | Cada servicio necesita este plugin para ser ejecutable |
-| 3 | **Test package incorrecto** en `auth-service` y `problem-service` | 🟡 Media | La clase de test usa `co.uceva.judge.auth_service` en lugar de `co.uceva.auth` |
-| 4 | **`application.properties` vacíos** — solo tienen `spring.application.name` | 🟡 Media | Agregar puerto, configuración de BD, etc. cuando se implementen |
-| 5 | **Sin `application.properties`** en servicios nuevos (submission, judge, feedback, contest) | 🟡 Media | Crear el archivo con al menos `spring.application.name` y el puerto |
-| 6 | **`shared/common-domain` y `shared/common-infrastructure`** sin código fuente | 🟡 Media | Crear la estructura de carpetas `src/main/java/co/uceva/shared/` |
-| 7 | **`docker-compose.yml` y `traefik.yml` vacíos** | 🟡 Media | Completar con la configuración de infraestructura |
-| 8 | **Sin Gradle Wrapper**, el CI/CD no puede construir el proyecto | 🔴 Alta | Resolver el punto 1 primero |
-| 9 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
-| 10 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que el esquema deje de depender de lo que Hibernate decida en cada arranque |
+| 1 | **`auth-service` no emite JWT**: solo expone `/register` | 🔴 Alta | Sin login no hay tokens que validar. Es lo que bloquea el filtro JWT de todos los servicios y obliga al bypass temporal de `submission-service` |
+| 2 | **Ningún endpoint HTTP valida el JWT**: los `@PreAuthorize` están escritos pero la autenticación llega anónima | 🔴 Alta | Escribir el filtro JWT reutilizando `JwtTokenValidator` (ya usado por el handshake del WebSocket) y retirar `TemporaryAuthBypassFilter` |
+| 3 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
+| 4 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que deje de depender de lo que Hibernate decida en cada arranque |
+| 5 | **`judge-service` no existe**: los envíos se encolan y nadie los consume | 🔴 Alta | Implementar el consumidor de `submission.evaluate`. El contrato ya está fijado en `docs/RABBITMQ.md`; `testing/ws-judge-simulator/` lo simula mientras tanto |
+| 6 | **`contest-service` no existe**: la composición real de los equipos se desconoce | 🟡 Media | `NoOpTeamMembershipAdapter` trata cada equipo como individual. Al llegar el servicio, añadir un adaptador y cambiar `app.team-membership.provider` |
+| 7 | **El registro de sesiones WebSocket es local a la instancia** | 🟡 Media | Con varias réplicas, la instancia que recibe el veredicto puede no tener la conexión del estudiante. Escalar horizontalmente exige compartir el registro (p. ej. Redis) |
+| 8 | **`traefik.yml` está vacío** | 🟡 Media | Sin API Gateway cada servicio se expone por su puerto. Al configurarlo, cuidar el reenvío de `Upgrade`/`Sec-WebSocket-Protocol` o el handshake del WebSocket no se completa |
+| 9 | **`app.websocket.allowed-origins=*`** | 🟡 Media | Cómodo en desarrollo; restringir a los orígenes del frontend antes de exponer el servicio |
+| 10 | **Test package incorrecto** en `auth-service` y `problem-service` | 🟢 Baja | La clase de test usa `co.uceva.judge.auth_service` en lugar de `co.uceva.auth` |
+| 11 | **`services/users-service/` conviven con `auth-service`** | 🟢 Baja | Hay dos módulos para la misma responsabilidad; decidir cuál queda y retirar el otro de `settings.gradle` |
 
 ---
 
@@ -665,4 +693,4 @@ Antes de enviar cambios en cualquier microservicio, verificar:
 
 ---
 
-*Documento generado el 2026-06-10. Actualizar cuando cambien decisiones arquitectónicas.*
+*Documento generado el 2026-06-10; última actualización el 2026-09-05. Actualizar cuando cambien decisiones arquitectónicas.*
