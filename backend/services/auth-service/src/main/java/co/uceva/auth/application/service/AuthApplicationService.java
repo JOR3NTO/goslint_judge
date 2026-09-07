@@ -75,14 +75,16 @@ public class AuthApplicationService implements RegisterUserUseCase, LoginUserUse
             throw new AccountLockedException("Demasiados intentos fallidos. Por favor, espere " + waitTime + " minutos.");
         }
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new BadCredentialsException("Credenciales incorrectas"));
-
-        if (!user.isActive()) {
-            throw new AccountDisabledException("Su cuenta no está activa. Verifique su correo electrónico o contacte a soporte.");
+        User user = userRepository.findByEmail(email).orElse(null);
+        
+        boolean passwordMatches = false;
+        if (user != null) {
+            passwordMatches = passwordEncoder.matches(password, user.getPasswordHash());
         }
 
-        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+        // Si el usuario no existe, la contraseña no coincide o la cuenta no está activa,
+        // lanzamos siempre el mismo error para evitar la enumeración de usuarios (seguridad).
+        if (user == null || !passwordMatches || !user.isActive()) {
             cachePort.incrementFailedAttempts(email);
             int attempts = cachePort.getFailedAttempts(email);
             if (attempts >= 5) {

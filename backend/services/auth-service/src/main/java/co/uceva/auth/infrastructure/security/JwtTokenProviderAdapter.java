@@ -22,6 +22,9 @@ public class JwtTokenProviderAdapter implements TokenProviderPort {
 
     @Value("${jwt.expiration.refresh}")
     private long jwtExpirationRefreshMs;
+    
+    @Value("${jwt.issuer:goslint-auth-service}")
+    private String jwtIssuer;
 
     @Override
     public String generateAccessToken(User user) {
@@ -44,6 +47,7 @@ public class JwtTokenProviderAdapter implements TokenProviderPort {
 
         return Jwts.builder()
                 .subject(user.getId().toString())
+                .issuer(jwtIssuer)
                 .claim("email", user.getEmail())
                 .claim("role", user.getRole().name())
                 .issuedAt(now)
@@ -53,6 +57,6 @@ public class JwtTokenProviderAdapter implements TokenProviderPort {
     }
 
     private SecretKey key() {
-        return Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 }
