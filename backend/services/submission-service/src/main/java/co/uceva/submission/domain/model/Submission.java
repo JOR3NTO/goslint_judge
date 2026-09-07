@@ -138,6 +138,26 @@ public class Submission {
         this.memoryUsedKb = memoryUsedKb;
     }
 
+    /**
+     * Marca el envío como fallido por un problema del sistema, una vez agotados
+     * todos los reintentos de evaluación.
+     * <p>
+     * El veredicto se deja intacto en {@code PENDING}: el juez nunca llegó a
+     * pronunciarse, y atribuirle un veredicto real culparía al código del
+     * estudiante de un fallo de la plataforma.
+     * </p>
+     * <p>
+     * La operación nunca pisa un envío ya evaluado: si el veredicto llegó a
+     * registrarse, un mensaje averiado que caiga tarde en la cola de fallidos no
+     * puede borrar un resultado válido que el estudiante ya vio.
+     * </p>
+     */
+    public void markSystemError() {
+        if (this.status != SubmissionStatus.JUDGED) {
+            this.status = SubmissionStatus.SYSTEM_ERROR;
+        }
+    }
+
     /** @return El código fuente en texto plano. */
     public String getSourceCode() {
         return sourceCode.content();
