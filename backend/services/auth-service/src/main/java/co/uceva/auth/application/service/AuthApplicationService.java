@@ -7,38 +7,22 @@ import co.uceva.auth.domain.exception.UserAlreadyExistsException;
 import co.uceva.auth.domain.model.User;
 import org.springframework.stereotype.Service;
 
-import co.uceva.auth.application.port.in.LoginUserUseCase;
-import co.uceva.auth.application.port.out.CachePort;
-import co.uceva.auth.application.port.out.TokenProviderPort;
-import co.uceva.auth.domain.exception.AccountDisabledException;
-import co.uceva.auth.domain.exception.AccountLockedException;
-import co.uceva.auth.domain.exception.BadCredentialsException;
-import co.uceva.auth.domain.model.AuthToken;
-
 /**
- * Servicio de Aplicación (Caso de Uso) que implementa la lógica principal
- * de registro de usuarios y autenticación. Es el Orquestador central de la capa de aplicación.
+ * Servicio de Aplicación que implementa la lógica principal de registro de usuarios.
+ * 
+ * NOTA: Este servicio será refactorizado en la rama de register para seguir
+ * la convención de Clean Architecture (application/usecase/impl/).
  */
 @Service
-public class AuthApplicationService implements RegisterUserUseCase, LoginUserUseCase {
+public class AuthApplicationService implements RegisterUserUseCase {
 
     private final UserRepository userRepository;
     private final PasswordEncoderPort passwordEncoder;
-    private final CachePort cachePort;
-    private final TokenProviderPort tokenProviderPort;
 
-    /**
-     * Inyección de dependencias mediante constructor.
-     * Recibe los puertos de salida (que serán implementados en la capa de infraestructura).
-     */
     public AuthApplicationService(UserRepository userRepository, 
-                                  PasswordEncoderPort passwordEncoder,
-                                  CachePort cachePort,
-                                  TokenProviderPort tokenProviderPort) {
+                                  PasswordEncoderPort passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.cachePort = cachePort;
-        this.tokenProviderPort = tokenProviderPort;
     }
 
     /**
@@ -66,46 +50,5 @@ public class AuthApplicationService implements RegisterUserUseCase, LoginUserUse
         
         // Se guarda utilizando el puerto del repositorio
         return userRepository.save(newUser);
-    }
-
-    @Override
-    public AuthToken login(String email, String password) {
-        if (cachePort.isAccountLocked(email)) {
-            long waitTime = cachePort.getLockTimeLeftSeconds(email) / 60;
-            throw new AccountLockedException("Demasiados intentos fallidos. Por favor, espere " + waitTime + " minutos.");
-        }
-
-        User user = userRepository.findByEmail(email).orElse(null);
-        
-        boolean passwordMatches = false;
-        if (user != null) {
-            passwordMatches = passwordEncoder.matches(password, user.getPasswordHash());
-        }
-
-        // Si el usuario no existe, la contraseña no coincide o la cuenta no está activa,
-        // lanzamos siempre el mismo error para evitar la enumeración de usuarios (seguridad).
-        if (user == null || !passwordMatches || !user.isActive()) {
-            cachePort.incrementFailedAttempts(email);
-            int attempts = cachePort.getFailedAttempts(email);
-            if (attempts >= 5) {
-                cachePort.lockAccount(email, 15);
-                throw new AccountLockedException("Su cuenta ha sido bloqueada por 15 minutos debido a múltiples intentos fallidos.");
-            }
-            throw new BadCredentialsException("Credenciales incorrectas");
-        }
-
-        cachePort.resetFailedAttempts(email);
-
-        String accessToken = tokenProviderPort.generateAccessToken(user);
-        String refreshToken = tokenProviderPort.generateRefreshToken(user);
-        
-        // Guardamos el refresh token por 8 horas (28800000 ms)
-        cachePort.saveRefreshToken(user.getId().toString(), refreshToken, 28800000);
-
-        return AuthToken.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .expiresIn(tokenProviderPort.getAccessTokenExpirationMs())
-                .build();
     }
 }

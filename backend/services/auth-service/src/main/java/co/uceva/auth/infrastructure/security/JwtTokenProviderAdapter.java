@@ -1,6 +1,6 @@
 package co.uceva.auth.infrastructure.security;
 
-import co.uceva.auth.application.port.out.TokenProviderPort;
+import co.uceva.auth.domain.service.TokenProvider;
 import co.uceva.auth.domain.model.User;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -12,7 +12,7 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 
 @Component
-public class JwtTokenProviderAdapter implements TokenProviderPort {
+public class JwtTokenProviderAdapter implements TokenProvider {
 
     @Value("${jwt.secret}")
     private String jwtSecret;

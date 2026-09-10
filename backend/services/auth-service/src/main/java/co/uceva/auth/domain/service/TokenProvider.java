@@ -1,8 +1,8 @@
-package co.uceva.auth.application.port.out;
+package co.uceva.auth.domain.service;
 
 import co.uceva.auth.domain.model.User;
 
-public interface TokenProviderPort {
+public interface TokenProvider {
     String generateAccessToken(User user);
     String generateRefreshToken(User user);
     Long getAccessTokenExpirationMs();

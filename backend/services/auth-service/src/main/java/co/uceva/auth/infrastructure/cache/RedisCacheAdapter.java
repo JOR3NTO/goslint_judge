@@ -1,13 +1,13 @@
 package co.uceva.auth.infrastructure.cache;
 
-import co.uceva.auth.application.port.out.CachePort;
+import co.uceva.auth.domain.repository.AuthCacheRepository;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
 @Component
-public class RedisCacheAdapter implements CachePort {
+public class RedisCacheAdapter implements AuthCacheRepository {
 
     private final StringRedisTemplate redisTemplate;
     

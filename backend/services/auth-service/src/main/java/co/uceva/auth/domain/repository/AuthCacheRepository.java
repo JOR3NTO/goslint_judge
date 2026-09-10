@@ -1,6 +1,6 @@
-package co.uceva.auth.application.port.out;
+package co.uceva.auth.domain.repository;
 
-public interface CachePort {
+public interface AuthCacheRepository {
     void incrementFailedAttempts(String email);
     void resetFailedAttempts(String email);
     int getFailedAttempts(String email);

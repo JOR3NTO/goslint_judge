@@ -1,4 +1,4 @@
-package co.uceva.auth.application.port.in;
+package co.uceva.auth.application.usecase;
 
 import co.uceva.auth.domain.model.AuthToken;
 
