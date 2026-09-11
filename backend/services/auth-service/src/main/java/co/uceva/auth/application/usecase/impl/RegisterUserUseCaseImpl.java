@@ -1,27 +1,28 @@
-package co.uceva.auth.application.service;
+package co.uceva.auth.application.usecase.impl;
 
-import co.uceva.auth.application.port.in.RegisterUserUseCase;
-import co.uceva.auth.application.port.out.PasswordEncoderPort;
-import co.uceva.auth.application.port.out.UserRepository;
+import co.uceva.auth.application.usecase.RegisterUserUseCase;
+import co.uceva.auth.domain.service.PasswordEncoder;
+import co.uceva.auth.domain.repository.UserRepository;
 import co.uceva.auth.domain.exception.UserAlreadyExistsException;
 import co.uceva.auth.domain.model.User;
 import org.springframework.stereotype.Service;
 
 /**
  * Servicio de Aplicación (Caso de Uso) que implementa la lógica principal
- * de registro de usuarios. Es el Orquestador central de la capa de aplicación.
+ * de registro de usuarios.
  */
 @Service
-public class AuthApplicationService implements RegisterUserUseCase {
+public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
 
     private final UserRepository userRepository;
-    private final PasswordEncoderPort passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Inyección de dependencias mediante constructor.
      * Recibe los puertos de salida (que serán implementados en la capa de infraestructura).
      */
-    public AuthApplicationService(UserRepository userRepository, PasswordEncoderPort passwordEncoder) {
+    public RegisterUserUseCaseImpl(UserRepository userRepository, 
+                                   PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }

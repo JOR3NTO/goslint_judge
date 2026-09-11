@@ -1,4 +1,4 @@
-package co.uceva.auth.infrastructure.web;
+package co.uceva.auth.infrastructure.web.controller;
 
 import co.uceva.auth.domain.exception.InvalidUserDataException;
 import co.uceva.auth.domain.exception.UserAlreadyExistsException;

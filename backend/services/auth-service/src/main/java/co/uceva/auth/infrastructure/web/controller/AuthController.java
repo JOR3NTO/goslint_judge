@@ -1,6 +1,6 @@
-package co.uceva.auth.infrastructure.web;
+package co.uceva.auth.infrastructure.web.controller;
 
-import co.uceva.auth.application.port.in.RegisterUserUseCase;
+import co.uceva.auth.application.usecase.RegisterUserUseCase;
 import co.uceva.auth.domain.model.User;
 import co.uceva.auth.infrastructure.web.dto.RegisterRequest;
 import jakarta.validation.Valid;

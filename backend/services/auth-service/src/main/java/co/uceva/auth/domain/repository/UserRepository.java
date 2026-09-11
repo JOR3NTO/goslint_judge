@@ -1,4 +1,4 @@
-package co.uceva.auth.application.port.out;
+package co.uceva.auth.domain.repository;
 
 import co.uceva.auth.domain.model.User;
 import java.util.Optional;
