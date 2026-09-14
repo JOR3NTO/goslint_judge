@@ -29,8 +29,8 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable) // Deshabilita CSRF (Cross-Site Request Forgery) ya que usaremos APIs Stateless
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/register").permitAll() // Público para todos
-                .anyRequest().authenticated() // Cualquier otra ruta requiere token (Implementación de Login pendiente)
+                .requestMatchers("/api/v1/auth/register", "/api/v1/auth/login").permitAll() // Público para todos
+                .anyRequest().authenticated() // Cualquier otra ruta requiere token
             );
         return http.build();
     }

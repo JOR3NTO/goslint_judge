@@ -8,8 +8,10 @@ import co.uceva.auth.domain.model.User;
 import org.springframework.stereotype.Service;
 
 /**
- * Servicio de Aplicación (Caso de Uso) que implementa la lógica principal
- * de registro de usuarios. Es el Orquestador central de la capa de aplicación.
+ * Servicio de Aplicación que implementa la lógica principal de registro de usuarios.
+ * 
+ * NOTA: Este servicio será refactorizado en la rama de register para seguir
+ * la convención de Clean Architecture (application/usecase/impl/).
  */
 @Service
 public class AuthApplicationService implements RegisterUserUseCase {
@@ -17,11 +19,8 @@ public class AuthApplicationService implements RegisterUserUseCase {
     private final UserRepository userRepository;
     private final PasswordEncoderPort passwordEncoder;
 
-    /**
-     * Inyección de dependencias mediante constructor.
-     * Recibe los puertos de salida (que serán implementados en la capa de infraestructura).
-     */
-    public AuthApplicationService(UserRepository userRepository, PasswordEncoderPort passwordEncoder) {
+    public AuthApplicationService(UserRepository userRepository, 
+                                  PasswordEncoderPort passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }

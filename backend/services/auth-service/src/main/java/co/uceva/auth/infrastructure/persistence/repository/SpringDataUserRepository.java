@@ -1,5 +1,6 @@
-package co.uceva.auth.infrastructure.persistence;
+package co.uceva.auth.infrastructure.persistence.repository;
 
+import co.uceva.auth.infrastructure.persistence.entity.UserJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
