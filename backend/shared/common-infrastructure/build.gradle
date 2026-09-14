@@ -8,6 +8,7 @@ dependencies {
     // Dependencias comunes de infraestructura para todos los servicios
     api 'org.springframework.boot:spring-boot-starter-web'
     api 'org.springframework.boot:spring-boot-starter-validation'
+    api 'org.springframework.boot:spring-boot-starter-security'
     
     // Lombok y tests ya están configurados en el padre
 }
