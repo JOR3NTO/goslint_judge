@@ -1,6 +1,6 @@
 package co.uceva.auth.infrastructure.persistence.adapter;
 
-import co.uceva.auth.application.port.out.UserRepository;
+import co.uceva.auth.domain.repository.UserRepository;
 import co.uceva.auth.domain.model.Role;
 import co.uceva.auth.domain.model.User;
 import co.uceva.auth.infrastructure.persistence.entity.UserJpaEntity;

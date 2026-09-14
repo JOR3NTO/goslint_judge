@@ -1,7 +1,7 @@
 package co.uceva.auth.infrastructure.web.controller;
 
 import co.uceva.auth.application.usecase.LoginUserUseCase;
-import co.uceva.auth.application.port.in.RegisterUserUseCase;
+import co.uceva.auth.application.usecase.RegisterUserUseCase;
 import co.uceva.auth.domain.model.AuthToken;
 import co.uceva.auth.domain.model.User;
 import co.uceva.auth.infrastructure.web.dto.LoginRequest;

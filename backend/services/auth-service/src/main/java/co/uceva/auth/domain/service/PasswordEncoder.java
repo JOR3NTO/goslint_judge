@@ -1,10 +1,10 @@
-package co.uceva.auth.application.port.out;
+package co.uceva.auth.domain.service;
 
 /**
- * Puerto de Salida (Output Port) para el cifrado de contraseñas.
+ * Servicio de Dominio para el cifrado de contraseñas.
  * Define el contrato que debe cumplir cualquier librería de encriptación (ej. BCrypt).
  */
-public interface PasswordEncoderPort {
+public interface PasswordEncoder {
     String encode(String rawPassword);
     boolean matches(String rawPassword, String encodedPassword);
 }
