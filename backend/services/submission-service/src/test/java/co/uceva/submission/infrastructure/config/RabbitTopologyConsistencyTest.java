@@ -46,6 +46,9 @@ class RabbitTopologyConsistencyTest {
     private static final String QUEUE = "custom.queue";
     private static final String DEAD_LETTER_EXCHANGE = "custom.dlx";
     private static final String DEAD_LETTER_QUEUE = "custom.dlq";
+    private static final String JUDGED_ROUTING_KEY = "custom.judged.routing-key";
+    private static final String JUDGED_QUEUE = "custom.judged.queue";
+    private static final String JUDGED_DEAD_LETTER_QUEUE = "custom.judged.dlq";
 
     /**
      * Contexto mínimo con la topología declarada.
@@ -75,6 +78,9 @@ class RabbitTopologyConsistencyTest {
             "app.messaging.submission.queue=" + QUEUE,
             "app.messaging.submission.dead-letter-exchange=" + DEAD_LETTER_EXCHANGE,
             "app.messaging.submission.dead-letter-queue=" + DEAD_LETTER_QUEUE,
+            "app.messaging.submission.judged-routing-key=" + JUDGED_ROUTING_KEY,
+            "app.messaging.submission.judged-queue=" + JUDGED_QUEUE,
+            "app.messaging.submission.judged-dead-letter-queue=" + JUDGED_DEAD_LETTER_QUEUE,
             "app.messaging.confirm-timeout-ms=200")
             .withBean(RabbitSubmissionEventPublisherAdapter.class);
 
@@ -151,7 +157,10 @@ class RabbitTopologyConsistencyTest {
                 "app.messaging.submission.routing-key=" + ROUTING_KEY,
                 "app.messaging.submission.queue=" + QUEUE,
                 "app.messaging.submission.dead-letter-exchange=" + DEAD_LETTER_EXCHANGE,
-                "app.messaging.submission.dead-letter-queue=" + DEAD_LETTER_QUEUE)
+                "app.messaging.submission.dead-letter-queue=" + DEAD_LETTER_QUEUE,
+                "app.messaging.submission.judged-routing-key=" + JUDGED_ROUTING_KEY,
+                "app.messaging.submission.judged-queue=" + JUDGED_QUEUE,
+                "app.messaging.submission.judged-dead-letter-queue=" + JUDGED_DEAD_LETTER_QUEUE)
                 .run(context -> {
                     assertThat(context).hasFailed();
                     // La clave concreta aparece en la causa raíz del fallo de arranque.
@@ -159,6 +168,62 @@ class RabbitTopologyConsistencyTest {
                             .hasStackTraceContaining("Could not resolve placeholder")
                             .hasStackTraceContaining("app.messaging.submission.exchange");
                 });
+    }
+
+    /**
+     * El tramo de vuelta necesita su propio binding: sin él, los veredictos que
+     * publique {@code judge-service} llegarían al exchange y no encajarían en
+     * ninguna cola, dejando envíos evaluados que nunca se registran.
+     */
+    @Test
+    void shouldBindTheJudgedQueueToTheMainExchange() {
+        contextRunner.run(context -> {
+            Binding binding = context.getBean("submissionJudgedBinding", Binding.class);
+
+            assertThat(context.getBean("submissionJudgedQueue", Queue.class).getName()).isEqualTo(JUDGED_QUEUE);
+            assertThat(binding.getExchange()).isEqualTo(EXCHANGE);
+            assertThat(binding.getDestination()).isEqualTo(JUDGED_QUEUE);
+            assertThat(binding.getRoutingKey()).isEqualTo(JUDGED_ROUTING_KEY);
+        });
+    }
+
+    /**
+     * Un veredicto que no consiga registrarse tiene que acabar en su cola de
+     * fallidos: es de donde el listener lo recoge para cerrar el envío con estado
+     * de error del sistema en lugar de dejarlo esperando para siempre.
+     */
+    @Test
+    void shouldRouteRejectedVerdictsToTheDeclaredDeadLetterQueue() {
+        contextRunner.run(context -> {
+            Queue judgedQueue = context.getBean("submissionJudgedQueue", Queue.class);
+            Binding deadLetterBinding = context.getBean("submissionJudgedDeadLetterBinding", Binding.class);
+            DirectExchange deadLetterExchange = context.getBean(DirectExchange.class);
+
+            assertThat(judgedQueue.getArguments())
+                    .containsEntry("x-dead-letter-exchange", deadLetterExchange.getName())
+                    .containsEntry("x-dead-letter-routing-key", deadLetterBinding.getRoutingKey());
+            assertThat(deadLetterBinding.getExchange()).isEqualTo(DEAD_LETTER_EXCHANGE);
+            assertThat(deadLetterBinding.getDestination()).isEqualTo(JUDGED_DEAD_LETTER_QUEUE);
+            assertThat(context.getBean("submissionJudgedDeadLetterQueue", Queue.class).getName())
+                    .isEqualTo(JUDGED_DEAD_LETTER_QUEUE);
+        });
+    }
+
+    /**
+     * Los dos tramos comparten exchange pero no cola: si la routing key de ida y la
+     * de vuelta coincidieran, cada envío se entregaría a los dos consumidores y el
+     * juez acabaría reevaluando sus propios veredictos.
+     */
+    @Test
+    void shouldKeepTheEvaluationAndVerdictQueuesApart() {
+        contextRunner.run(context -> {
+            Binding evaluate = context.getBean("submissionEvaluateBinding", Binding.class);
+            Binding judged = context.getBean("submissionJudgedBinding", Binding.class);
+
+            assertThat(judged.getExchange()).isEqualTo(evaluate.getExchange());
+            assertThat(judged.getRoutingKey()).isNotEqualTo(evaluate.getRoutingKey());
+            assertThat(judged.getDestination()).isNotEqualTo(evaluate.getDestination());
+        });
     }
 
     /** Completa la confirmación pendiente para que la publicación no espere al broker. */

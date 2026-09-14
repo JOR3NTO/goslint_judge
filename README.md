@@ -33,9 +33,10 @@ goslint_judge/
 │   │   ├── common-domain/         ← Entidades y eventos compartidos (sin Spring)
 │   │   └── common-infrastructure/ ← Config transversal (excepciones, JWT base)
 │   └── services/
-│       ├── users-service/         (puerto 8081)
+│       ├── auth-service/          (puerto 8081)
 │       ├── problem-service/       (puerto 8082)
 │       ├── submission-service/    (puerto 8083)
+│       │   └── docs/              ← 📖 RABBITMQ.md · WEBSOCKET.md
 │       ├── judge-service/         (puerto 8084)
 │       ├── feedback-service/      (puerto 8085)
 │       └── contest-service/       (puerto 8086)
@@ -49,8 +50,11 @@ goslint_judge/
 │       └── admin-app/    (puerto 3001) ← Panel administrativo
 │
 ├── infrastructure/           ← Docker Compose, Traefik
-│   ├── docker/               ← docker-compose.yml (BD, colas, reverse proxy)
+│   ├── docker/               ← docker-compose.yml (PostgreSQL + RabbitMQ)
 │   └── traefik/              ← Configuración del API Gateway
+│
+└── testing/                  ← Utilidades de prueba manual
+    └── ws-judge-simulator/   ← Simula judge-service para ver el WebSocket en vivo
 ```
 
 ---
@@ -61,6 +65,9 @@ goslint_judge/
 |----------------|------------------------------------------------------------------|
 | Backend        | [`backend/ARCHITECTURE.md`](./backend/ARCHITECTURE.md)          |
 | Frontend       | [`frontend/README.md`](./frontend/README.md)                     |
+| Mensajería (RabbitMQ) | [`backend/services/submission-service/docs/RABBITMQ.md`](./backend/services/submission-service/docs/RABBITMQ.md) |
+| Notificación en tiempo real (WebSocket) | [`backend/services/submission-service/docs/WEBSOCKET.md`](./backend/services/submission-service/docs/WEBSOCKET.md) |
+| Probador manual del WebSocket | [`testing/ws-judge-simulator/README.md`](./testing/ws-judge-simulator/README.md) |
 
 ---
 
@@ -109,10 +116,10 @@ goslint_judge/
 ### Backend
 
 ```bash
-cd backend
+# 1. Levantar la infraestructura (PostgreSQL + RabbitMQ)
+docker compose -f infrastructure/docker/docker-compose.yml up -d
 
-# 1. Inicializar el Gradle Wrapper (solo la primera vez, requiere Gradle global)
-gradle wrapper --gradle-version 8.9
+cd backend
 
 # 2. Compilar todos los módulos
 ./gradlew build
@@ -120,10 +127,20 @@ gradle wrapper --gradle-version 8.9
 # 3. Correr un microservicio específico
 ./gradlew :services:auth-service:bootRun
 ./gradlew :services:problem-service:bootRun
+./gradlew :services:submission-service:bootRun
 ```
 
-> ⚠️ Cada microservicio necesita su base de datos PostgreSQL corriendo.  
-> Próximamente el `docker-compose.yml` levantará toda la infraestructura con un solo comando.
+> `submission-service` **no arranca sin `JWT_SECRET`** (mínimo 32 bytes): la clave
+> no tiene valor por defecto a propósito, para que un secreto de ejemplo no acabe
+> heredado en un entorno real. Las variables van en `backend/.env`:
+>
+> ```bash
+> set -a && source backend/.env && set +a
+> ./gradlew :services:submission-service:bootRun
+> ```
+>
+> Sin RabbitMQ el servicio arranca igualmente: los envíos quedan en `PENDING` y se
+> reintentan solos cuando el broker vuelva.
 
 ---
 
@@ -148,16 +165,23 @@ pnpm dev:admin
 
 | Componente          | Estado                | Notas                                              |
 |---------------------|-----------------------|----------------------------------------------------|
-| `auth-service`      | 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `problem-service`   | 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `submission-service`| 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `judge-service`     | 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `feedback-service`  | 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `contest-service`   | 🟡 Esqueleto          | Estructura Clean Architecture lista                |
+| `auth-service`      | 🟡 Parcial            | Solo registro de usuarios. **Falta el login**, y con él la emisión de JWT |
+| `problem-service`   | 🟢 Funcional          | CRUD de problemas y casos de prueba, con roles declarados. Falta su migración de Flyway |
+| `submission-service`| 🟢 Funcional          | Envío → RabbitMQ → veredicto → WebSocket, con reintentos y colas de fallidos |
+| `judge-service`     | 🔴 Esqueleto          | Sin implementar; lo simula `testing/ws-judge-simulator/` |
+| `feedback-service`  | 🔴 Esqueleto          | Sin implementar                                    |
+| `contest-service`   | 🔴 Esqueleto          | Sin implementar; los equipos se tratan como individuales mientras tanto |
 | `student-app`       | 🟢 UI base lista      | Landing, Login, Register, Contests migrados        |
 | `admin-app`         | 🔴 Pendiente          | Placeholder - en construcción                      |
-| `docker-compose`    | 🔴 Pendiente          | Infraestructura aún por configurar                 |
-| `Gradle Wrapper`    | 🔴 Pendiente          | Requiere Gradle global para inicializar            |
+| `docker-compose`    | 🟢 Listo              | Levanta PostgreSQL y RabbitMQ                      |
+| `traefik`           | 🔴 Pendiente          | `traefik.yml` aún vacío                            |
+| `Gradle Wrapper`    | 🟢 Listo              | `./gradlew` disponible en `backend/`               |
+
+### Lo que falta para cerrar el flujo de extremo a extremo
+
+1. **Login en `auth-service`** — hoy no hay quien emita los JWT que el resto valida.
+2. **Filtro JWT para los endpoints HTTP** — las restricciones por rol están escritas pero no se aplican; en local se usa un bypass temporal (`AUTH_BYPASS=true`).
+3. **`judge-service`** — los envíos se encolan correctamente, pero nadie los evalúa todavía.
 
 ---
 

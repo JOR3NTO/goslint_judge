@@ -1,5 +1,7 @@
 package co.uceva.auth.infrastructure.web.controller;
 
+import co.uceva.auth.domain.exception.AccountLockedException;
+import co.uceva.auth.domain.exception.BadCredentialsException;
 import co.uceva.auth.domain.exception.InvalidUserDataException;
 import co.uceva.auth.domain.exception.UserAlreadyExistsException;
 import org.springframework.http.HttpStatus;
@@ -59,5 +61,28 @@ public class AuthExceptionHandler {
         Map<String, String> response = new HashMap<>();
         response.put("error", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    /**
+     * Maneja credenciales incorrectas en el login.
+     * Devuelve siempre el mismo mensaje genérico para evitar enumeración de usuarios.
+     * @return HTTP 401 Unauthorized.
+     */
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<Map<String, String>> handleBadCredentials(BadCredentialsException ex) {
+        Map<String, String> response = new HashMap<>();
+        response.put("error", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    /**
+     * Maneja cuentas bloqueadas temporalmente por múltiples intentos fallidos.
+     * @return HTTP 423 Locked con el mensaje indicando cuánto tiempo esperar.
+     */
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<Map<String, String>> handleAccountLocked(AccountLockedException ex) {
+        Map<String, String> response = new HashMap<>();
+        response.put("error", ex.getMessage());
+        return ResponseEntity.status(423).body(response);
     }
 }

@@ -1,7 +1,11 @@
 package co.uceva.auth.infrastructure.web.controller;
 
+import co.uceva.auth.application.usecase.LoginUserUseCase;
 import co.uceva.auth.application.usecase.RegisterUserUseCase;
+import co.uceva.auth.domain.model.AuthToken;
 import co.uceva.auth.domain.model.User;
+import co.uceva.auth.infrastructure.web.dto.LoginRequest;
+import co.uceva.auth.infrastructure.web.dto.LoginResponse;
 import co.uceva.auth.infrastructure.web.dto.RegisterRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -14,19 +18,40 @@ import java.util.Map;
 /**
  * Controlador REST que maneja las solicitudes HTTP relacionadas con la Autenticación.
  * Pertenece a la capa de Infraestructura y delega toda la lógica de negocio
- * al puerto de entrada (RegisterUserUseCase).
+ * al puerto de entrada (RegisterUserUseCase, LoginUserUseCase).
  */
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
     private final RegisterUserUseCase registerUserUseCase;
+    private final LoginUserUseCase loginUserUseCase;
 
     /**
      * Inyección de dependencias para obtener el orquestador del caso de uso.
      */
-    public AuthController(RegisterUserUseCase registerUserUseCase) {
+    public AuthController(RegisterUserUseCase registerUserUseCase, LoginUserUseCase loginUserUseCase) {
         this.registerUserUseCase = registerUserUseCase;
+        this.loginUserUseCase = loginUserUseCase;
+    }
+
+    /**
+     * Endpoint para iniciar sesión en la plataforma.
+     * @param request JSON con email y contraseña.
+     * @return 200 OK si tiene éxito, con el access token y refresh token.
+     */
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        AuthToken authToken = loginUserUseCase.login(request.getEmail(), request.getPassword());
+        
+        LoginResponse response = LoginResponse.builder()
+                .accessToken(authToken.getAccessToken())
+                .refreshToken(authToken.getRefreshToken())
+                .expiresIn(authToken.getExpiresIn())
+                .type("Bearer")
+                .build();
+                
+        return ResponseEntity.ok(response);
     }
 
     /**

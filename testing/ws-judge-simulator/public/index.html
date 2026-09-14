@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Probador de WebSocket · submission-service</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Probador del canal de estado de envíos</h1>
+    <p class="subtitle">
+      Conecta al WebSocket real de <code>submission-service</code> y controla manualmente
+      un juez simulado: tú decides cuándo "termina" de evaluar cada envío.
+    </p>
+  </header>
+
+  <main>
+    <section class="panel" id="panel-connection">
+      <h2>1. Conexión WebSocket</h2>
+      <div class="grid">
+        <label>
+          URL del WebSocket
+          <input id="ws-url" type="text" value="ws://localhost:8083/ws/submissions" />
+        </label>
+        <label>
+          Subprotocolo
+          <input id="ws-subprotocol" type="text" value="goslint-judge" />
+        </label>
+        <label>
+          Secreto JWT (debe ser igual a JWT_SECRET en backend/.env)
+          <input id="jwt-secret" type="text" placeholder="pega aquí JWT_SECRET" />
+        </label>
+        <label>
+          Emisor (JWT_ISSUER)
+          <input id="jwt-issuer" type="text" value="goslint-judge" />
+        </label>
+        <label>
+          userId (UUID, quien "escucha")
+          <div class="input-with-button">
+            <input id="user-id" type="text" placeholder="UUID del usuario" />
+            <button type="button" id="btn-random-user">Generar</button>
+          </div>
+        </label>
+        <label>
+          Rol
+          <select id="user-role">
+            <option value="STUDENT" selected>STUDENT</option>
+            <option value="ADMIN">ADMIN</option>
+            <option value="ORGANIZER">ORGANIZER</option>
+          </select>
+        </label>
+        <label class="checkbox">
+          <input id="use-query-token" type="checkbox" />
+          Enviar el token por query param en vez de subprotocolo (fallback de compatibilidad)
+        </label>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-connect" class="primary">Conectar</button>
+        <button type="button" id="btn-disconnect" disabled>Desconectar</button>
+        <span id="connection-status" class="status status-offline">Desconectado</span>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-create">
+      <h2>2. Crear envíos</h2>
+      <p class="hint">
+        El equipo se resuelve hoy como individual (<code>NoOpTeamMembershipAdapter</code>):
+        solo recibe notificaciones el usuario cuyo <code>userId</code> coincide con el
+        <code>teamId</code> del envío. Por eso el campo de abajo se sincroniza con el
+        <code>userId</code> de conexión.
+      </p>
+      <div class="grid">
+        <label>
+          teamId
+          <div class="input-with-button">
+            <input id="team-id" type="text" placeholder="UUID del equipo" />
+            <button type="button" id="btn-sync-team">= userId</button>
+          </div>
+        </label>
+        <label>
+          problemId
+          <div class="input-with-button">
+            <input id="problem-id" type="text" placeholder="UUID del problema" />
+            <button type="button" id="btn-random-problem">Generar</button>
+          </div>
+        </label>
+        <label>
+          Lenguaje
+          <select id="language">
+            <option value="PYTHON" selected>PYTHON</option>
+            <option value="C">C</option>
+            <option value="CPP">CPP</option>
+            <option value="JAVA">JAVA</option>
+          </select>
+        </label>
+        <label class="full">
+          Código fuente
+          <textarea id="source-code" rows="3">print("hola mundo")</textarea>
+        </label>
+        <label>
+          Cuántos envíos crear de una vez
+          <input id="batch-count" type="number" min="1" max="20" value="1" />
+        </label>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-create-real" class="primary">
+          Crear vía API real (POST autenticado)
+        </button>
+      </div>
+      <p class="hint warn">
+        <code>SubmissionController</code> exige un rol vía <code>@PreAuthorize</code>, pero todavía no
+        hay filtro JWT para peticiones HTTP (solo el handshake del WebSocket valida el token de
+        verdad). Con <code>AUTH_BYPASS=true</code> en <code>backend/.env</code>,
+        <code>submission-service</code> registra un bypass temporal
+        (<code>TemporaryAuthBypassFilter</code>) que autentica cualquier petición REST con todos los
+        roles, así que este botón funciona sin necesidad de un token válido. Si el bypass está
+        desactivado, responde <strong>403</strong>.
+      </p>
+    </section>
+
+    <section class="panel" id="panel-judge">
+      <h2>3. Juez simulado (<span id="simulator-url-label">http://localhost:4100</span>)</h2>
+      <div class="grid">
+        <label>
+          URL del simulador
+          <input id="simulator-url" type="text" value="http://localhost:4100" />
+        </label>
+        <label class="checkbox">
+          <input id="auto-judge" type="checkbox" />
+          Modo automático: juzgar cada envío nuevo con veredicto y tiempo aleatorios
+        </label>
+      </div>
+      <div id="pending-list" class="pending-list">
+        <p class="empty">Sin envíos esperando veredicto todavía.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-cards">
+      <h2>4. Estado en vivo de los envíos</h2>
+      <div id="cards" class="cards">
+        <p class="empty">Aún no hay envíos que seguir.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-log">
+      <h2>5. Registro de eventos</h2>
+      <pre id="log"></pre>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
