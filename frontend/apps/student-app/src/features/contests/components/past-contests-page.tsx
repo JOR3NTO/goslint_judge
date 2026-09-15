@@ -2,12 +2,12 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Navbar } from "@/components/navbar"
-import { Footer } from "@/components/footer"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { Navbar } from "@/shared/ui/navbar"
+import { Footer } from "@/shared/ui/footer"
+import { Badge } from "@/shared/ui/primitives/badge"
+import { Button } from "@/shared/ui/primitives/button"
+import { Card, CardContent, CardHeader } from "@/shared/ui/primitives/card"
+import { Input } from "@/shared/ui/primitives/input"
 import {
   Table,
   TableBody,
@@ -15,7 +15,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/shared/ui/primitives/table"
 import { 
   Trophy, 
   Users, 
@@ -132,7 +132,7 @@ const difficultyColors = {
   Experto: "bg-red-500/10 text-red-400 border-red-500/30",
 }
 
-export default function PastContestsPage() {
+export function PastContestsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 5

@@ -1,13 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Navbar } from "@/components/navbar"
-import { Footer } from "@/components/footer"
-import { ContestCard, type Contest } from "@/components/contest-card"
-import { StatsCard } from "@/components/stats-card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { Navbar } from "@/shared/ui/navbar"
+import { Footer } from "@/shared/ui/footer"
+import { ContestCard, type Contest } from "@/features/contests/components/contest-card"
+import { StatsCard } from "@/shared/ui/stats-card"
+import { Button } from "@/shared/ui/primitives/button"
+import { Input } from "@/shared/ui/primitives/input"
+import { Badge } from "@/shared/ui/primitives/badge"
 import { 
   Trophy, 
   Users, 
@@ -95,7 +95,7 @@ const allContests: Contest[] = [
 const difficulties = ["Todos", "Principiante", "Intermedio", "Avanzado", "Experto"]
 const statuses = ["Todos", "En Curso", "Próximamente"]
 
-export default function ContestsPage() {
+export function ContestsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedDifficulty, setSelectedDifficulty] = useState("Todos")
   const [selectedStatus, setSelectedStatus] = useState("Todos")

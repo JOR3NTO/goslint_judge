@@ -2,14 +2,14 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/shared/ui/primitives/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
+import { Input } from "@/shared/ui/primitives/input"
+import { Label } from "@/shared/ui/primitives/label"
+import { Checkbox } from "@/shared/ui/primitives/checkbox"
 import { Code2, Eye, EyeOff, Github, Mail, User, ArrowLeft, Check } from "lucide-react"
 
-export default function RegisterPage() {
+export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [password, setPassword] = useState("")

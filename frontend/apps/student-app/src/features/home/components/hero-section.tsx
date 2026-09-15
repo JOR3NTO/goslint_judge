@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/shared/ui/primitives/button"
 import { ArrowRight, Code2, Sparkles, Terminal } from "lucide-react"
 
 export function HeroSection() {

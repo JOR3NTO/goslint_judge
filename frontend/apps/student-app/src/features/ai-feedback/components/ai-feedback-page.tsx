@@ -1,19 +1,19 @@
 "use client"
 
 import { useState } from "react"
-import { Navbar } from "@/components/navbar"
-import { Footer } from "@/components/footer"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
+import { Navbar } from "@/shared/ui/navbar"
+import { Footer } from "@/shared/ui/footer"
+import { Button } from "@/shared/ui/primitives/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
+import { Textarea } from "@/shared/ui/primitives/textarea"
+import { Badge } from "@/shared/ui/primitives/badge"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/shared/ui/primitives/select"
 import { 
   Sparkles, 
   Code2, 
@@ -149,7 +149,7 @@ const feedbackTypeConfig = {
   }
 }
 
-export default function AIFeedbackPage() {
+export function AIFeedbackPage() {
   const [code, setCode] = useState(exampleCode)
   const [language, setLanguage] = useState("cpp")
   const [isAnalyzing, setIsAnalyzing] = useState(false)

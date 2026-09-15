@@ -1,9 +1,9 @@
-import { Navbar } from "@/components/navbar"
-import { Footer } from "@/components/footer"
-import { HeroSection } from "@/components/hero-section"
-import { FeaturesSection } from "@/components/features-section"
-import { ContestCard, type Contest } from "@/components/contest-card"
-import { Button } from "@/components/ui/button"
+import { Navbar } from "@/shared/ui/navbar"
+import { Footer } from "@/shared/ui/footer"
+import { HeroSection } from "@/features/home/components/hero-section"
+import { FeaturesSection } from "@/features/home/components/features-section"
+import { ContestCard, type Contest } from "@/features/contests/components/contest-card"
+import { Button } from "@/shared/ui/primitives/button"
 import { ArrowRight } from "lucide-react"
 import Link from "next/link"
 
@@ -46,7 +46,7 @@ const upcomingContests: Contest[] = [
   }
 ]
 
-export default function HomePage() {
+export function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />

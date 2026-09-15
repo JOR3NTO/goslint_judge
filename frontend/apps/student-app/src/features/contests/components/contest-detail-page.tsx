@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Navbar } from "@/components/navbar"
-import { Footer } from "@/components/footer"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Navbar } from "@/shared/ui/navbar"
+import { Footer } from "@/shared/ui/footer"
+import { Button } from "@/shared/ui/primitives/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
+import { Badge } from "@/shared/ui/primitives/badge"
+import { Progress } from "@/shared/ui/primitives/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/primitives/tabs"
 import {
   Table,
   TableBody,
@@ -16,7 +16,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/shared/ui/primitives/table"
 import { 
   ArrowLeft, 
   Trophy, 
@@ -99,7 +99,7 @@ const difficultyColors = {
   "Muy Difícil": "bg-red-500/10 text-red-400 border-red-500/30",
 }
 
-export default function ContestDetailPage() {
+export function ContestDetailPage() {
   const [timeLeft, setTimeLeft] = useState({ hours: 2, minutes: 34, seconds: 56 })
   const [progress, setProgress] = useState(50)
 

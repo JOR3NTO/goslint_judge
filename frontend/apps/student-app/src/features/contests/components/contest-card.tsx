@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
+import { Badge } from "@/shared/ui/primitives/badge"
+import { Button } from "@/shared/ui/primitives/button"
+import { Card, CardContent, CardFooter, CardHeader } from "@/shared/ui/primitives/card"
 import { Calendar, Clock, Users, Trophy, ArrowRight } from "lucide-react"
 
 export interface Contest {

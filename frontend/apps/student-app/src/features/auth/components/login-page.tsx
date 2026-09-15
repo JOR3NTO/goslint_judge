@@ -2,13 +2,13 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Button } from "@/shared/ui/primitives/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
+import { Input } from "@/shared/ui/primitives/input"
+import { Label } from "@/shared/ui/primitives/label"
 import { Code2, Eye, EyeOff, Github, Mail, ArrowLeft } from "lucide-react"
 
-export default function LoginPage() {
+export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
