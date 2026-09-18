@@ -22,8 +22,8 @@ export function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative">
       {/* Background Effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%2300ff88%22%20fill-opacity%3D%220.03%22%3E%3Ccircle%20cx%3D%221%22%20cy%3D%221%22%20r%3D%221%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50" />
+      <div className="absolute inset-0 from-primary/10 via-background to-background" style={{ backgroundImage: 'radial-gradient(ellipse at center, var(--tw-gradient-stops))' }} />
+      <div className="absolute inset-0 opacity-50" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%2300ff88%22%20fill-opacity%3D%220.03%22%3E%3Ccircle%20cx%3D%221%22%20cy%3D%221%22%20r%3D%221%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')" }} />
       
       <div className="relative w-full max-w-md">
         {/* Back to Home */}
@@ -106,7 +106,7 @@ export function LoginPage() {
 
               <Button
                 type="submit"
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 glow-green-sm"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 glow-green-sm cursor-pointer"
                 disabled={isLoading}
               >
                 {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
@@ -125,11 +125,11 @@ export function LoginPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="border-border hover:border-primary hover:bg-primary/10">
+              <Button variant="outline" className="border-border hover:border-primary hover:bg-primary/10 cursor-pointer">
                 <Github className="mr-2 h-4 w-4" />
                 GitHub
               </Button>
-              <Button variant="outline" className="border-border hover:border-primary hover:bg-primary/10">
+              <Button variant="outline" className="border-border hover:border-primary hover:bg-primary/10 cursor-pointer">
                 <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                   <path
                     fill="currentColor"

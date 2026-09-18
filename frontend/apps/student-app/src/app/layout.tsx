@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
-
+import 'tw-animate-css'
 const geistSans = Geist({ 
   subsets: ["latin"],
   variable: '--font-geist-sans'
