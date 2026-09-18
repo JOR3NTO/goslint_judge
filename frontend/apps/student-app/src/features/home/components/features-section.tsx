@@ -56,7 +56,7 @@ const features = [
 export function FeaturesSection() {
   return (
     <section className="py-24 relative">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
+      <div className="absolute inset-0 from-primary/5 via-transparent to-transparent" style={{ backgroundImage: 'radial-gradient(ellipse at bottom, var(--tw-gradient-stops))' }} />
       
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
