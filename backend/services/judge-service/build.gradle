@@ -5,4 +5,6 @@ plugins {
 dependencies {
     implementation project(':shared:common-domain')
     implementation project(':shared:common-infrastructure')
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'   // RabbitMQ
+    testImplementation 'org.springframework.amqp:spring-rabbit-test'
 }

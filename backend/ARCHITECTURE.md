@@ -162,7 +162,7 @@ Candidatos a residir aquí:
 | `auth-service` | 8081 | 🟡 Parcial | Registro de usuarios (`POST /api/v1/auth/register`). **La emisión de JWT sigue pendiente**: no hay login, y sin él ningún otro servicio puede autenticar de verdad una petición HTTP. Esquema aún con `ddl-auto=update`, sin Flyway |
 | `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Falta el filtro JWT y su migración base de Flyway |
 | `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción del envío, encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Esquema versionado con Flyway (`V1`–`V3`). Es el único servicio que **autentica de verdad**, y solo en el handshake del WebSocket |
-| `judge-service` | 8084 | 🟡 Parcial | Dominio (`JudgeTask`, `JudgeResult`, `TestCase`, límites) y capa de aplicación (`EvaluateSubmissionUseCase` con sus puertos) completos; sandbox con `bwrap`/cgroups en `infrastructure/sandbox`. **Faltan los adaptadores** (RabbitMQ, cliente de `problem-service`, `SandboxExecutor` sobre `Runner`) y el `Compiler` (otra HU). Su papel lo simula hoy [`testing/ws-judge-simulator/`](../testing/ws-judge-simulator/README.md) |
+| `judge-service` | 8084 | 🟡 Parcial | Dominio, aplicación e infraestructura completos: consume `submission.evaluate`, obtiene casos de prueba y límites de `problem-service` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) y publica el veredicto en `submission.judged`. **Solo evalúa Python**: el `Compiler` (C, C++, Java) va en otra HU, y esos lenguajes terminan como `SYSTEM_ERROR`. El JWT `SERVICE` hacia `problem-service` lo firma el propio juez con el secreto compartido |
 | `feedback-service` | 8085 | 🔴 Esqueleto | Solo la clase de arranque |
 | `contest-service` | 8086 | 🔴 Esqueleto | Solo la clase de arranque. Mientras no exista, `submission-service` resuelve cada equipo como individual mediante `NoOpTeamMembershipAdapter` |
 
@@ -327,6 +327,20 @@ Detalles que conviene conocer antes de desplegar sobre una base de datos ya exis
 **Puertos de salida (`application/port/out`):** `ProblemLimitsPort` (límites de tiempo y memoria del problema), `SandboxExecutor` (ejecuta la tarea y devuelve el `JudgeResult`) y `JudgeResultPublisher` (publica el resultado hacia `submission-service`).
 
 > La compilación (`Compiler`) está pendiente y se abordará en otra historia de usuario.
+
+**Infraestructura (`infrastructure/`):**
+
+| Pieza | Rol |
+|-------|-----|
+| `messaging/SubmissionEvaluationListener` | Consume `submission.evaluate`. Un fallo transitorio se propaga para el reintento (3 intentos, luego DLQ); uno permanente (`TestCasesNotFoundException`, `IllegalArgumentException`) se rechaza sin reintentar |
+| `messaging/RabbitJudgeResultPublisherAdapter` | Publica `SubmissionJudgedEvent` en `submission.exchange` con routing key `submission.judged`, persistente y esperando la confirmación del broker |
+| `security/ServiceTokenProvider` | Emite el JWT `role=SERVICE` del juez (HS256, secreto y emisor compartidos, `sub` = `app.security.jwt.service-id`, vigencia 5 min) y lo reutiliza hasta 30 s antes de expirar. Exige `JWT_SECRET` (mín. 32 bytes, sin valor por defecto) |
+| `client/ProblemServiceTestCaseRepositoryAdapter` | `TestCaseRepository` sobre `GET /api/v1/problems/test-cases/{id}/all` (JWT `SERVICE` en cada petición); un `404` o lista vacía es `TestCasesNotFoundException` |
+| `client/ProblemServiceLimitsAdapter` | `ProblemLimitsPort` sobre `GET /api/v1/problems/{id}` |
+| `sandbox/RunnerSandboxExecutor` | `SandboxExecutor` sobre `Runner`: escribe el fuente a un temporal, ejecuta y traduce el mapa de resultados a `JudgeResult` |
+| `config/` | Convertidor JSON de RabbitMQ, bean del `Runner` y `RestClient` hacia `problem-service` |
+
+`judge-service` **no declara topología**: exchange, colas y DLQ las declara `submission-service`, dueño del contrato (ver su [`RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md)). No usa base de datos; se excluye la autoconfiguración de JPA que el `build.gradle` raíz aplica a todos los módulos.
 
 **Veredictos emitidos:** `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `RUNTIME_ERROR`, `COMPILATION_ERROR`
 
@@ -628,8 +642,9 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 | 2 | **Ningún endpoint HTTP valida el JWT**: los `@PreAuthorize` están escritos pero la autenticación llega anónima | 🔴 Alta | Escribir el filtro JWT reutilizando `JwtTokenValidator` (ya usado por el handshake del WebSocket) y retirar `TemporaryAuthBypassFilter` |
 | 3 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
 | 4 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que deje de depender de lo que Hibernate decida en cada arranque |
-| 5 | **`judge-service` sin adaptadores**: dominio y aplicación listos, pero los envíos se encolan y nadie los consume | 🔴 Alta | Implementar el listener de `submission.evaluate`, el publisher de `submission.judged`, el cliente de `problem-service` y el `SandboxExecutor` sobre `Runner`. El contrato está en `docs/RABBITMQ.md`; `testing/ws-judge-simulator/` lo simula mientras tanto |
-| 5b | **`Compiler` vacío y `Runner` sin `SandboxExecutionException`** | 🟡 Media | La compilación va en otra HU. `Runner` aún reporta como `RUNTIME_ERROR` los fallos de `IOException`/`InterruptedException` del sistema |
+| 5 | **`judge-service` solo evalúa Python** | 🟡 Media | El `Compiler` (C, C++, Java) va en otra HU; hasta entonces esos envíos acaban en `SYSTEM_ERROR` tras agotar los reintentos |
+| 5b | **`Runner` no usa `SandboxExecutionException`** | 🟡 Media | Los `IOException`/`InterruptedException` del sistema se reportan como `RUNTIME_ERROR`, culpando al estudiante de un fallo de la plataforma |
+| 5c | **`TestCaseRunner` compara µs con ms** | 🔴 Alta | `utime > timeLimit` mide microsegundos contra un límite en milisegundos (el `TimeWatchdog` sí multiplica por 1000): cualquier solución que use más de `timeLimit` µs de CPU se marcaría `TIME_LIMIT_EXCEEDED` |
 | 6 | **`contest-service` no existe**: la composición real de los equipos se desconoce | 🟡 Media | `NoOpTeamMembershipAdapter` trata cada equipo como individual. Al llegar el servicio, añadir un adaptador y cambiar `app.team-membership.provider` |
 | 7 | **El registro de sesiones WebSocket es local a la instancia** | 🟡 Media | Con varias réplicas, la instancia que recibe el veredicto puede no tener la conexión del estudiante. Escalar horizontalmente exige compartir el registro (p. ej. Redis) |
 | 8 | **`traefik.yml` está vacío** | 🟡 Media | Sin API Gateway cada servicio se expone por su puerto. Al configurarlo, cuidar el reenvío de `Upgrade`/`Sec-WebSocket-Protocol` o el handshake del WebSocket no se completa |
