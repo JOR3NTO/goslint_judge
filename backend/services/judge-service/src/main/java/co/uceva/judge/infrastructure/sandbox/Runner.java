@@ -1,11 +1,11 @@
 package co.uceva.judge.infrastructure.sandbox;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import co.uceva.judge.domain.model.TestCase;
 import co.uceva.judge.domain.valueobject.AbsoluteTimeLimit;
 import co.uceva.judge.domain.valueobject.HardTimePercent;
 import co.uceva.judge.domain.valueobject.OutputSizeLimit;
@@ -71,42 +71,48 @@ public class Runner {
      * límites de memoria, tiempo, salida y la comparación con la salida
      * esperada.
      *
-     * @param command          Intérprete o comando usado para ejecutar la solución.
-     * @param solutionPath     Ruta del archivo fuente de la solución a ejecutar.
-     * @param inputs           Entradas de cada caso de prueba.
-     * @param expectedOutputs  Salidas esperadas de cada caso de prueba.
-     * @param timeLimit        Límite de tiempo de ejecución, en milisegundos, por caso de prueba.
-     * @param memoryLimit      Límite de memoria, en bytes, por caso de prueba.
-     * @return Mapa con el veredicto de la ejecución ({@code status}) y las
-     *         métricas máximas observadas ({@code maxCpuTime}, {@code maxMemoryUsed}).
+     * @param command      Intérprete o comando usado para ejecutar la solución.
+     * @param solutionPath Ruta del archivo fuente de la solución a ejecutar.
+     * @param testCases    Casos de prueba del problema, en el orden en que deben ejecutarse.
+     * @param timeLimit    Límite de tiempo de ejecución, en milisegundos, por caso de prueba.
+     * @param memoryLimit  Límite de memoria, en bytes, por caso de prueba.
+     * @return Mapa con el veredicto de la ejecución ({@code status}), las métricas
+     *         máximas observadas ({@code maxCpuTime}, {@code maxMemoryUsed}) y, si la
+     *         solución no fue aceptada, el identificador del caso de prueba en el que
+     *         falló ({@code failedTestCase}).
      */
-    public Map<String, Object> runSolution(String command, String solutionPath, ArrayList<String> inputs,
-            ArrayList<String> expectedOutputs, long timeLimit, long memoryLimit) {
+    public Map<String, Object> runSolution(String command, String solutionPath, List<TestCase> testCases,
+            long timeLimit, long memoryLimit) {
 
         Map<String, Object> result = new HashMap<>();
         boolean testsPassed = true;
         long maxCpuTime = 0;
         long maxMemoryUsed = 0;
 
-        for (int i = 0; i < inputs.size(); i++) {
+        for (TestCase testCase : testCases) {
             SandboxWorkspace workspace = null;
             try {
                 workspace = SandboxWorkspace.create(memoryLimit, maxPids, solutionPath);
                 List<String> runCommand = BwrapCommandFactory.build(workspace, maxVolumeSize, command);
 
-                TestCaseResult testResult = testCaseRunner.run(workspace, runCommand, inputs.get(i), timeLimit);
+                TestCaseResult testResult = testCaseRunner.run(workspace, runCommand, testCase.input(), timeLimit);
                 maxCpuTime = Math.max(maxCpuTime, testResult.cpuTimeUsec());
                 maxMemoryUsed = Math.max(maxMemoryUsed, testResult.memoryUsedKb());
 
                 if (testResult.status() != null) {
                     result.put("status", testResult.status());
+                    result.put("failedTestCase", testCase.id());
                     break;
                 }
-                if (!(testsPassed &= testResult.output().equals(expectedOutputs.get(i)))) break;
+                if (!(testsPassed &= testResult.output().equals(testCase.expectedOutput()))) {
+                    result.put("failedTestCase", testCase.id());
+                    break;
+                }
 
             } catch (IOException | InterruptedException e) {
                 System.out.println("Error running solution: " + e.getMessage());
                 result.put("status", VerdictStatus.RUNTIME_ERROR);
+                result.put("failedTestCase", testCase.id());
             } finally {
                 if (workspace != null) {
                     workspace.cleanup();

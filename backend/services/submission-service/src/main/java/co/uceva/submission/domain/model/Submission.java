@@ -3,7 +3,7 @@ package co.uceva.submission.domain.model;
 import co.uceva.shared.domain.ProgrammingLanguage;
 import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.shared.domain.VerdictStatus;
-import co.uceva.submission.domain.valueobject.SourceCode;
+import co.uceva.shared.domain.valueobject.SourceCode;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

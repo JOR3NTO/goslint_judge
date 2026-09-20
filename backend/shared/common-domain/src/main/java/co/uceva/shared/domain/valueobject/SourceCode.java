@@ -1,4 +1,4 @@
-package co.uceva.submission.domain.valueobject;
+package co.uceva.shared.domain.valueobject;
 
 import co.uceva.shared.domain.ProgrammingLanguage;
 
