@@ -162,7 +162,7 @@ Candidatos a residir aquí:
 | `auth-service` | 8081 | 🟡 Parcial | Registro de usuarios (`POST /api/v1/auth/register`). **La emisión de JWT sigue pendiente**: no hay login, y sin él ningún otro servicio puede autenticar de verdad una petición HTTP. Esquema aún con `ddl-auto=update`, sin Flyway |
 | `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Falta el filtro JWT y su migración base de Flyway |
 | `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción del envío, encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Esquema versionado con Flyway (`V1`–`V3`). Es el único servicio que **autentica de verdad**, y solo en el handshake del WebSocket |
-| `judge-service` | 8084 | 🔴 Esqueleto | Solo la clase de arranque. Su papel lo simula hoy [`testing/ws-judge-simulator/`](../testing/ws-judge-simulator/README.md) |
+| `judge-service` | 8084 | 🟡 Parcial | Dominio (`JudgeTask`, `JudgeResult`, `TestCase`, límites) y capa de aplicación (`EvaluateSubmissionUseCase` con sus puertos) completos; sandbox con `bwrap`/cgroups en `infrastructure/sandbox`. **Faltan los adaptadores** (RabbitMQ, cliente de `problem-service`, `SandboxExecutor` sobre `Runner`) y el `Compiler` (otra HU). Su papel lo simula hoy [`testing/ws-judge-simulator/`](../testing/ws-judge-simulator/README.md) |
 | `feedback-service` | 8085 | 🔴 Esqueleto | Solo la clase de arranque |
 | `contest-service` | 8086 | 🔴 Esqueleto | Solo la clase de arranque. Mientras no exista, `submission-service` resuelve cada equipo como individual mediante `NoOpTeamMembershipAdapter` |
 
@@ -309,15 +309,24 @@ Detalles que conviene conocer antes de desplegar sobre una base de datos ya exis
 ### `judge-service` — Puerto `8084`
 **Responsabilidad:** Motor de evaluación (Judging Engine). Consume la cola de RabbitMQ, crea contenedores Docker aislados, ejecuta el código contra los casos de prueba y emite el veredicto.
 
-| Entidad de dominio | Descripción |
-|--------------------|-------------|
-| `JudgeTask`        | submissionId, language, sourceCode, testCases, timeLimitMs, memoryLimitKb |
-| `JudgeResult`      | submissionId, verdict, executionTimeMs, memoryUsedKb, failedTestCase |
+| Elemento de dominio | Descripción |
+|---------------------|-------------|
+| `JudgeTask`         | submissionId, language, sourceCode, testCases, timeLimit, memoryLimit. Se ensambla con `JudgeTask.create(...)` y valida sus invariantes (al menos un caso de prueba, límites en rango) |
+| `JudgeResult`       | submissionId, verdict, executionTimeMs, memoryUsedKb, failedTestCase (`null` si es `ACCEPTED` o si falló antes de ejecutar, p. ej. compilación). Se crea con `JudgeResult.create(...)` |
+| `TestCase`          | VO propio del juez: id, input, expectedOutput, orderIndex. No comparte modelo con `problem-service` |
+| Límites del sandbox | VOs validados: `TimeLimit`, `MemoryLimit`, `PidsLimit`, `VolumeSizeLimit`, `OutputSizeLimit`, `HardTimePercent`, `WatchIntervalMillis`, `AbsoluteTimeLimit` |
 
-**Casos de uso principales:**
-- `EvaluateSubmissionUseCase` — Orquesta el pipeline de compilación y ejecución
-- `RunInSandboxUseCase` — Lanza contenedor Docker, aplica límites de CPU/RAM, captura stdout/stderr
-- `CompareOutputUseCase` — I/O Matching contra el expected output del test case
+**Puertos de dominio y excepciones:**
+- `TestCaseRepository` (`domain/repository`) — lectura de los casos de prueba de un problema; los datos pertenecen a `problem-service`.
+- `TestCasesNotFoundException` — el problema no tiene casos de prueba.
+- `SandboxExecutionException` — fallo del propio sistema en el sandbox, distinto de un veredicto que culpa al estudiante.
+
+**Caso de uso:**
+- `EvaluateSubmissionUseCase` — recibe el `SubmissionReceivedEvent`, obtiene casos de prueba y límites, ensambla el `JudgeTask`, lo ejecuta en el sandbox y publica el `JudgeResult`. Los fallos del sistema se propagan sin publicar, para que la mensajería reintente y, agotados los reintentos, lo cierre la DLQ.
+
+**Puertos de salida (`application/port/out`):** `ProblemLimitsPort` (límites de tiempo y memoria del problema), `SandboxExecutor` (ejecuta la tarea y devuelve el `JudgeResult`) y `JudgeResultPublisher` (publica el resultado hacia `submission-service`).
+
+> La compilación (`Compiler`) está pendiente y se abordará en otra historia de usuario.
 
 **Veredictos emitidos:** `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `RUNTIME_ERROR`, `COMPILATION_ERROR`
 
@@ -604,7 +613,7 @@ dependencies {
 }
 ```
 
-> Todos los servicios aplican ya el plugin. Los que siguen siendo esqueleto (`judge`, `feedback`, `contest`) aún no declaran sus dependencias reales (Docker client, cliente HTTP del LLM, etc.): se añaden al implementarlos.
+> Todos los servicios aplican ya el plugin. Los que siguen siendo esqueleto (`feedback`, `contest`; `judge` está a medias) aún no declaran sus dependencias reales (Docker client, cliente HTTP del LLM, etc.): se añaden al implementarlos.
 
 ### Gradle Wrapper
 Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` desde `backend/`; no hace falta Gradle instalado globalmente.
@@ -619,7 +628,8 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 | 2 | **Ningún endpoint HTTP valida el JWT**: los `@PreAuthorize` están escritos pero la autenticación llega anónima | 🔴 Alta | Escribir el filtro JWT reutilizando `JwtTokenValidator` (ya usado por el handshake del WebSocket) y retirar `TemporaryAuthBypassFilter` |
 | 3 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
 | 4 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que deje de depender de lo que Hibernate decida en cada arranque |
-| 5 | **`judge-service` no existe**: los envíos se encolan y nadie los consume | 🔴 Alta | Implementar el consumidor de `submission.evaluate`. El contrato ya está fijado en `docs/RABBITMQ.md`; `testing/ws-judge-simulator/` lo simula mientras tanto |
+| 5 | **`judge-service` sin adaptadores**: dominio y aplicación listos, pero los envíos se encolan y nadie los consume | 🔴 Alta | Implementar el listener de `submission.evaluate`, el publisher de `submission.judged`, el cliente de `problem-service` y el `SandboxExecutor` sobre `Runner`. El contrato está en `docs/RABBITMQ.md`; `testing/ws-judge-simulator/` lo simula mientras tanto |
+| 5b | **`Compiler` vacío y `Runner` sin `SandboxExecutionException`** | 🟡 Media | La compilación va en otra HU. `Runner` aún reporta como `RUNTIME_ERROR` los fallos de `IOException`/`InterruptedException` del sistema |
 | 6 | **`contest-service` no existe**: la composición real de los equipos se desconoce | 🟡 Media | `NoOpTeamMembershipAdapter` trata cada equipo como individual. Al llegar el servicio, añadir un adaptador y cambiar `app.team-membership.provider` |
 | 7 | **El registro de sesiones WebSocket es local a la instancia** | 🟡 Media | Con varias réplicas, la instancia que recibe el veredicto puede no tener la conexión del estudiante. Escalar horizontalmente exige compartir el registro (p. ej. Redis) |
 | 8 | **`traefik.yml` está vacío** | 🟡 Media | Sin API Gateway cada servicio se expone por su puerto. Al configurarlo, cuidar el reenvío de `Upgrade`/`Sec-WebSocket-Protocol` o el handshake del WebSocket no se completa |
