@@ -172,6 +172,9 @@ Candidatos a residir aquí:
 |-----------|-----------|
 | [`services/submission-service/docs/RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md) | Topología, contrato de mensajes con `judge-service`, garantías de entrega, DLQ y reintentos |
 | [`services/submission-service/docs/WEBSOCKET.md`](./services/submission-service/docs/WEBSOCKET.md) | Canal `/ws/submissions`: autenticación en el handshake, contrato del mensaje, alcance por equipo y limitaciones |
+| [`services/judge-service/docs/BWRAP.md`](./services/judge-service/docs/BWRAP.md) | Aislamiento de la ejecución con bubblewrap: comando, qué ve el programa, filtro seccomp y códigos de salida |
+| [`services/judge-service/docs/CGROUPS.md`](./services/judge-service/docs/CGROUPS.md) | Límites y métricas por ejecución con cgroups v2: hoja por evaluación, memoria, PIDs, CPU y de dónde sale cada veredicto |
+| [`services/judge-service/docs/REQUIREMENTS.md`](./services/judge-service/docs/REQUIREMENTS.md) | Lo que hay que preparar en el host: kernel, slice de cgroups y flags del contenedor |
 
 ---
 
@@ -352,6 +355,12 @@ Detalles que conviene conocer antes de desplegar sobre una base de datos ya exis
 | GET    | `/actuator/health` | Público | Estado del servicio, sin detalles |
 
 Los límites (`OutputHandle` usa `outputSizeBytes`, `ErrorsHandle` usa `errorSizeBytes` y `TimeWatchdog` usa los otros tres) arrancan con `app.sandbox.monitor.*`. El `Runner` los lee al empezar cada evaluación, así que un cambio solo aplica a las que empiecen después, y **se pierde al reiniciar**: no hay base de datos donde persistirlos.
+
+> 📖 El detalle del sandbox —el comando de bwrap y el filtro seccomp, los límites y
+> métricas de cgroups, y lo que hay que preparar en el host— está en
+> [`BWRAP.md`](./services/judge-service/docs/BWRAP.md),
+> [`CGROUPS.md`](./services/judge-service/docs/CGROUPS.md) y
+> [`REQUIREMENTS.md`](./services/judge-service/docs/REQUIREMENTS.md).
 
 `judge-service` **no declara topología**: exchange, colas y DLQ las declara `submission-service`, dueño del contrato (ver su [`RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md)). No usa base de datos; se excluye la autoconfiguración de JPA que el `build.gradle` raíz aplica a todos los módulos.
 
@@ -656,8 +665,6 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 | 3 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
 | 4 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que deje de depender de lo que Hibernate decida en cada arranque |
 | 5 | **`judge-service` solo evalúa Python** | 🟡 Media | El `Compiler` (C, C++, Java) va en otra HU; hasta entonces esos envíos acaban en `SYSTEM_ERROR` tras agotar los reintentos |
-| 5b | **`Runner` no usa `SandboxExecutionException`** | 🟡 Media | Los `IOException`/`InterruptedException` del sistema se reportan como `RUNTIME_ERROR`, culpando al estudiante de un fallo de la plataforma |
-| 5c | **`TestCaseRunner` compara µs con ms** | 🔴 Alta | `utime > timeLimit` mide microsegundos contra un límite en milisegundos (el `TimeWatchdog` sí multiplica por 1000): cualquier solución que use más de `timeLimit` µs de CPU se marcaría `TIME_LIMIT_EXCEEDED` |
 | 6 | **`contest-service` no existe**: la composición real de los equipos se desconoce | 🟡 Media | `NoOpTeamMembershipAdapter` trata cada equipo como individual. Al llegar el servicio, añadir un adaptador y cambiar `app.team-membership.provider` |
 | 7 | **El registro de sesiones WebSocket es local a la instancia** | 🟡 Media | Con varias réplicas, la instancia que recibe el veredicto puede no tener la conexión del estudiante. Escalar horizontalmente exige compartir el registro (p. ej. Redis) |
 | 8 | **`traefik.yml` está vacío** | 🟡 Media | Sin API Gateway cada servicio se expone por su puerto. Al configurarlo, cuidar el reenvío de `Upgrade`/`Sec-WebSocket-Protocol` o el handshake del WebSocket no se completa |
