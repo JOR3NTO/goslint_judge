@@ -314,7 +314,7 @@ Detalles que conviene conocer antes de desplegar sobre una base de datos ya exis
 | `JudgeTask`         | submissionId, language, sourceCode, testCases, timeLimit, memoryLimit. Se ensambla con `JudgeTask.create(...)` y valida sus invariantes (al menos un caso de prueba, límites en rango) |
 | `JudgeResult`       | submissionId, verdict, executionTimeMs, memoryUsedKb, failedTestCase (`null` si es `ACCEPTED` o si falló antes de ejecutar, p. ej. compilación). Se crea con `JudgeResult.create(...)` |
 | `TestCase`          | VO propio del juez: id, input, expectedOutput, orderIndex. No comparte modelo con `problem-service` |
-| Límites del sandbox | VOs validados: `TimeLimit`, `MemoryLimit`, `PidsLimit`, `VolumeSizeLimit`, `OutputSizeLimit`, `HardTimePercent`, `WatchIntervalMillis`, `AbsoluteTimeLimit` |
+| Límites del sandbox | VOs validados: `TimeLimit`, `MemoryLimit`, `PidsLimit`, `VolumeSizeLimit`, `OutputSizeLimit`, `ErrorSizeLimit`, `HardTimePercent`, `WatchIntervalMillis`, `AbsoluteTimeLimit` |
 
 **Puertos de dominio y excepciones:**
 - `TestCaseRepository` (`domain/repository`) — lectura de los casos de prueba de un problema; los datos pertenecen a `problem-service`.
@@ -338,7 +338,20 @@ Detalles que conviene conocer antes de desplegar sobre una base de datos ya exis
 | `client/ProblemServiceTestCaseRepositoryAdapter` | `TestCaseRepository` sobre `GET /api/v1/problems/test-cases/{id}/all` (JWT `SERVICE` en cada petición); un `404` o lista vacía es `TestCasesNotFoundException` |
 | `client/ProblemServiceLimitsAdapter` | `ProblemLimitsPort` sobre `GET /api/v1/problems/{id}` |
 | `sandbox/RunnerSandboxExecutor` | `SandboxExecutor` sobre `Runner`: escribe el fuente a un temporal, ejecuta y traduce el mapa de resultados a `JudgeResult` |
+| `web/MonitorLimitsController` | Consulta y modificación de los límites de los monitores del sandbox (solo `ADMIN`) |
+| `security/JwtAuthenticationFilter` + `config/SecurityConfig` | Autentica el HTTP con el JWT y el mismo `JwtTokenValidator` que el resto; el rol pasa a `ROLE_<rol>` para `@PreAuthorize` |
+| `persistence/InMemoryMonitorLimitsRepository` | Guarda los límites vigentes en memoria (el juez no tiene BD) |
 | `config/` | Convertidor JSON de RabbitMQ, bean del `Runner` y `RestClient` hacia `problem-service` |
+
+**Endpoints de `judge-service`:**
+
+| Método | Endpoint | Acceso | Notas |
+|--------|----------|--------|-------|
+| GET    | `/api/v1/judge/monitor-limits` | ADMIN | Límites vigentes de los monitores |
+| PUT    | `/api/v1/judge/monitor-limits` | ADMIN | Reemplaza los cinco límites: `outputSizeBytes`, `errorSizeBytes`, `hardTimePercent`, `watchIntervalMs`, `absoluteTimeMs`. Un valor fuera de rango o ausente responde `400` |
+| GET    | `/actuator/health` | Público | Estado del servicio, sin detalles |
+
+Los límites (`OutputHandle` usa `outputSizeBytes`, `ErrorsHandle` usa `errorSizeBytes` y `TimeWatchdog` usa los otros tres) arrancan con `app.sandbox.monitor.*`. El `Runner` los lee al empezar cada evaluación, así que un cambio solo aplica a las que empiecen después, y **se pierde al reiniciar**: no hay base de datos donde persistirlos.
 
 `judge-service` **no declara topología**: exchange, colas y DLQ las declara `submission-service`, dueño del contrato (ver su [`RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md)). No usa base de datos; se excluye la autoconfiguración de JPA que el `build.gradle` raíz aplica a todos los módulos.
 

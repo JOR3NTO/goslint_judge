@@ -5,13 +5,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import co.uceva.judge.domain.model.MonitorLimits;
 import co.uceva.judge.domain.model.TestCase;
-import co.uceva.judge.domain.valueobject.AbsoluteTimeLimit;
-import co.uceva.judge.domain.valueobject.HardTimePercent;
-import co.uceva.judge.domain.valueobject.OutputSizeLimit;
+import co.uceva.judge.domain.repository.MonitorLimitsRepository;
 import co.uceva.judge.domain.valueobject.PidsLimit;
 import co.uceva.judge.domain.valueobject.VolumeSizeLimit;
-import co.uceva.judge.domain.valueobject.WatchIntervalMillis;
 import co.uceva.judge.infrastructure.sandbox.command.BwrapCommandFactory;
 import co.uceva.judge.infrastructure.sandbox.execution.TestCaseResult;
 import co.uceva.judge.infrastructure.sandbox.execution.TestCaseRunner;
@@ -32,35 +30,22 @@ public class Runner {
     private final PidsLimit maxPids;
     /** Tamaño máximo del volumen escribible ({@code /work}) dentro del sandbox. */
     private final VolumeSizeLimit maxVolumeSize;
-    /** Ejecutor de casos de prueba individuales, configurado con los límites de salida y tiempo. */
-    private final TestCaseRunner testCaseRunner;
+    /** Límites vigentes de los monitores; se consultan en cada ejecución para que un cambio se aplique a la siguiente. */
+    private final MonitorLimitsRepository monitorLimitsRepository;
 
     /**
-     * Crea el runner con los límites del dominio en sus valores por defecto.
-     * Útil mientras estos valores no sean expuestos a través de una API.
-     */
-    public Runner() {
-        this(PidsLimit.ofDefault(), VolumeSizeLimit.ofDefault(), OutputSizeLimit.ofDefault(),
-            HardTimePercent.ofDefault(), WatchIntervalMillis.ofDefault(), AbsoluteTimeLimit.ofDefault());
-    }
-
-    /**
-     * Crea el runner con límites parametrizables, pensados para ser
-     * suministrados en el futuro desde una API (por ejemplo, por problema o
-     * por lenguaje), en lugar de estar fijos en el código.
+     * Crea el runner con límites de sandbox fijos y los límites de los monitores
+     * leídos, en cada ejecución, del repositorio, para poder parametrizarlos en
+     * tiempo de ejecución.
      *
-     * @param maxPids           Número máximo de procesos simultáneos permitidos dentro del sandbox.
-     * @param maxVolumeSize     Tamaño máximo del volumen escribible ({@code /work}) dentro del sandbox.
-     * @param maxOutputSize     Tamaño máximo permitido para la salida estándar y de error del proceso.
-     * @param hardTimePercent   Porcentaje adicional sobre el límite de tiempo antes de forzar la terminación del proceso.
-     * @param watchInterval     Intervalo con el que se verifica el tiempo de CPU utilizado por el proceso.
-     * @param absoluteTimeLimit Tiempo máximo absoluto que puede durar el proceso, sin importar el límite configurado.
+     * @param maxPids                 Número máximo de procesos simultáneos permitidos dentro del sandbox.
+     * @param maxVolumeSize           Tamaño máximo del volumen escribible ({@code /work}) dentro del sandbox.
+     * @param monitorLimitsRepository Fuente de los límites de salida y de tiempo de los monitores.
      */
-    public Runner(PidsLimit maxPids, VolumeSizeLimit maxVolumeSize, OutputSizeLimit maxOutputSize,
-            HardTimePercent hardTimePercent, WatchIntervalMillis watchInterval, AbsoluteTimeLimit absoluteTimeLimit) {
+    public Runner(PidsLimit maxPids, VolumeSizeLimit maxVolumeSize, MonitorLimitsRepository monitorLimitsRepository) {
         this.maxPids = maxPids;
         this.maxVolumeSize = maxVolumeSize;
-        this.testCaseRunner = new TestCaseRunner(maxOutputSize, hardTimePercent, watchInterval, absoluteTimeLimit);
+        this.monitorLimitsRepository = monitorLimitsRepository;
     }
 
     /**
@@ -83,6 +68,10 @@ public class Runner {
      */
     public Map<String, Object> runSolution(String command, String solutionPath, List<TestCase> testCases,
             long timeLimit, long memoryLimit) {
+
+        MonitorLimits limits = monitorLimitsRepository.find();
+        TestCaseRunner testCaseRunner = new TestCaseRunner(limits.outputSize(), limits.errorSize(), limits.hardTimePercent(),
+                limits.watchInterval(), limits.absoluteTimeLimit());
 
         Map<String, Object> result = new HashMap<>();
         boolean testsPassed = true;

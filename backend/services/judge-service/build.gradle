@@ -6,5 +6,6 @@ dependencies {
     implementation project(':shared:common-domain')
     implementation project(':shared:common-infrastructure')
     implementation 'org.springframework.boot:spring-boot-starter-amqp'   // RabbitMQ
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'   // /actuator/health
     testImplementation 'org.springframework.amqp:spring-rabbit-test'
 }
