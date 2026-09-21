@@ -82,7 +82,7 @@ public class TestCaseRunner {
         pb.environment().put("PATH", "/usr/bin:/bin");
         pb.environment().put("SECCOMP_PROFILE", workspace.seccompProfile());
         Process process = pb.start();
-        ErrorsHandle errorsHandle = new ErrorsHandle(process, workspace.cgLeafPath(), process.getErrorStream(), maxErrorSize.bytes());
+        ErrorsHandle errorsHandle = new ErrorsHandle(workspace.cgLeafPath(), process.getErrorStream(), maxErrorSize.bytes());
         OutputHandle outputHelper = new OutputHandle(workspace.cgLeafPath(), process.getInputStream(), maxOutputSize.bytes());
         outputHelper.start();
         errorsHandle.start();
@@ -95,7 +95,7 @@ public class TestCaseRunner {
         outputHelper.join();
         errorsHandle.join();
         watchdog.join();
-        long memoryUsed = Long.parseLong(Files.readString(workspace.memoryPeakPath()).trim());
+        long memoryUsed = Long.parseLong(Files.readString(workspace.memoryPeakPath()).trim()) / 1024;
         long utime = Files.readAllLines(workspace.cpuStatsPath()).stream()
                 .filter(line -> line.contains("usage_usec"))
                 .map(line -> line.split(" ")[1])
@@ -106,7 +106,7 @@ public class TestCaseRunner {
         if (isOomKilled) {
             return new TestCaseResult(VerdictStatus.MEMORY_LIMIT_EXCEEDED, utime, memoryUsed, null);
         }
-        if (watchdog.getForcedTLE().get() || utime > timeLimit) {
+        if (watchdog.getForcedTLE().get() || utime > timeLimit * 1000) {
             return new TestCaseResult(VerdictStatus.TIME_LIMIT_EXCEEDED, utime, memoryUsed, null);
         }
         if (process.exitValue() != 0 || errorsHandle.getIsRuntimeErrorKilled().get()) {

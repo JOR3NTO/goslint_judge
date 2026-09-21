@@ -9,8 +9,8 @@ public record MemoryLimit(int kilobytes) {
 
     /** Límite mínimo de memoria en kilobytes (4 MB). */
     public static final int MIN_KB = 4_096;     // 4 MB
-    /** Límite máximo de memoria en kilobytes (512 MB). */
-    public static final int MAX_KB = 262_144; //  512 MB
+    /** Límite máximo de memoria en kilobytes (256 MB). */
+    public static final int MAX_KB = 262_144; //  256 MB
 
     /**
      * Constructor compacto que valida los invariantes del dominio.

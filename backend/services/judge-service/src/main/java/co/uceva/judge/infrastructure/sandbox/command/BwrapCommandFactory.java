@@ -65,6 +65,7 @@ public final class BwrapCommandFactory {
                 "--tmpfs", "/work", // Monta un tmpfs escribible y limitado en tamano como directorio de trabajo.
 
                 // Temporales adicionales
+                "--size", String.valueOf(maxVolumeSize.bytes()), // Limita el tamano del tmpfs escribible que se monta a continuacion.
                 "--tmpfs", "/tmp", // Monta un tmpfs adicional para archivos temporales.
 
                 "--chdir", "/work", // Establece /work como directorio de trabajo actual dentro del sandbox.

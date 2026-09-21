@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import co.uceva.judge.domain.valueobject.AbsoluteTimeLimit;
 import co.uceva.judge.domain.valueobject.HardTimePercent;
 import co.uceva.judge.domain.valueobject.WatchIntervalMillis;
+import co.uceva.judge.infrastructure.sandbox.kill.CgroupKiller;
 
 /**
  * Hilo que vigila el tiempo de CPU consumido por el proceso en ejecución
@@ -21,8 +22,6 @@ public class TimeWatchdog extends Thread {
 
     /** Proceso cuyo tiempo de CPU está siendo vigilado. */
     private final Process p;
-    /** Ruta del cgroup asociado al proceso, usada para forzar su terminación. */
-    private final Path cgLeafPath;
     /** Ruta del archivo {@code cpu.stat} del cgroup, usado para leer el tiempo de CPU consumido. */
     private final Path cpuStatsPath;
     /** Límite de tiempo de ejecución, en milisegundos, configurado para el proceso. */
@@ -33,6 +32,8 @@ public class TimeWatchdog extends Thread {
     private final WatchIntervalMillis watchInterval;
     /** Tiempo máximo absoluto que puede durar un proceso, sin importar el límite configurado. */
     private final AbsoluteTimeLimit absoluteTimeLimit;
+    /** Instancia del asistente para matar el cgroup del proceso. */
+    private final CgroupKiller cgroupKiller;
     /** Indica si el proceso fue terminado de forma forzada por exceder el límite de tiempo. */
     private final AtomicBoolean forcedTLE = new AtomicBoolean(false);
 
@@ -68,7 +69,7 @@ public class TimeWatchdog extends Thread {
         this.p = p;
         this.cpuStatsPath = cpuStatsPath;
         this.timeLimit = timeLimit;
-        this.cgLeafPath = cgLeafPath;
+        this.cgroupKiller = new CgroupKiller(cgLeafPath);
         this.hardTimePercent = hardTimePercent;
         this.watchInterval = watchInterval;
         this.absoluteTimeLimit = absoluteTimeLimit;
@@ -86,7 +87,7 @@ public class TimeWatchdog extends Thread {
     @Override
     public void run() {
         long startInterval = System.currentTimeMillis();
-        long startTime = System.nanoTime();
+        long startTime = System.currentTimeMillis();
         while (p.isAlive()) {
             long current = System.currentTimeMillis();
             if (current - startInterval >= watchInterval.milliseconds()) {
@@ -100,7 +101,7 @@ public class TimeWatchdog extends Thread {
                     if (utime >= timeLimit * (1 + hardTimePercent.percentage()) * 1000
                             || current - startTime >= absoluteTimeLimit.milliseconds()) {
                         forcedTLE.set(true);
-                        killCgroup();
+                        cgroupKiller.killCgroup();
                         p.descendants().forEach(ProcessHandle::destroyForcibly);
                         p.destroyForcibly();
                         break;
@@ -114,32 +115,6 @@ public class TimeWatchdog extends Thread {
             } catch (InterruptedException e) {
                 System.out.println("Error sleeping: " + e.getMessage());
             }
-        }
-    }
-
-    /**
-     * Escribe en {@code cgroup.kill} para forzar la terminación de todos los
-     * procesos pertenecientes al cgroup del proceso monitoreado.
-     */
-    private void killCgroup() {
-        if (cgLeafPath == null) {
-            return;
-        }
-
-        Path cgroupKillPath = cgLeafPath.resolve("cgroup.kill");
-
-        try {
-            if (Files.exists(cgroupKillPath)) {
-                Files.writeString(
-                    cgroupKillPath,
-                    "1",
-                    StandardOpenOption.WRITE
-                );
-            }
-        } catch (IOException e) {
-            System.err.println(
-                "Error killing cgroup " + cgLeafPath + ": " + e
-            );
         }
     }
 

@@ -7,7 +7,9 @@ import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.UUID;
 
+import co.uceva.judge.domain.exception.SandboxExecutionException;
 import co.uceva.judge.domain.valueobject.PidsLimit;
+import co.uceva.judge.infrastructure.sandbox.kill.CgroupKiller;
 
 /**
  * Representa el entorno aislado (cgroup y directorio de trabajo) creado para
@@ -34,6 +36,9 @@ public class SandboxWorkspace {
     private final String seccompProfile;
     /** Ruta absoluta del archivo fuente de la solución a ejecutar. */
     private final Path origen;
+    /** Instancia del asistente para matar el cgroup del proceso. */
+    private final CgroupKiller cgroupKiller;
+    
 
     private SandboxWorkspace(Path cgLeafPath, Path memoryPeakPath, Path memoryEventsPath, Path cpuStatsPath,
             Path cgroupProcs, Path workDirPath, String workDir, String seccompProfile, Path origen) {
@@ -46,6 +51,7 @@ public class SandboxWorkspace {
         this.workDir = workDir;
         this.seccompProfile = seccompProfile;
         this.origen = origen;
+        this.cgroupKiller = new CgroupKiller(cgLeafPath);
     }
 
     /**
@@ -66,6 +72,7 @@ public class SandboxWorkspace {
         String memoryPeak = cgLeaf + "/memory.peak";
         String memoryEvents = cgLeaf + "/memory.events";
         String memoryMax = cgLeaf + "/memory.max";
+        String memoryMaxSwap = cgLeaf + "/memory.swap.max";
         String pidsMax = cgLeaf + "/pids.max";
         String cpuStats = cgLeaf + "/cpu.stat";
         Path cpuStatsPath = Path.of(cpuStats);
@@ -73,11 +80,21 @@ public class SandboxWorkspace {
         Path memoryPeakPath = Path.of(memoryPeak);
         Path memoryEventsPath = Path.of(memoryEvents);
         Path memoryMaxPath = Path.of(memoryMax);
+        Path memoryMaxSwapPath = Path.of(memoryMaxSwap);
         Path pidsMaxPath = Path.of(pidsMax);
         cgLeafPath.toFile().mkdirs();
-        cgLeafPath.toFile().mkdirs();
         Files.writeString(memoryMaxPath, String.valueOf(memoryLimit), StandardOpenOption.WRITE);
+        if(!Files.readAllLines(memoryMaxPath).get(0).equals(String.valueOf(memoryLimit))) {
+            throw new SandboxExecutionException("Error preparando el entorno de ejecución", new IOException("No se pudo establecer el límite de memoria en " + memoryLimit + " bytes"));
+        }
+        Files.writeString(memoryMaxSwapPath, String.valueOf(0), StandardOpenOption.WRITE);
+        if(!Files.readAllLines(memoryMaxSwapPath).get(0).equals(String.valueOf(0))) {
+            throw new SandboxExecutionException("Error preparando el entorno de ejecución", new IOException("No se pudo establecer el límite de memoria swap en 0 bytes"));
+        }
         Files.writeString(pidsMaxPath, String.valueOf(maxPids.pids()), StandardOpenOption.WRITE);
+        if(!Files.readAllLines(pidsMaxPath).get(0).equals(String.valueOf(maxPids.pids()))) {
+            throw new SandboxExecutionException("Error preparando el entorno de ejecución", new IOException("No se pudo establecer el límite de procesos en " + maxPids.pids() + " procesos"));
+        }
         String uuid = UUID.randomUUID().toString();
         String workDir = "/work/" + uuid;
         Path cgroupProcs = Path.of(cgLeaf + "/cgroup.procs");
@@ -123,6 +140,7 @@ public class SandboxWorkspace {
         // Eliminar unicamente el directorio del cgroup
         if (cgLeafPath != null) {
             try {
+                cgroupKiller.killCgroup();
                 Files.deleteIfExists(cgLeafPath);
             } catch (IOException e) {
                 System.err.println(

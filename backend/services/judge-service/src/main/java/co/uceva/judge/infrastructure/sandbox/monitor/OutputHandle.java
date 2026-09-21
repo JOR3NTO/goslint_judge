@@ -3,10 +3,14 @@ package co.uceva.judge.infrastructure.sandbox.monitor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import co.uceva.judge.infrastructure.sandbox.Runner;
+import co.uceva.judge.infrastructure.sandbox.kill.CgroupKiller;
 
 /**
  * Hilo que consume el flujo de salida estándar (stdout) del proceso en
@@ -14,14 +18,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * tamaño máximo permitido, termina el cgroup del proceso.
  */
 public class OutputHandle extends Thread {
+    private static final Logger log = LoggerFactory.getLogger(OutputHandle.class);
     /** Flujo de salida estándar (stdout) del proceso. */
     private final InputStream inputStream;
     /** Tamaño máximo en bytes permitido para la salida estándar. */
     private final long maxOutputSize;
-    /** Ruta del cgroup asociado al proceso, usada para forzar su terminación. */
-    private final Path cgLeafPath;
     /** Acumulador de la salida estándar leída hasta el momento. */
     private final StringBuilder outputBuilder = new StringBuilder();
+    /** Instancia del asistente para matar el cgroup del proceso. */
+    private final CgroupKiller cgroupKiller;
     /** Indica si la salida estándar superó el tamaño máximo permitido. */
     private final AtomicBoolean outputSizeExceeded = new AtomicBoolean(false);
     /** Indica si la lectura del flujo de salida ha finalizado. */
@@ -37,7 +42,7 @@ public class OutputHandle extends Thread {
     public OutputHandle(Path cgLeafPath, InputStream inputStream, long maxOutputSize) {
         this.inputStream = inputStream;
         this.maxOutputSize = maxOutputSize;
-        this.cgLeafPath = cgLeafPath;
+        this.cgroupKiller = new CgroupKiller(cgLeafPath);
     }
 
     /**
@@ -56,41 +61,15 @@ public class OutputHandle extends Thread {
                 totalBytesRead += bytesRead;
                 if (totalBytesRead > maxOutputSize) {
                     outputSizeExceeded.set(true);
-                    killCgroup();
+                    cgroupKiller.killCgroup();
                     break;
                 }
                 outputBuilder.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
             }
         } catch (IOException e) {
-            System.out.println("Error reading process output: " + e.getMessage());
+            log.error("Error reading process output: {}", e.getMessage(), e);
         } finally {
             outputReadComplete.set(true);
-        }
-    }
-
-    /**
-     * Escribe en {@code cgroup.kill} para forzar la terminación de todos los
-     * procesos pertenecientes al cgroup del proceso monitoreado.
-     */
-    private void killCgroup() {
-        if (cgLeafPath == null) {
-            return;
-        }
-
-        Path cgroupKillPath = cgLeafPath.resolve("cgroup.kill");
-
-        try {
-            if (Files.exists(cgroupKillPath)) {
-                Files.writeString(
-                    cgroupKillPath,
-                    "1",
-                    StandardOpenOption.WRITE
-                );
-            }
-        } catch (IOException e) {
-            System.err.println(
-                "Error killing cgroup " + cgLeafPath + ": " + e
-            );
         }
     }
 

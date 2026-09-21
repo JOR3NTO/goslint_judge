@@ -5,6 +5,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import co.uceva.judge.domain.model.MonitorLimits;
 import co.uceva.judge.domain.model.TestCase;
 import co.uceva.judge.domain.repository.MonitorLimitsRepository;
@@ -25,6 +28,8 @@ import co.uceva.shared.domain.VerdictStatus;
  * tiempo de ejecución o respuesta incorrecta).
  */
 public class Runner {
+    
+    private static final Logger log = LoggerFactory.getLogger(Runner.class);
 
     /** Número máximo de procesos que puede crear la solución de forma simultánea. */
     private final PidsLimit maxPids;
@@ -93,13 +98,13 @@ public class Runner {
                     result.put("failedTestCase", testCase.id());
                     break;
                 }
-                if (!(testsPassed &= testResult.output().equals(testCase.expectedOutput()))) {
+                if (!(testsPassed &= testResult.output().equals(testCase.expectedOutput().trim()))) {
                     result.put("failedTestCase", testCase.id());
                     break;
                 }
 
             } catch (IOException | InterruptedException e) {
-                System.out.println("Error running solution: " + e.getMessage());
+                log.error("Error running solution: " + e.getMessage());
                 result.put("status", VerdictStatus.RUNTIME_ERROR);
                 result.put("failedTestCase", testCase.id());
             } finally {
@@ -109,7 +114,7 @@ public class Runner {
             }
         }
         result.put("maxCpuTime", maxCpuTime / 1000);
-        result.put("maxMemoryUsed", maxMemoryUsed / 1024);
+        result.put("maxMemoryUsed", maxMemoryUsed);
         if (result.containsKey("status")) {
             return result;
         }
