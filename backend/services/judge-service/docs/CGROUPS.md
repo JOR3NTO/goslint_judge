@@ -194,6 +194,7 @@ Dimensionamiento: cada evaluación concurrente puede llegar a su `memory.max`, m
 | [infrastructure/sandbox/monitor/ErrorsHandle.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/monitor/ErrorsHandle.java) | Consume stderr con tope y detecta errores en ejecución |
 | [infrastructure/sandbox/Runner.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/Runner.java) | Recorre los casos de prueba y agrega las métricas máximas |
 | [domain/valueobject/](../src/main/java/co/uceva/judge/domain/valueobject/) | `PidsLimit`, `VolumeSizeLimit`, `MemoryLimit`, `TimeLimit` y los límites de los monitores, con sus rangos válidos |
+| [docker/entrypoint.sh](../docker/entrypoint.sh) | Prepara `/cg` al arrancar el contenedor: limpia hojas huérfanas, delega permisos y comprueba que funciona |
 
 ---
 
@@ -253,7 +254,7 @@ Los límites por problema (`timeLimitMs`, `memoryLimitKb`) llegan desde `problem
 
 ## 15. Estado de la validación
 
-Las cifras de este documento se midieron en un host real (aarch64, kernel `6.8.0-1060-oracle`) sobre el **paquete de sandbox `goslint-sandbox`**, un prototipo que todavía no forma parte de este repositorio (ver [REQUIREMENTS.md](./REQUIREMENTS.md), anexo). Su script `prueba_humo.sh` pasó 17 de 17 comprobaciones:
+Las cifras de este documento se midieron en un host real (aarch64, kernel `6.8.0-1060-oracle`) con [prueba_humo.sh](../docker/prueba_humo.sh), que pasó 17 de 17 comprobaciones. La implementación medida fue el prototipo del sandbox, no las clases de `infrastructure/sandbox` de este servicio:
 
 | Comprobación | Resultado |
 |---|---|
@@ -266,7 +267,7 @@ Las cifras de este documento se midieron en un host real (aarch64, kernel `6.8.0
 
 Pendiente de validar:
 
-- **El código de `judge-service` contra cgroups reales.** Lo medido fue el prototipo; las clases de `infrastructure/sandbox` de este servicio solo tienen pruebas unitarias.
+- **El código de `judge-service` contra cgroups reales.** Lo medido fue el prototipo; las clases de `infrastructure/sandbox` de este servicio solo tienen pruebas unitarias. La imagen ya las empaqueta, así que el siguiente paso es levantarla sobre una `goslint.slice` de verdad y repetir `prueba_humo.sh`.
 - `cgroup.kill`, `memory.swap.max` y el `rmdir` con reintentos.
 - Métricas de una ejecución mientras otra consume CPU a fondo.
 - `pids.max` adecuado para la JVM.

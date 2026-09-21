@@ -157,7 +157,11 @@ La ruta del filtro (`/opt/judge/filter.bpf`) viaja como variable de entorno `SEC
 - Con `KILL_PROCESS` (el programa muere con SIGSYS, código de salida 159): montajes y cambios de namespace, `ptrace` y acceso a memoria ajena, `bpf`, `io_uring_*`, `userfaultfd`, `perf_event_open`, `keyctl`, módulos y arranque del kernel, `open_by_handle_at`, reloj y hostname, y `clone` con flags de namespace.
 - Con `ERRNO` (falla con error normal): `clone3` (ENOSYS, para que glibc use `clone`), 26 familias de socket con historial de vulnerabilidades (entre ellas `AF_NETLINK`, `AF_PACKET`, `AF_ALG`, `AF_VSOCK`), `ioctl(TIOCSTI)`, `personality` para apagar ASLR y `syslog`.
 
-**Cómo se genera y se verifica.** El filtro depende de la arquitectura y de la versión de libseccomp, por eso se genera al construir la imagen del sandbox y se verifica con su propio script, que carga el filtro en procesos hijo y comprueba 19 comportamientos. Ese generador vive en el paquete del sandbox, todavía fuera de este repositorio ([REQUIREMENTS.md](./REQUIREMENTS.md), anexo).
+**Cómo se genera y se verifica.** El filtro depende de la arquitectura y de la versión de libseccomp, por eso [gen_seccomp.py](../docker/gen_seccomp.py) lo genera al construir la imagen, en `/opt/judge/filter.bpf`, y nunca se copia entre máquinas distintas. El mismo script se verifica a sí mismo: carga el filtro en procesos hijo y comprueba 19 comportamientos.
+
+```bash
+docker exec -u ubuntu goslint-judge python3 /opt/judge/gen_seccomp.py -o /tmp/f.bpf --verify
+```
 
 ---
 
@@ -211,6 +215,8 @@ El contenedor no usa `--privileged` ni `--cap-add`. Lo que hace falta son tres r
 | [infrastructure/sandbox/workspace/SandboxWorkspace.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/workspace/SandboxWorkspace.java) | Hoja de cgroup, `/work/<uuid>` y ruta del filtro seccomp |
 | [infrastructure/sandbox/execution/TestCaseRunner.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/execution/TestCaseRunner.java) | Lanza el proceso con el entorno limpio y recoge el resultado |
 | [infrastructure/sandbox/RunnerSandboxExecutor.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/RunnerSandboxExecutor.java) | Escribe el fuente en disco y traduce el resultado a `JudgeResult` |
+| [docker/gen_seccomp.py](../docker/gen_seccomp.py) | Genera y verifica el filtro seccomp que carga bwrap |
+| [docker/Dockerfile](../docker/Dockerfile) | Imagen con `bubblewrap`, `python3` y el filtro ya generado |
 
 ---
 
@@ -225,7 +231,7 @@ El contenedor no usa `--privileged` ni `--cap-add`. Lo que hace falta son tres r
 
 ## 13. Estado de la validación
 
-Lo de este documento se midió en un host real (aarch64, kernel `6.8.0-1060-oracle`, cgroup v2) sobre el **paquete de sandbox `goslint-sandbox`**, un prototipo que aún no forma parte de este repositorio. Su `prueba_humo.sh` pasó 17 de 17:
+Lo de este documento se midió en un host real (aarch64, kernel `6.8.0-1060-oracle`, cgroup v2) con [prueba_humo.sh](../docker/prueba_humo.sh), que pasó 17 de 17. El comando de bwrap que se validó entonces era el del prototipo del sandbox, no el que construye hoy `BwrapCommandFactory`:
 
 | Comprobación | Resultado |
 |---|---|
@@ -244,6 +250,7 @@ Lo de este documento se midió en un host real (aarch64, kernel `6.8.0-1060-orac
 Pendiente de validar:
 
 - **El comando que construye este servicio.** El prototipo montaba el fuente en `/work`; `BwrapCommandFactory` lo monta en `/solution` y da un `/work` escribible aparte, pensando en la compilación. Esa variante no se ha probado en un host real.
+- **La imagen con el servicio dentro.** Construye y el filtro seccomp pasa sus 19 comprobaciones, pero `prueba_humo.sh` todavía no se ha ejecutado contra una `goslint.slice` real desde esta imagen.
 - Control sin `systempaths=unconfined` (sección 5).
 - Java y C++ dentro del sandbox con el filtro seccomp, y los montajes extra que necesiten.
 - Carga concurrente sostenida.

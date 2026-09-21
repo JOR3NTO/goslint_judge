@@ -3,7 +3,7 @@
 > Lo que hay que preparar **fuera** del código para que la evaluación en sandbox funcione: kernel, cgroups y flags del contenedor.
 > Documento vivo: actualizar cuando cambien los requisitos del host o el empaquetado del sandbox.
 
-**Alcance.** Aquí está solo lo que **no se puede resolver desde la imagen**. Instalar paquetes, crear usuarios, generar el filtro seccomp o preparar permisos dentro del contenedor es cosa del `Dockerfile` y del entrypoint (ver el [anexo](#anexo-qué-resuelve-la-imagen-y-qué-el-host)).
+**Alcance.** Aquí está solo lo que **no se puede resolver desde la imagen**. Instalar paquetes, generar el filtro seccomp o preparar permisos dentro del contenedor es cosa del [Dockerfile](../docker/Dockerfile) y del [entrypoint](../docker/entrypoint.sh) (ver el [anexo](#anexo-qué-resuelve-la-imagen-y-qué-el-host)).
 
 **Referencia técnica.** El porqué de cada requisito está en [BWRAP.md](./BWRAP.md) (aislamiento de procesos y sistema de archivos) y en [CGROUPS.md](./CGROUPS.md) (límites y métricas). Aquí solo está el «qué hace falta» y el «cómo verificarlo».
 
@@ -37,6 +37,15 @@ cat /sys/fs/cgroup/goslint.slice/cgroup.subtree_control   # debe incluir memory 
 docker version --format '{{.Server.KernelVersion}}'       # igual que uname -r
 ```
 
+Con el contenedor arriba:
+
+```bash
+docker logs goslint-judge | grep "delegacion de cgroups OK"
+docker exec -u ubuntu goslint-judge python3 /opt/judge/gen_seccomp.py -o /tmp/f.bpf --verify
+docker exec -u ubuntu goslint-judge sh /opt/judge/prueba_humo.sh       # 17 OK, 0 FALLO
+docker inspect goslint-judge --format '{{.HostConfig.Privileged}} {{.HostConfig.CapAdd}}'   # false []
+```
+
 Si alguno falla, ver la sección correspondiente.
 
 ## Entorno en el que se validó
@@ -50,7 +59,7 @@ Si alguno falla, ver la sección correspondiente.
 | Capabilities efectivas del usuario | 0 (`CapEff: 0000000000000000`) |
 | `Privileged` / `CapAdd` | `false` / `[]` |
 
-> Lo validado fue el **paquete de sandbox `goslint-sandbox`**, un prototipo con su propio `Dockerfile`, entrypoint y pruebas de humo que **todavía no forma parte de este repositorio**. El código de `judge-service` aún no se ha ejecutado dentro de él.
+> Lo validado fue el prototipo del sandbox. Su `Dockerfile`, entrypoint, generador de seccomp y pruebas de humo ya están integrados en [`services/judge-service/docker/`](../docker/), pero la imagen empaqueta ahora además el propio `judge-service`, y **esa imagen todavía no se ha ejecutado sobre una `goslint.slice` real**.
 
 **No validado:** hosts x86_64, Ubuntu 22.04 con HWE, Docker Desktop, y cualquier carga con Java o C++.
 
@@ -128,26 +137,15 @@ Si el `KernelVersion` no coincide, hay Docker Desktop o una VM intermedia.
 
 ### 4.1. Como unit file de systemd (recomendado)
 
-Un `mkdir` manual **se pierde en cada reinicio del host**. Un unit file persiste:
-
-```ini
-# /etc/systemd/system/goslint.slice
-[Unit]
-Description=Slice para contenedores de goslint judge
-Before=slices.target
-
-# Opcional, recomendado (no validado): tope global para TODAS las ejecuciones.
-# Las hojas cuelgan de la slice, no del contenedor, así que --memory y --pids-limit
-# del contenedor no las cubren.
-# [Slice]
-# MemoryMax=...
-# TasksMax=...
-```
+Un `mkdir` manual **se pierde en cada reinicio del host**. Un unit file persiste, y el repositorio trae uno listo en [infrastructure/systemd/goslint.slice](../../../../infrastructure/systemd/goslint.slice):
 
 ```bash
+sudo cp infrastructure/systemd/goslint.slice /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now goslint.slice
 ```
+
+Trae comentado un bloque `[Slice]` con `MemoryMax` y `TasksMax` para poner un tope global a todas las ejecuciones (recomendado, sin validar; ver [CGROUPS.md](./CGROUPS.md), sección 10).
 
 **Verificación:**
 
@@ -187,9 +185,17 @@ Requires=goslint.slice
 
 **Por qué:** ninguno se puede poner en el `Dockerfile`: son decisiones del runtime, no de la imagen. Sin ellos, `bwrap` falla antes de ejecutar nada.
 
+Ya están declarados en el servicio `judge-service` de [infrastructure/docker/docker-compose.yml](../../../../infrastructure/docker/docker-compose.yml), bajo el perfil `sandbox` para que un `docker compose up` normal siga levantando solo PostgreSQL y RabbitMQ:
+
+```bash
+JWT_SECRET=<mínimo 32 bytes> docker compose --profile sandbox up -d --build judge-service
+```
+
+Equivalente con `docker run`:
+
 ```bash
 docker run -d \
-  --name goslint-sandbox \
+  --name goslint-judge \
   --init \
   --cgroupns=host \
   --cgroup-parent=goslint.slice \
@@ -198,7 +204,8 @@ docker run -d \
   --security-opt seccomp=unconfined \
   --security-opt apparmor=unconfined \
   --security-opt systempaths=unconfined \
-  <imagen>
+  -e JWT_SECRET=... -p 8084:8084 \
+  goslint-judge:dev
 ```
 
 | Flag | Por qué es obligatorio |
@@ -236,7 +243,7 @@ docker run -d \
 **Verificación (dentro del contenedor, como el usuario del servicio):**
 
 ```bash
-docker exec -u <usuario> <contenedor> sh -c '
+docker exec -u ubuntu goslint-judge sh -c '
   ls -la /cg | grep cgroup.procs
   mkdir /cg/prueba && echo $$ > /cg/prueba/cgroup.procs && echo OK
   rmdir /cg/prueba'
@@ -307,15 +314,14 @@ Si bwrap falla al crear el namespace (por ejemplo, `setting up uid map: Permissi
 
 **Pendiente:**
 
-1. **Empaquetar `judge-service` para este sandbox.** Hoy el repositorio solo tiene [infrastructure/docker/docker-compose.yml](../../../../infrastructure/docker/docker-compose.yml) con PostgreSQL y RabbitMQ; el `Dockerfile`, el entrypoint, el generador de seccomp y las pruebas de humo del sandbox siguen fuera.
-2. **Ejecutar el código de este servicio contra cgroups reales.** Lo validado fue el prototipo.
-3. **Control de `systempaths=unconfined`:** quitar el flag, recrear el contenedor y repetir las pruebas. Si el primer check falla al montar `/proc`, el flag es necesario; si pasa, se puede eliminar.
-4. Java y C++ dentro del sandbox, con el filtro seccomp y los montajes que necesiten.
-5. Métricas de una ejecución mientras otra consume CPU a fondo, y carga concurrente sostenida.
-6. `pids.max` adecuado para la JVM.
-7. Topes globales en la slice (`MemoryMax`, `TasksMax`) y el drop-in de arranque de Docker.
-8. Un host x86_64.
-9. Perfil AppArmor propio como alternativa a `apparmor=unconfined`.
+1. **Levantar la imagen sobre una `goslint.slice` real** y repetir `prueba_humo.sh`. La imagen construye y su filtro seccomp pasa las 19 comprobaciones, pero el código de `infrastructure/sandbox` nunca se ha ejecutado contra cgroups de verdad.
+2. **Control de `systempaths=unconfined`:** quitar el flag, recrear el contenedor y repetir las pruebas. Si el primer check falla al montar `/proc`, el flag es necesario; si pasa, se puede eliminar.
+3. Java y C++ dentro del sandbox, con el filtro seccomp y los montajes que necesiten.
+4. Métricas de una ejecución mientras otra consume CPU a fondo, y carga concurrente sostenida.
+5. `pids.max` adecuado para la JVM.
+6. Topes globales en la slice (`MemoryMax`, `TasksMax`) y el drop-in de arranque de Docker.
+7. Un host x86_64.
+8. Perfil AppArmor propio como alternativa a `apparmor=unconfined`.
 
 ---
 
@@ -323,11 +329,9 @@ Si bwrap falla al crear el namespace (por ejemplo, `setting up uid map: Permissi
 
 | Lo resuelve | Qué |
 |---|---|
-| `Dockerfile` | Instalación de `bubblewrap`, `python3`, `python3-seccomp` y el JDK; generación del filtro `/opt/judge/filter.bpf`; carpetas `/work` y `/opt/judge` |
-| Entrypoint | `chown -R` de `/cg`, limpieza de hojas de corridas previas (con `rmdir`), autodiagnóstico de la delegación y bajada de privilegios |
-| `docker-compose.yml` | Los flags de la sección 5 |
-| Generador de seccomp | El filtro y su verificación |
-| Pruebas de humo | Validación del sandbox real: aislamiento, seccomp, límites y limpieza |
+| [docker/Dockerfile](../docker/Dockerfile) | Compila el jar del servicio, instala `bubblewrap`, `python3` y `python3-seccomp`, genera `/opt/judge/filter.bpf` y crea `/work` |
+| [docker/entrypoint.sh](../docker/entrypoint.sh) | `chown -R` de `/cg`, limpieza de hojas de corridas previas (con `rmdir`), autodiagnóstico de la delegación y bajada de privilegios |
+| [infrastructure/docker/docker-compose.yml](../../../../infrastructure/docker/docker-compose.yml) | Los flags de la sección 5, en el perfil `sandbox` |
+| [docker/gen_seccomp.py](../docker/gen_seccomp.py) | El filtro seccomp y su verificación (`--verify`) |
+| [docker/prueba_humo.sh](../docker/prueba_humo.sh) | Validación del sandbox real: aislamiento, seccomp, límites y limpieza |
 | Cualquier lenguaje adicional | Dependencias en la imagen y, si hace falta, montajes extra en el comando de bwrap |
-
-> Ninguna de estas piezas está todavía en el repositorio: viven en el paquete `goslint-sandbox`. Integrarlas es el punto 1 de los pendientes.

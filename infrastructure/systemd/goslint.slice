@@ -1,0 +1,27 @@
+# Slice de cgroups v2 donde nacen el contenedor de judge-service y las hojas
+# prog-<uuid> de cada evaluacion.
+#
+# Hace falta porque el contenedor no puede crear su propia rama delegada desde
+# dentro: el kernel exige escritura en el ancestro comun entre el cgroup de
+# origen y el de destino, y ese ancestro es de root. Ver
+# backend/services/judge-service/docs/REQUIREMENTS.md, seccion 4.
+#
+#   sudo cp infrastructure/systemd/goslint.slice /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now goslint.slice
+#
+# Verificar:
+#   systemctl is-active goslint.slice                          # active
+#   cat /sys/fs/cgroup/goslint.slice/cgroup.subtree_control    # memory y pids
+
+[Unit]
+Description=Slice para contenedores de goslint judge
+Before=slices.target
+
+# Tope global de TODAS las evaluaciones (recomendado, sin validar). Las hojas
+# prog-* cuelgan de la slice y no del contenedor, asi que --memory y --pids-limit
+# del contenedor no las cubren. Dimensionar como: evaluaciones simultaneas x
+# memory.max de cada una, mas el propio servicio y el /work en memoria.
+# [Slice]
+# MemoryMax=
+# TasksMax=

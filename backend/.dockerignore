@@ -1,0 +1,10 @@
+# Contexto de build de la imagen de judge-service (services/judge-service/docker/Dockerfile).
+# El jar se compila dentro de la imagen, asi que nada de lo generado en local debe viajar.
+**/build/
+**/bin/
+**/.gradle/
+.gradle/
+.venv/
+**/*.env
+**/application-local.properties
+**/application-local.yml

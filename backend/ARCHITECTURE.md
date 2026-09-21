@@ -162,7 +162,7 @@ Candidatos a residir aquí:
 | `auth-service` | 8081 | 🟡 Parcial | Registro de usuarios (`POST /api/v1/auth/register`). **La emisión de JWT sigue pendiente**: no hay login, y sin él ningún otro servicio puede autenticar de verdad una petición HTTP. Esquema aún con `ddl-auto=update`, sin Flyway |
 | `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Falta el filtro JWT y su migración base de Flyway |
 | `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción del envío, encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Esquema versionado con Flyway (`V1`–`V3`). Es el único servicio que **autentica de verdad**, y solo en el handshake del WebSocket |
-| `judge-service` | 8084 | 🟡 Parcial | Dominio, aplicación e infraestructura completos: consume `submission.evaluate`, obtiene casos de prueba y límites de `problem-service` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) y publica el veredicto en `submission.judged`. **Solo evalúa Python**: el `Compiler` (C, C++, Java) va en otra HU, y esos lenguajes terminan como `SYSTEM_ERROR`. El JWT `SERVICE` hacia `problem-service` lo firma el propio juez con el secreto compartido |
+| `judge-service` | 8084 | 🟡 Parcial | Dominio, aplicación e infraestructura completos: consume `submission.evaluate`, obtiene casos de prueba y límites de `problem-service` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) y publica el veredicto en `submission.judged`. **Solo evalúa Python**: el `Compiler` (C, C++, Java) va en otra HU, y esos lenguajes terminan como `SYSTEM_ERROR`. El JWT `SERVICE` hacia `problem-service` lo firma el propio juez con el secreto compartido. Se despliega en su propia imagen con `bubblewrap` y seccomp (perfil `sandbox` del compose) |
 | `feedback-service` | 8085 | 🔴 Esqueleto | Solo la clase de arranque |
 | `contest-service` | 8086 | 🔴 Esqueleto | Solo la clase de arranque. Mientras no exista, `submission-service` resuelve cada equipo como individual mediante `NoOpTeamMembershipAdapter` |
 
@@ -345,6 +345,13 @@ Detalles que conviene conocer antes de desplegar sobre una base de datos ya exis
 | `security/JwtAuthenticationFilter` + `config/SecurityConfig` | Autentica el HTTP con el JWT y el mismo `JwtTokenValidator` que el resto; el rol pasa a `ROLE_<rol>` para `@PreAuthorize` |
 | `persistence/InMemoryMonitorLimitsRepository` | Guarda los límites vigentes en memoria (el juez no tiene BD) |
 | `config/` | Convertidor JSON de RabbitMQ, bean del `Runner` y `RestClient` hacia `problem-service` |
+
+**Imagen del sandbox (`docker/`):** `judge-service` es el único servicio que **no se ejecuta con `./gradlew bootRun`** para evaluar de verdad: necesita `bubblewrap`, el filtro seccomp y una rama de cgroups delegada. Su [`Dockerfile`](./services/judge-service/docker/Dockerfile) compila el jar y lo empaqueta sobre Ubuntu con `bubblewrap` y `python3`, `gen_seccomp.py` genera el filtro en el build, y `entrypoint.sh` prepara `/cg` al arrancar. El contenedor se declara en [`infrastructure/docker/docker-compose.yml`](../infrastructure/docker/docker-compose.yml) bajo el perfil `sandbox`, de modo que un `docker compose up` normal siga levantando solo PostgreSQL y RabbitMQ:
+
+```bash
+sudo cp infrastructure/systemd/goslint.slice /etc/systemd/system/ && sudo systemctl enable --now goslint.slice
+JWT_SECRET=<mínimo 32 bytes> docker compose --profile sandbox up -d --build judge-service
+```
 
 **Endpoints de `judge-service`:**
 
@@ -664,6 +671,7 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 | 2 | **Ningún endpoint HTTP valida el JWT**: los `@PreAuthorize` están escritos pero la autenticación llega anónima | 🔴 Alta | Escribir el filtro JWT reutilizando `JwtTokenValidator` (ya usado por el handshake del WebSocket) y retirar `TemporaryAuthBypassFilter` |
 | 3 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
 | 4 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que deje de depender de lo que Hibernate decida en cada arranque |
+| 5 | **El sandbox nunca se ha ejecutado sobre cgroups reales** | 🔴 Alta | La imagen construye y el filtro seccomp pasa sus 19 comprobaciones, pero falta levantarla sobre una `goslint.slice` de verdad y correr `prueba_humo.sh`. Hasta entonces, la evaluación solo está probada con mocks |
 | 5 | **`judge-service` solo evalúa Python** | 🟡 Media | El `Compiler` (C, C++, Java) va en otra HU; hasta entonces esos envíos acaban en `SYSTEM_ERROR` tras agotar los reintentos |
 | 6 | **`contest-service` no existe**: la composición real de los equipos se desconoce | 🟡 Media | `NoOpTeamMembershipAdapter` trata cada equipo como individual. Al llegar el servicio, añadir un adaptador y cambiar `app.team-membership.provider` |
 | 7 | **El registro de sesiones WebSocket es local a la instancia** | 🟡 Media | Con varias réplicas, la instancia que recibe el veredicto puede no tener la conexión del estudiante. Escalar horizontalmente exige compartir el registro (p. ej. Redis) |

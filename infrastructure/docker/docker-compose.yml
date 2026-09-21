@@ -43,6 +43,85 @@ services:
       retries: 5
       start_period: 30s
 
+  # Sandbox de evaluacion. Perfil "sandbox": NO arranca con un 'docker compose up'
+  # normal, porque exige que goslint.slice exista en el host (ver
+  # backend/services/judge-service/docs/REQUIREMENTS.md). Sin ese requisito, los
+  # demas servicios de este archivo seguirian levantando igual.
+  #
+  #   sudo cp ../systemd/goslint.slice /etc/systemd/system/ && sudo systemctl enable --now goslint.slice
+  #   JWT_SECRET=... docker compose --profile sandbox up -d --build judge-service
+  #   docker logs goslint-judge | grep "delegacion de cgroups OK"
+  #   docker exec -u ubuntu goslint-judge sh /opt/judge/prueba_humo.sh
+  judge-service:
+    profiles: ["sandbox"]
+    build:
+      context: ../../backend
+      dockerfile: services/judge-service/docker/Dockerfile
+      args:
+        # "false" en produccion: quita ps, pgrep y strace de la imagen.
+        WITH_DEBUG_TOOLS: "${JUDGE_DEBUG_TOOLS:-true}"
+    image: goslint-judge:dev
+    container_name: goslint-judge
+    restart: "no"
+
+    # tini como PID 1: recoge los procesos zombi que deje una evaluacion.
+    init: true
+
+    # --- Cgroups: el contenedor nace DENTRO de la rama preparada en el host ---
+    cgroup: host                      # --cgroupns=host
+    cgroup_parent: goslint.slice      # --cgroup-parent=goslint.slice
+
+    volumes:
+      # Escritura sobre UNA sola rama del cgroupfs, no sobre todo /sys/fs/cgroup.
+      # create_host_path: false -> si la slice no existe, falla en claro en vez de
+      # crear un directorio vacio sin controladores que daria errores raros.
+      - type: bind
+        source: /sys/fs/cgroup/goslint.slice
+        target: /cg
+        bind:
+          create_host_path: false
+
+    # Directorios de trabajo por ejecucion (/work/<uuid>) en RAM: se pierden al
+    # reiniciar y no dejan basura. uid/gid 1000 = usuario 'ubuntu' de la imagen.
+    tmpfs:
+      - /work:mode=0755,uid=1000,gid=1000,size=${JUDGE_WORK_SIZE:-256m}
+
+    security_opt:
+      # bwrap necesita mount, pivot_root y unshare, que el perfil por defecto de
+      # Docker bloquea. El codigo evaluado NO queda sin filtro: bwrap le carga el
+      # suyo, generado por gen_seccomp.py.
+      - seccomp=unconfined
+      # El perfil docker-default de AppArmor trae 'deny mount' (Ubuntu/Debian).
+      - apparmor=unconfined
+      # Quita las mascaras de /proc para que 'bwrap --proc /proc' funcione y cada
+      # ejecucion vea solo sus propios PIDs.
+      - systempaths=unconfined
+
+    # NO se anade cap_add ni privileged. Si alguien lo propone "para que funcione",
+    # falta alguno de los flags de arriba.
+
+    ports:
+      - "${JUDGE_PORT:-8084}:8084"
+
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      # problem-service corre fuera de este compose (por Gradle, en el host).
+      PROBLEM_SERVICE_URL: ${PROBLEM_SERVICE_URL:-http://host.docker.internal:8082}
+      # OBLIGATORIA, minimo 32 bytes. Se comparte con auth-service; no se pone un
+      # valor por defecto porque un secreto de ejemplo aceptaria tokens falsificados.
+      # Vacia, el contenedor arranca y muere al validar la clave.
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_ISSUER: ${JWT_ISSUER:-goslint-judge}
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
 volumes:
   postgres-data:
   rabbitmq-data:
