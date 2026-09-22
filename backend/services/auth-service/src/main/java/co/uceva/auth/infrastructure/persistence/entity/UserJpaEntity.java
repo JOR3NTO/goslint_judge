@@ -26,6 +26,14 @@ public class UserJpaEntity {
     @Id
     private UUID id;
 
+    /** Nombre del usuario */
+    @Column(name = "first_name", nullable = false, columnDefinition = "varchar(255) default 'Usuario'")
+    private String firstName;
+
+    /** Apellido del usuario */
+    @Column(name = "last_name", nullable = false, columnDefinition = "varchar(255) default 'Prueba'")
+    private String lastName;
+
     /** Nombre de usuario, no puede ser nulo y debe ser único */
     @Column(nullable = false, unique = true)
     private String username;

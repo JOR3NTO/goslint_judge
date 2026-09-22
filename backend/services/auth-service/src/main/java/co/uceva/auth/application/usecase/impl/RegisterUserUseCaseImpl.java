@@ -35,7 +35,7 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
      * 4. Construye el objeto de dominio y lo guarda.
      */
     @Override
-    public User register(String username, String email, String password, String institution) {
+    public User register(String firstName, String lastName, String username, String email, String password, String institution) {
         if (userRepository.existsByEmail(email)) {
             throw new UserAlreadyExistsException("El correo electrónico ya está registrado.");
         }
@@ -48,9 +48,10 @@ public class RegisterUserUseCaseImpl implements RegisterUserUseCase {
         String hashedPassword = passwordEncoder.encode(password);
         
         // Uso del factory method del dominio
-        User newUser = User.createNewStudent(username, email, hashedPassword, institution);
+        User newUser = User.createNewStudent(firstName, lastName, username, email, hashedPassword, institution);
         
         // Se guarda utilizando el puerto del repositorio
         return userRepository.save(newUser);
     }
 }
+

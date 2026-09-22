@@ -1,7 +1,7 @@
 package co.uceva.auth.application.usecase.impl;
 
-import co.uceva.auth.application.port.out.PasswordEncoderPort;
-import co.uceva.auth.application.port.out.UserRepository;
+import co.uceva.auth.domain.service.PasswordEncoder;
+import co.uceva.auth.domain.repository.UserRepository;
 import co.uceva.auth.application.usecase.LoginUserUseCase;
 import co.uceva.auth.domain.exception.AccountLockedException;
 import co.uceva.auth.domain.exception.BadCredentialsException;
@@ -20,12 +20,12 @@ import org.springframework.stereotype.Service;
 public class LoginUserUseCaseImpl implements LoginUserUseCase {
 
     private final UserRepository userRepository;
-    private final PasswordEncoderPort passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
     private final AuthCacheRepository authCacheRepository;
     private final TokenProvider tokenProvider;
 
     public LoginUserUseCaseImpl(UserRepository userRepository,
-                                PasswordEncoderPort passwordEncoder,
+                                PasswordEncoder passwordEncoder,
                                 AuthCacheRepository authCacheRepository,
                                 TokenProvider tokenProvider) {
         this.userRepository = userRepository;
