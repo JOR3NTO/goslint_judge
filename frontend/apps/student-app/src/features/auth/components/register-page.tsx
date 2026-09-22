@@ -67,18 +67,22 @@ export function RegisterPage() {
     setIsLoading(true)
     setServerError(null)
 
-    // Simulate API call
-    setTimeout(() => {
-      // Simulate checking for duplicate email
-      if (formData.email === "admin@uceva.edu.co" || formData.email === "admin@gmail.com") {
-        setServerError("Ya existe una cuenta con este correo electrónico.")
-        setIsLoading(false)
-        return
-      }
+    try {
+      const response = await fetch("http://localhost:8081/api/v1/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+        }),
+      })
 
-      // Simulate random server error
-      if (Math.random() < 0.2) {
-        setServerError("Hubo un error de conexión con el servidor. Por favor, intenta de nuevo.")
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        setServerError(errorData?.message || "Ocurrió un error al registrarse. Verifica tus datos.")
         setIsLoading(false)
         return
       }
@@ -86,8 +90,12 @@ export function RegisterPage() {
       // Success! Auto-login and redirect
       setIsLoading(false)
       // Redirect to home/dashboard
-      router.push("/contests")
-    }, 2000)
+      router.push("/login?registered=true")
+    } catch (error: any) {
+      console.error("Error en registro:", error)
+      setServerError("Hubo un error de conexión con el servidor. Por favor, intenta de nuevo.")
+      setIsLoading(false)
+    }
   }
 
   return (
