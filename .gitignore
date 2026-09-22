@@ -101,7 +101,7 @@ $RECYCLE.BIN/
 *.iml
 *.iws
 *.ipr
-out/
+/out/
 
 # VSCode — configuraciones locales
 .vscode/
