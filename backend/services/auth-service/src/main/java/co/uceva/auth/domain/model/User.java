@@ -17,6 +17,10 @@ import java.util.UUID;
 public class User {
     /** Identificador único universal del usuario. */
     private UUID id;
+    /** Nombre del usuario. */
+    private String firstName;
+    /** Apellido del usuario. */
+    private String lastName;
     /** Nombre de usuario único (handle) usado en la plataforma. */
     private String username;
     /** Correo electrónico único del usuario. */
@@ -36,15 +40,19 @@ public class User {
      * Factory method para crear un nuevo estudiante con valores por defecto.
      * Agrupa la lógica de inicialización para nuevos registros públicos.
      *
-     * @param username     El nombre de usuario elegido.
+     * @param firstName    El nombre del usuario.
+     * @param lastName     El apellido del usuario.
+     * @param username     El nombre de usuario elegido (handle).
      * @param email        El correo electrónico del usuario.
      * @param passwordHash La contraseña ya cifrada.
      * @param institution  La institución a la que pertenece.
      * @return Una instancia de {@link User} lista para ser persistida.
      */
-    public static User createNewStudent(String username, String email, String passwordHash, String institution) {
+    public static User createNewStudent(String firstName, String lastName, String username, String email, String passwordHash, String institution) {
         return User.builder()
                 .id(UUID.randomUUID()) // Genera un ID seguro
+                .firstName(firstName)
+                .lastName(lastName)
                 .username(username)
                 .email(email)
                 .passwordHash(passwordHash) // Aquí ya llega encriptada
@@ -55,3 +63,4 @@ public class User {
                 .build();
     }
 }
+

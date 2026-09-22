@@ -65,6 +65,8 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest request) {
         // Delegar al caso de uso de negocio
         User registeredUser = registerUserUseCase.register(
+                request.getFirstName(),
+                request.getLastName(),
                 request.getUsername(),
                 request.getEmail(),
                 request.getPassword(),
