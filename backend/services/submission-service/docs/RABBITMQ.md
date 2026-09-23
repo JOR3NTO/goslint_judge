@@ -43,14 +43,19 @@ Todo cuelga de un único exchange de tipo *topic* (`submission.exchange`) y un e
    rk: submission.   │                              │
        evaluate      │                              │
                      │                              │        consume
-      judge-service ─┤                              ├─▶ submission.judged  ──▶ submission-service
+      judge-service ─┤                              ├─▶ submission.judging  ──▶ submission-service
+   rk: submission.   │                              │
+       judging       │                              │        consume
+                     │                              ├─▶ submission.judged  ──▶ submission-service
+      judge-service ─┤                              │
    rk: submission.   └──────────────────────────────┘
        judged
                                   │ (mensajes rechazados definitivamente)
                                   ▼
                      ┌──────────────────────────────┐
                      │   submission.dlx             ├─▶ submission.evaluate.dlq ─┐
-                     │      (direct, durable)       ├─▶ submission.judged.dlq   ─┤
+                     │      (direct, durable)       ├─▶ submission.judging.dlq  ─┤
+                     │                              ├─▶ submission.judged.dlq   ─┤
                      └──────────────────────────────┘                            │
                                                                                  ▼
                                                        ExhaustedSubmissionDeadLetterListener
@@ -62,11 +67,13 @@ Todo cuelga de un único exchange de tipo *topic* (`submission.exchange`) y un e
 | Exchange principal | `submission.exchange` | `RabbitConfig#submissionExchange` | — |
 | Exchange de fallidos | `submission.dlx` | `RabbitConfig#submissionDeadLetterExchange` | — |
 | Cola de evaluación | `submission.evaluate` | `RabbitConfig#submissionEvaluateQueue` | `judge-service` |
+| Cola del aviso de inicio | `submission.judging` | `RabbitConfig#submissionJudgingQueue` | `SubmissionJudgingListener` |
 | Cola de veredictos | `submission.judged` | `RabbitConfig#submissionJudgedQueue` | `SubmissionJudgedListener` |
 | DLQ de evaluación | `submission.evaluate.dlq` | `RabbitConfig#submissionEvaluateDeadLetterQueue` | `ExhaustedSubmissionDeadLetterListener` |
+| DLQ del aviso de inicio | `submission.judging.dlq` | `RabbitConfig#submissionJudgingDeadLetterQueue` | `ExhaustedSubmissionDeadLetterListener` |
 | DLQ de veredictos | `submission.judged.dlq` | `RabbitConfig#submissionJudgedDeadLetterQueue` | `ExhaustedSubmissionDeadLetterListener` |
 
-Las dos colas de trabajo llevan `deadLetterExchange` + `deadLetterRoutingKey` apuntando a su DLQ, así que un mensaje rechazado definitivamente por su consumidor acaba ahí en lugar de desaparecer.
+Las tres colas de trabajo llevan `deadLetterExchange` + `deadLetterRoutingKey` apuntando a su DLQ, así que un mensaje rechazado definitivamente por su consumidor acaba ahí en lugar de desaparecer.
 
 > **Los nombres no están escritos en el código.** Salen de `app.messaging.submission.*` en [application.properties](../src/main/resources/application.properties): `RabbitConfig` declara la topología a partir de esas claves y el publicador envía a esas mismas claves. Cambiar una mueve ambos lados a la vez. Esas propiedades son también **el contrato con `judge-service`**.
 
@@ -89,6 +96,18 @@ Los cuerpos son JSON (`Jackson2JsonMessageConverter` sobre el `ObjectMapper` de 
 ```
 
 Publicado a `submission.exchange` con routing key `submission.evaluate`. El mensaje va marcado como `PERSISTENT` y lleva el `submissionId` como `messageId`, para que el consumidor pueda descartar entregas duplicadas.
+
+### Entrada — `SubmissionJudgingStartedEvent`
+[`shared/common-domain/.../event/SubmissionJudgingStartedEvent.java`](../../../shared/common-domain/src/main/java/co/uceva/shared/domain/event/SubmissionJudgingStartedEvent.java)
+
+```json
+{
+  "submissionId": "…",
+  "startedAt": "2026-09-05T18:30:02Z"
+}
+```
+
+`judge-service` lo publica en `submission.exchange` con routing key `submission.judging` en cuanto toma el envío, antes de evaluarlo. No transporta ningún resultado: solo avisa de que el procesamiento empezó, para que este servicio pueda reflejarlo como `status = JUDGING`.
 
 ### Entrada — `SubmissionJudgedEvent`
 [`shared/common-domain/.../event/SubmissionJudgedEvent.java`](../../../shared/common-domain/src/main/java/co/uceva/shared/domain/event/SubmissionJudgedEvent.java)
@@ -133,9 +152,22 @@ Dos decisiones sostienen este flujo:
 
 ---
 
-## 5. Flujo de entrada — recibir el veredicto
+## 5. Flujo de entrada — recibir el aviso de inicio y el veredicto
 
 ```
+judge-service ─▶ submission.judging
+  │
+  ├─ SubmissionJudgingListener     @RabbitListener
+  │     └─ MarkSubmissionJudgingUseCaseImpl   @Transactional
+  │           ├─ findById  (no existe → AmqpRejectAndDontRequeueException → DLQ directa)
+  │           ├─ markJudging()   → status = JUDGING (no pisa JUDGED ni SYSTEM_ERROR)
+  │           └─ publishEvent(SubmissionStatusChangedEvent)   (solo si hubo transición)
+  │
+  ├─ [COMMIT]
+  │
+  └─ SubmissionStatusNotificationListener  → WebSocket   (ver WEBSOCKET.md)
+
+
 judge-service ─▶ submission.judged
   │
   ├─ SubmissionJudgedListener      @RabbitListener
@@ -149,10 +181,12 @@ judge-service ─▶ submission.judged
   └─ SubmissionStatusNotificationListener  → WebSocket   (ver WEBSOCKET.md)
 ```
 
-El listener no decide nada: traduce el mensaje a un comando y delega. La distinción que sí hace es entre **fallo transitorio** y **mensaje imposible**:
+Ninguno de los dos listeners decide nada: traducen el mensaje a un comando y delegan. La distinción que sí hacen es entre **fallo transitorio** y **mensaje imposible**:
 
-- La base de datos no responde → la excepción se propaga, el contenedor reintenta (3 intentos con backoff exponencial), y si se agotan el mensaje va a `submission.judged.dlq`.
+- La base de datos no responde → la excepción se propaga, el contenedor reintenta (3 intentos con backoff exponencial), y si se agotan el mensaje va a su DLQ (`submission.judging.dlq` o `submission.judged.dlq`, según el tramo).
 - El envío referido no existe → `AmqpRejectAndDontRequeueException` inmediata. Reintentarlo no lo haría aparecer; gastar tres intentos sería tiempo perdido.
+
+El aviso de inicio es el único de los dos que puede llegar sobre un envío que todavía está en `PENDING` (si adelanta a la confirmación de encolado) o repetirse sin causar daño (si el consumidor ya lo había procesado, `markJudging()` es idempotente). Lo único que protege es no retroceder un envío que ya tiene un desenlace: si ya está `JUDGED` o `SYSTEM_ERROR`, el aviso se ignora y no se notifica nada.
 
 ---
 
@@ -160,11 +194,12 @@ El listener no decide nada: traduce el mensaje a un comando y delega. La distinc
 
 `spring.rabbitmq.listener.simple.default-requeue-rejected=false` es imprescindible: sin él, un mensaje rechazado volvería a la misma cola y giraría indefinidamente entre cola y consumidor sin llegar nunca a la DLQ.
 
-[`ExhaustedSubmissionDeadLetterListener`](../src/main/java/co/uceva/submission/infrastructure/messaging/ExhaustedSubmissionDeadLetterListener.java) vigila **ambas** DLQ, porque la evaluación puede romperse en cualquiera de sus dos tramos:
+[`ExhaustedSubmissionDeadLetterListener`](../src/main/java/co/uceva/submission/infrastructure/messaging/ExhaustedSubmissionDeadLetterListener.java) vigila las **tres** DLQ, porque la evaluación puede romperse en cualquiera de sus tramos:
 
 | Cola | Qué pasó | Acción |
 |------|----------|--------|
 | `submission.evaluate.dlq` | El juez agotó los reintentos sin poder evaluar | `status = SYSTEM_ERROR` |
+| `submission.judging.dlq` | El aviso de inicio llegó pero no pudo registrarse | `status = SYSTEM_ERROR` |
 | `submission.judged.dlq` | El veredicto llegó pero no pudo registrarse | `status = SYSTEM_ERROR` |
 
 Sin este listener, esos envíos quedarían retenidos en el broker y el estudiante seguiría viendo indefinidamente un envío «en cola» que nadie va a evaluar. `SYSTEM_ERROR` es un estado **terminal** que no dice nada sobre la corrección del código (su `verdict` sigue siendo `PENDING`): dice que la plataforma no consiguió emitir un veredicto. Y como cualquier cambio de estado, se notifica por WebSocket, que es lo que cierra la espera.
@@ -193,12 +228,14 @@ Requiere `@EnableScheduling`, declarado en `RabbitConfig`.
 | [infrastructure/messaging/RabbitSubmissionEventPublisherAdapter.java](../src/main/java/co/uceva/submission/infrastructure/messaging/RabbitSubmissionEventPublisherAdapter.java) | Publica y espera la confirmación del broker |
 | [infrastructure/messaging/NoOpSubmissionEventPublisherAdapter.java](../src/main/java/co/uceva/submission/infrastructure/messaging/NoOpSubmissionEventPublisherAdapter.java) | Sustituto sin broker (`app.messaging.enabled=false`) |
 | [infrastructure/messaging/SubmissionEnqueueListener.java](../src/main/java/co/uceva/submission/infrastructure/messaging/SubmissionEnqueueListener.java) | Dispara el encolado tras el commit |
+| [infrastructure/messaging/SubmissionJudgingListener.java](../src/main/java/co/uceva/submission/infrastructure/messaging/SubmissionJudgingListener.java) | Consume `submission.judging` |
 | [infrastructure/messaging/SubmissionJudgedListener.java](../src/main/java/co/uceva/submission/infrastructure/messaging/SubmissionJudgedListener.java) | Consume `submission.judged` |
-| [infrastructure/messaging/ExhaustedSubmissionDeadLetterListener.java](../src/main/java/co/uceva/submission/infrastructure/messaging/ExhaustedSubmissionDeadLetterListener.java) | Consume ambas DLQ y cierra el envío como `SYSTEM_ERROR` |
+| [infrastructure/messaging/ExhaustedSubmissionDeadLetterListener.java](../src/main/java/co/uceva/submission/infrastructure/messaging/ExhaustedSubmissionDeadLetterListener.java) | Consume las tres DLQ y cierra el envío como `SYSTEM_ERROR` |
 | [infrastructure/messaging/PendingSubmissionRetryScheduler.java](../src/main/java/co/uceva/submission/infrastructure/messaging/PendingSubmissionRetryScheduler.java) | Barrido periódico de envíos sin encolar |
 | [infrastructure/mapper/SubmissionEventMapper.java](../src/main/java/co/uceva/submission/infrastructure/mapper/SubmissionEventMapper.java) | `Submission` → `SubmissionReceivedEvent` |
 | [application/port/out/SubmissionEventPublisher.java](../src/main/java/co/uceva/submission/application/port/out/SubmissionEventPublisher.java) | Puerto de salida (la capa de aplicación no conoce AMQP) |
 | [application/usecase/impl/EnqueueSubmissionUseCaseImpl.java](../src/main/java/co/uceva/submission/application/usecase/impl/EnqueueSubmissionUseCaseImpl.java) | Publica y marca `QUEUED` |
+| [application/usecase/impl/MarkSubmissionJudgingUseCaseImpl.java](../src/main/java/co/uceva/submission/application/usecase/impl/MarkSubmissionJudgingUseCaseImpl.java) | Marca `JUDGING` y señala el cambio |
 | [application/usecase/impl/UpdateSubmissionVerdictUseCaseImpl.java](../src/main/java/co/uceva/submission/application/usecase/impl/UpdateSubmissionVerdictUseCaseImpl.java) | Registra el veredicto y señala el cambio |
 | [application/usecase/impl/MarkSubmissionSystemErrorUseCaseImpl.java](../src/main/java/co/uceva/submission/application/usecase/impl/MarkSubmissionSystemErrorUseCaseImpl.java) | Cierra el envío como `SYSTEM_ERROR` |
 | [application/exception/EventPublishingException.java](../src/main/java/co/uceva/submission/application/exception/EventPublishingException.java) | Fallo de publicación, traducido fuera de la infraestructura |
@@ -236,6 +273,9 @@ Todo en [src/main/resources/application.properties](../src/main/resources/applic
 | `app.messaging.submission.queue` | `submission.evaluate` |
 | `app.messaging.submission.dead-letter-exchange` | `submission.dlx` |
 | `app.messaging.submission.dead-letter-queue` | `submission.evaluate.dlq` |
+| `app.messaging.submission.judging-routing-key` | `submission.judging` |
+| `app.messaging.submission.judging-queue` | `submission.judging` |
+| `app.messaging.submission.judging-dead-letter-queue` | `submission.judging.dlq` |
 | `app.messaging.submission.judged-routing-key` | `submission.judged` |
 | `app.messaging.submission.judged-queue` | `submission.judged` |
 | `app.messaging.submission.judged-dead-letter-queue` | `submission.judged.dlq` |
@@ -258,10 +298,10 @@ Todo en [src/main/resources/application.properties](../src/main/resources/applic
 Para que el pipeline funcione de extremo a extremo hacen falta:
 
 1. **Un broker RabbitMQ accesible** en `RABBITMQ_HOST:RABBITMQ_PORT`. Con `app.messaging.enabled=true` (el valor por defecto), si el broker no está el servicio **arranca igualmente**, pero cada envío se queda en `PENDING` y el barrido lo reintenta hasta que el broker vuelva.
-2. **PostgreSQL con el esquema migrado.** El estado (`PENDING`/`QUEUED`/`JUDGED`/`SYSTEM_ERROR`) vive en la tabla `submissions`; las migraciones `V2` y `V3` de Flyway crean la columna `status`, su `CHECK` y el índice parcial del reintento. Con `ddl-auto=validate`, un esquema desalineado aborta el arranque.
-3. **`judge-service` consumiendo `submission.evaluate`** y publicando en `submission.judged`. Sin él los envíos se acumulan en la cola (no se pierden) y nunca pasan de `QUEUED`.
+2. **PostgreSQL con el esquema migrado.** El estado (`PENDING`/`QUEUED`/`JUDGING`/`JUDGED`/`SYSTEM_ERROR`) vive en la tabla `submissions`; las migraciones `V2` y `V3` de Flyway crean la columna `status`, su `CHECK` y el índice parcial del reintento. Con `ddl-auto=validate`, un esquema desalineado aborta el arranque.
+3. **`judge-service` consumiendo `submission.evaluate`**, avisando en `submission.judging` al empezar y publicando en `submission.judged` al terminar. Sin él los envíos se acumulan en la cola (no se pierden) y nunca pasan de `QUEUED`.
 4. **La dependencia Gradle** `spring-boot-starter-amqp`, ya declarada en [build.gradle](../build.gradle).
-5. **Los records de `shared/common-domain`** (`SubmissionReceivedEvent`, `SubmissionJudgedEvent`, `VerdictStatus`, `SubmissionStatus`, `ProgrammingLanguage`), compartidos con `judge-service`: son el contrato de serialización.
+5. **Los records de `shared/common-domain`** (`SubmissionReceivedEvent`, `SubmissionJudgingStartedEvent`, `SubmissionJudgedEvent`, `VerdictStatus`, `SubmissionStatus`, `ProgrammingLanguage`), compartidos con `judge-service`: son el contrato de serialización.
 6. **`@EnableScheduling`** activo (lo aporta `RabbitConfig`) para el barrido de pendientes.
 
 ---
@@ -271,7 +311,7 @@ Para que el pipeline funcione de extremo a extremo hacen falta:
 `app.messaging.enabled=false` permite levantar el servicio sin RabbitMQ (desarrollo local, pruebas). Con ese valor:
 
 - `RabbitConfig` no se registra → no se declara topología ni se crea `RabbitTemplate`.
-- No se registran `SubmissionJudgedListener`, `ExhaustedSubmissionDeadLetterListener` ni `PendingSubmissionRetryScheduler`.
+- No se registran `SubmissionJudgingListener`, `SubmissionJudgedListener`, `ExhaustedSubmissionDeadLetterListener` ni `PendingSubmissionRetryScheduler`.
 - El bean activo pasa a ser `NoOpSubmissionEventPublisherAdapter`, que da la entrega por confirmada sin contactar con nadie. **No lanza excepción a propósito**: con la mensajería desactivada, dejar los envíos atrapados en `PENDING` y reintentándolos para siempre no aportaría nada.
 
 Conviene excluir además la autoconfiguración AMQP, como hace [application-test.properties](../src/test/resources/application-test.properties):
@@ -291,6 +331,9 @@ spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.amqp.RabbitA
 | [RabbitSubmissionEventPublisherAdapterTest](../src/test/java/co/uceva/submission/infrastructure/messaging/RabbitSubmissionEventPublisherAdapterTest.java) | ACK, NACK, timeout y mensaje devuelto |
 | [PendingSubmissionRetrySchedulerTest](../src/test/java/co/uceva/submission/infrastructure/messaging/PendingSubmissionRetrySchedulerTest.java) | Barrido de pendientes |
 | [EnqueueSubmissionUseCaseImplTest](../src/test/java/co/uceva/submission/application/usecase/impl/EnqueueSubmissionUseCaseImplTest.java) | Que solo se marca `QUEUED` si hubo confirmación |
+| [MarkSubmissionJudgingUseCaseImplTest](../src/test/java/co/uceva/submission/application/usecase/impl/MarkSubmissionJudgingUseCaseImplTest.java) | Que `JUDGING` no pisa un envío ya cerrado |
+| [SubmissionJudgingListenerTest](../src/test/java/co/uceva/submission/infrastructure/messaging/SubmissionJudgingListenerTest.java) | Delegación y rechazo sin reintento cuando el envío no existe |
+| [ExhaustedSubmissionDeadLetterListenerTest](../src/test/java/co/uceva/submission/infrastructure/messaging/ExhaustedSubmissionDeadLetterListenerTest.java) | Las tres DLQ cierran el envío como `SYSTEM_ERROR` |
 | [SubmissionVerdictNotificationIntegrationTest](../src/test/java/co/uceva/submission/SubmissionVerdictNotificationIntegrationTest.java) | Veredicto → persistencia → notificación |
 
 Inspección manual con el broker en marcha (consola de gestión en `http://localhost:15672`, `guest`/`guest`):

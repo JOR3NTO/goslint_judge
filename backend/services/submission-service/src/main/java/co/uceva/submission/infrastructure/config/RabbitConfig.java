@@ -145,6 +145,82 @@ public class RabbitConfig {
     }
 
     /**
+     * Cola duradera por la que {@code judge-service} avisa de que empezó a
+     * evaluar un envío.
+     * <p>
+     * Un aviso que este servicio no consiga registrar tras los reintentos se
+     * deriva a su cola de mensajes muertos, donde
+     * {@code ExhaustedSubmissionDeadLetterListener} lo recoge igual que hace con
+     * las otras dos colas de trabajo.
+     * </p>
+     *
+     * @param judgingQueue           Nombre de la cola del aviso de inicio.
+     * @param deadLetterExchange     Exchange al que derivar los mensajes rechazados.
+     * @param judgingDeadLetterQueue Routing key con la que se derivan, igual al nombre de la DLQ.
+     * @return Cola del aviso de inicio con su política de mensajes muertos.
+     */
+    @Bean
+    public Queue submissionJudgingQueue(
+            @Value("${app.messaging.submission.judging-queue}") String judgingQueue,
+            @Value("${app.messaging.submission.dead-letter-exchange}") String deadLetterExchange,
+            @Value("${app.messaging.submission.judging-dead-letter-queue}") String judgingDeadLetterQueue) {
+        return QueueBuilder.durable(judgingQueue)
+                .deadLetterExchange(deadLetterExchange)
+                .deadLetterRoutingKey(judgingDeadLetterQueue)
+                .build();
+    }
+
+    /**
+     * Cola donde quedan retenidos los avisos de inicio que no pudieron registrarse.
+     *
+     * @param judgingDeadLetterQueue Nombre de la cola de mensajes muertos del aviso de inicio.
+     * @return Cola de mensajes muertos del aviso de inicio.
+     */
+    @Bean
+    public Queue submissionJudgingDeadLetterQueue(
+            @Value("${app.messaging.submission.judging-dead-letter-queue}") String judgingDeadLetterQueue) {
+        return QueueBuilder.durable(judgingDeadLetterQueue).build();
+    }
+
+    /**
+     * Enlaza la cola del aviso de inicio con el exchange principal.
+     * <p>
+     * La routing key es la que {@code judge-service} debe usar al publicar el
+     * aviso: es el contrato entre ambos servicios.
+     * </p>
+     *
+     * @param submissionJudgingQueue Cola del aviso de inicio.
+     * @param submissionExchange     Exchange principal.
+     * @param judgingRoutingKey      Routing key del aviso de inicio de evaluación.
+     * @return Binding entre el exchange principal y la cola del aviso de inicio.
+     */
+    @Bean
+    public Binding submissionJudgingBinding(Queue submissionJudgingQueue,
+            TopicExchange submissionExchange,
+            @Value("${app.messaging.submission.judging-routing-key}") String judgingRoutingKey) {
+        return BindingBuilder.bind(submissionJudgingQueue)
+                .to(submissionExchange)
+                .with(judgingRoutingKey);
+    }
+
+    /**
+     * Enlaza la cola de avisos de inicio fallidos con el exchange de mensajes muertos.
+     *
+     * @param submissionJudgingDeadLetterQueue Cola de mensajes muertos del aviso de inicio.
+     * @param submissionDeadLetterExchange     Exchange de mensajes muertos.
+     * @param judgingDeadLetterQueue           Routing key usada al derivar, igual al nombre de la DLQ.
+     * @return Binding entre el exchange de mensajes muertos y la cola de avisos fallidos.
+     */
+    @Bean
+    public Binding submissionJudgingDeadLetterBinding(Queue submissionJudgingDeadLetterQueue,
+            DirectExchange submissionDeadLetterExchange,
+            @Value("${app.messaging.submission.judging-dead-letter-queue}") String judgingDeadLetterQueue) {
+        return BindingBuilder.bind(submissionJudgingDeadLetterQueue)
+                .to(submissionDeadLetterExchange)
+                .with(judgingDeadLetterQueue);
+    }
+
+    /**
      * Cola duradera por la que {@code judge-service} devuelve los veredictos.
      * <p>
      * Un veredicto que este servicio no consiga registrar tras los reintentos se

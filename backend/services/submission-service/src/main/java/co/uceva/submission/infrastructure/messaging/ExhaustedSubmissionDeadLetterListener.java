@@ -1,6 +1,7 @@
 package co.uceva.submission.infrastructure.messaging;
 
 import co.uceva.shared.domain.event.SubmissionJudgedEvent;
+import co.uceva.shared.domain.event.SubmissionJudgingStartedEvent;
 import co.uceva.shared.domain.event.SubmissionReceivedEvent;
 import co.uceva.submission.application.usecase.MarkSubmissionSystemErrorUseCase;
 import co.uceva.submission.domain.exception.SubmissionNotFoundException;
@@ -28,6 +29,7 @@ import java.util.UUID;
  * </p>
  * <ul>
  *   <li>{@code submission.evaluate.dlq} — el juez no consiguió evaluar el envío.</li>
+ *   <li>{@code submission.judging.dlq} — el aviso de inicio de evaluación llegó pero no pudo registrarse.</li>
  *   <li>{@code submission.judged.dlq} — el veredicto llegó pero no pudo registrarse.</li>
  * </ul>
  * <p>
@@ -62,6 +64,17 @@ public class ExhaustedSubmissionDeadLetterListener {
     public void onEvaluationExhausted(SubmissionReceivedEvent event) {
         markAsSystemError(event.submissionId(),
                 "el motor de evaluación agotó los reintentos sin poder evaluar el envío");
+    }
+
+    /**
+     * Cierra un envío cuyo aviso de inicio de evaluación no pudo registrarse.
+     *
+     * @param event Aviso de inicio que no consiguió aplicarse.
+     */
+    @RabbitListener(queues = "${app.messaging.submission.judging-dead-letter-queue}")
+    public void onJudgingExhausted(SubmissionJudgingStartedEvent event) {
+        markAsSystemError(event.submissionId(),
+                "se agotaron los reintentos de registro del aviso de inicio de evaluación");
     }
 
     /**
