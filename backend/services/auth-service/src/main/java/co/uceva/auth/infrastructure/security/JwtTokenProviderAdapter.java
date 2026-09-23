@@ -3,7 +3,6 @@ package co.uceva.auth.infrastructure.security;
 import co.uceva.auth.domain.service.TokenProvider;
 import co.uceva.auth.domain.model.User;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;

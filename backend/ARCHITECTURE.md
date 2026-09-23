@@ -159,7 +159,7 @@ Candidatos a residir aquí:
 
 | Servicio | Puerto | Estado | Qué hay hoy |
 |----------|--------|--------|-------------|
-| `auth-service` | 8081 | 🟡 Parcial | Registro de usuarios (`POST /api/v1/auth/register`). **La emisión de JWT sigue pendiente**: no hay login, y sin él ningún otro servicio puede autenticar de verdad una petición HTTP. Esquema aún con `ddl-auto=update`, sin Flyway |
+| `auth-service` | 8081 | 🟢 Funcional | Registro de usuarios (`POST /register`) y Login (`POST /login`) implementados. Emite JWT (Access Token 15 min y Refresh Token 8h). Implementa bloqueo de cuenta por intentos fallidos usando Redis. Esquema aún con `ddl-auto=update`, sin Flyway. Falta filtro JWT para rutas protegidas. |
 | `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Falta el filtro JWT y su migración base de Flyway |
 | `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción del envío, encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Esquema versionado con Flyway (`V1`–`V3`). Es el único servicio que **autentica de verdad**, y solo en el handshake del WebSocket |
 | `judge-service` | 8084 | 🔴 Esqueleto | Solo la clase de arranque. Su papel lo simula hoy [`testing/ws-judge-simulator/`](../testing/ws-judge-simulator/README.md) |
@@ -180,8 +180,8 @@ Candidatos a residir aquí:
 
 | Entidad de dominio | Descripción |
 |--------------------|-------------|
-| `User`             | id, username, email, passwordHash, role (ADMIN/STUDENT/ORGANIZER), institution, isActive |
-| `Token`            | JWT emitido al autenticarse |
+| `User`             | id, username, email, passwordHash, role (ADMIN/STUDENT/ORGANIZER), institution, isActive, createdAt |
+| `AuthToken`        | accessToken, refreshToken, expiresIn |
 
 **Roles del sistema:**
 
@@ -194,10 +194,9 @@ Candidatos a residir aquí:
 
 **Casos de uso principales:**
 - `RegisterUserUseCase` — Registro de nuevos usuarios
-- `AuthenticateUserUseCase` — Login → devuelve JWT
-- `ValidateTokenUseCase` — Validación de token (consumida por otros servicios vía HTTP interno)
+- `LoginUserUseCase` — Login → valida intentos contra Redis (máx. 5, bloqueo de 15 min) y devuelve JWT (access + refresh)
 
-**Tablas BD:** `users`
+**Tablas BD:** `users` (PostgreSQL), `auth:failed_attempts:*` y `auth:lock:*` (Redis)
 
 ---
 
@@ -433,11 +432,10 @@ GET /api/v1/problems/test-cases/{problemId}/samples
 
 ### 6.4 Estado actual de la seguridad
 
-- **JWT aún no está implementado**: por ahora `problem-service` tiene una configuración de seguridad mínima (`SecurityConfig`) que habilita `@EnableMethodSecurity` y permite todas las requests a nivel de filtro HTTP (`anyRequest().permitAll()`).
-- **Las restricciones por rol ya están escritas** en los controllers y se activarán completamente cuando se agregue el filtro JWT que extraiga el rol del token y lo convierta a `ROLE_*`.
-- El rol `SERVICE` **no está en el enum `Role` del `auth-service`** porque no es un rol de usuario humano. Cuando se implemente la generación de JWTs para microservicios, el claim `role=SERVICE` se mapeará directamente a la authority `ROLE_SERVICE`.
+- **La emisión de tokens ya está implementada**: `auth-service` expone `/login` y devuelve tokens JWT con claims estándar (`sub`, `email`, `role`).
+- **Filtro JWT en endpoints pendiente**: Las restricciones por rol ya están escritas en los controllers, pero actualmente todos los endpoints permiten acceso anónimo a nivel de filtro HTTP (`anyRequest().permitAll()` o equivalente). Se activarán completamente cuando se agregue el filtro JWT global que extraiga el rol del token y lo convierta a `ROLE_*`.
+- El rol `SERVICE` **no está en el enum `Role` del `auth-service`** porque no es un rol de usuario humano. Cuando se implemente la validación, el claim `role=SERVICE` se mapeará directamente a la authority `ROLE_SERVICE`.
 - **El canal WebSocket ya autentica de verdad.** `JwtTokenValidator` (en `shared/common-infrastructure`) verifica firma, emisor y vigencia, y `JwtHandshakeInterceptor` lo aplica durante el handshake: una conexión sin token válido se rechaza con `401` y nunca llega a abrirse. El mismo bean servirá al futuro filtro JWT de los endpoints HTTP, de modo que ambos lados validen igual.
-- **La emisión de tokens sigue pendiente**: `auth-service` solo expone `/register`. El WebSocket únicamente consume un token ya emitido; el login es una historia aparte y siempre HTTP.
 
 ### 6.5 Canal de notificación en tiempo real
 
@@ -615,17 +613,16 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 
 | # | Problema | Criticidad | Acción requerida |
 |---|----------|-----------|------------------|
-| 1 | **`auth-service` no emite JWT**: solo expone `/register` | 🔴 Alta | Sin login no hay tokens que validar. Es lo que bloquea el filtro JWT de todos los servicios y obliga al bypass temporal de `submission-service` |
-| 2 | **Ningún endpoint HTTP valida el JWT**: los `@PreAuthorize` están escritos pero la autenticación llega anónima | 🔴 Alta | Escribir el filtro JWT reutilizando `JwtTokenValidator` (ya usado por el handshake del WebSocket) y retirar `TemporaryAuthBypassFilter` |
-| 3 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
-| 4 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que deje de depender de lo que Hibernate decida en cada arranque |
-| 5 | **`judge-service` no existe**: los envíos se encolan y nadie los consume | 🔴 Alta | Implementar el consumidor de `submission.evaluate`. El contrato ya está fijado en `docs/RABBITMQ.md`; `testing/ws-judge-simulator/` lo simula mientras tanto |
-| 6 | **`contest-service` no existe**: la composición real de los equipos se desconoce | 🟡 Media | `NoOpTeamMembershipAdapter` trata cada equipo como individual. Al llegar el servicio, añadir un adaptador y cambiar `app.team-membership.provider` |
-| 7 | **El registro de sesiones WebSocket es local a la instancia** | 🟡 Media | Con varias réplicas, la instancia que recibe el veredicto puede no tener la conexión del estudiante. Escalar horizontalmente exige compartir el registro (p. ej. Redis) |
-| 8 | **`traefik.yml` está vacío** | 🟡 Media | Sin API Gateway cada servicio se expone por su puerto. Al configurarlo, cuidar el reenvío de `Upgrade`/`Sec-WebSocket-Protocol` o el handshake del WebSocket no se completa |
-| 9 | **`app.websocket.allowed-origins=*`** | 🟡 Media | Cómodo en desarrollo; restringir a los orígenes del frontend antes de exponer el servicio |
-| 10 | **Test package incorrecto** en `auth-service` y `problem-service` | 🟢 Baja | La clase de test usa `co.uceva.judge.auth_service` en lugar de `co.uceva.auth` |
-| 11 | **`services/users-service/` conviven con `auth-service`** | 🟢 Baja | Hay dos módulos para la misma responsabilidad; decidir cuál queda y retirar el otro de `settings.gradle` |
+| 1 | **Ningún endpoint HTTP valida el JWT**: los `@PreAuthorize` están escritos pero la autenticación llega anónima | 🔴 Alta | Escribir el filtro JWT reutilizando `JwtTokenValidator` (ya usado por el handshake del WebSocket) y retirar configuraciones temporales de seguridad en los servicios |
+| 2 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
+| 3 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que deje de depender de lo que Hibernate decida en cada arranque |
+| 4 | **`judge-service` no existe**: los envíos se encolan y nadie los consume | 🔴 Alta | Implementar el consumidor de `submission.evaluate`. El contrato ya está fijado en `docs/RABBITMQ.md`; `testing/ws-judge-simulator/` lo simula mientras tanto |
+| 5 | **`contest-service` no existe**: la composición real de los equipos se desconoce | 🟡 Media | `NoOpTeamMembershipAdapter` trata cada equipo como individual. Al llegar el servicio, añadir un adaptador y cambiar `app.team-membership.provider` |
+| 6 | **El registro de sesiones WebSocket es local a la instancia** | 🟡 Media | Con varias réplicas, la instancia que recibe el veredicto puede no tener la conexión del estudiante. Escalar horizontalmente exige compartir el registro (p. ej. Redis) |
+| 7 | **`traefik.yml` está vacío** | 🟡 Media | Sin API Gateway cada servicio se expone por su puerto. Al configurarlo, cuidar el reenvío de `Upgrade`/`Sec-WebSocket-Protocol` o el handshake del WebSocket no se completa |
+| 8 | **`app.websocket.allowed-origins=*`** | 🟡 Media | Cómodo en desarrollo; restringir a los orígenes del frontend antes de exponer el servicio |
+| 9 | **Test package incorrecto** en `auth-service` y `problem-service` | 🟢 Baja | La clase de test usa `co.uceva.judge.auth_service` en lugar de `co.uceva.auth` |
+| 10 | **`services/users-service/` conviven con `auth-service`** | 🟢 Baja | Hay dos módulos para la misma responsabilidad; decidir cuál queda y retirar el otro de `settings.gradle` |
 
 ---
 

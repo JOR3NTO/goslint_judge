@@ -1,6 +1,7 @@
 plugins {
     id 'org.springframework.boot' version '3.2.4' apply false
     id 'io.spring.dependency-management' version '1.1.4' apply false
+    id "io.freefair.lombok" version "8.6" apply false
     id 'java'
     id 'jacoco'
 }
@@ -9,10 +10,18 @@ subprojects {
     apply plugin: 'java'
     apply plugin: 'jacoco'
     apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'io.freefair.lombok'
 
     group = 'co.uceva.judge'
     version = '1.0.0'
-    sourceCompatibility = '17'
+    
+    java {
+        sourceCompatibility = '17'
+        targetCompatibility = '17'
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(17)
+        }
+    }
 
     repositories {
         mavenCentral()
@@ -28,10 +37,12 @@ subprojects {
     dependencies {
         implementation 'org.springframework:spring-tx'
         implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-        compileOnly 'org.projectlombok:lombok:1.18.34'
-        annotationProcessor 'org.projectlombok:lombok:1.18.34'
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
         testImplementation 'org.springframework.security:spring-security-test'
+    }
+
+    tasks.withType(JavaCompile) {
+        options.annotationProcessorPath = configurations.annotationProcessor
     }
 
     jacoco {
