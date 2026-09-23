@@ -61,4 +61,18 @@ subprojects {
         useJUnitPlatform()
         finalizedBy jacocoTestReport
     }
+
+    tasks.withType(org.springframework.boot.gradle.tasks.run.BootRun).configureEach {
+        def envFile = file("${rootProject.projectDir}/.env")
+        if (envFile.exists()) {
+            envFile.readLines().each { line ->
+                if (line.trim().length() > 0 && !line.startsWith("#")) {
+                    def parts = line.split("=", 2)
+                    if (parts.length == 2) {
+                        environment(parts[0].trim(), parts[1].trim())
+                    }
+                }
+            }
+        }
+    }
 }
