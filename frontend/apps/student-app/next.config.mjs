@@ -11,6 +11,15 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  allowedDevOrigins: ['192.168.18.51'],
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:8081/api/:path*'
+      }
+    ]
+  },
   turbopack: {
     root: path.resolve(__dirname, '../..'),
   },

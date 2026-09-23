@@ -15,6 +15,7 @@ export function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [acceptTerms, setAcceptTerms] = useState(false)
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -35,8 +36,14 @@ export function RegisterPage() {
     setIsLoading(true)
     setServerError(null)
 
+    if (!acceptTerms) {
+      setServerError("Debes aceptar los Términos de Servicio y la Política de Privacidad para continuar.")
+      setIsLoading(false)
+      return
+    }
+
     try {
-      const response = await fetch("http://localhost:8081/api/v1/auth/register", {
+      const response = await fetch("/api/v1/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -48,13 +55,17 @@ export function RegisterPage() {
           email: formData.email,
           password: formData.password,
           institution: "",
-          role: "student",
         }),
       })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null)
-        setServerError(errorData?.message || errorData?.error || "Ocurrió un error al registrarse. Verifica tus datos.")
+        console.error("Backend error response:", errorData)
+        setServerError(
+          errorData?.message || 
+          errorData?.error || 
+          (errorData ? JSON.stringify(errorData) : "Ocurrió un error al registrarse. Verifica tus datos.")
+        )
         setIsLoading(false)
         return
       }
@@ -226,7 +237,12 @@ export function RegisterPage() {
               </div>
 
               <div className="flex items-start gap-2">
-                <Checkbox id="terms" className="mt-1 border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary" required />
+                <Checkbox 
+                  id="terms" 
+                  checked={acceptTerms}
+                  onCheckedChange={(checked) => setAcceptTerms(checked === true)}
+                  className="mt-1 border-border data-[state=checked]:bg-primary data-[state=checked]:border-primary" 
+                />
                 <Label htmlFor="terms" className="text-sm text-muted-foreground font-normal leading-tight">
                   Acepto los{" "}
                   <Link href="#" className="text-primary hover:text-primary/80 transition-colors">
