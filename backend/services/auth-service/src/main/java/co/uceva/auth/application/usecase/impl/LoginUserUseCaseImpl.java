@@ -1,7 +1,7 @@
 package co.uceva.auth.application.usecase.impl;
 
-import co.uceva.auth.domain.repository.UserRepository;
 import co.uceva.auth.domain.service.PasswordEncoder;
+import co.uceva.auth.domain.repository.UserRepository;
 import co.uceva.auth.application.usecase.LoginUserUseCase;
 import co.uceva.auth.domain.exception.AccountLockedException;
 import co.uceva.auth.domain.exception.BadCredentialsException;

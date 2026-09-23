@@ -61,6 +61,8 @@ public class UserRepositoryAdapter implements UserRepository {
     private UserJpaEntity toEntity(User user) {
         UserJpaEntity entity = new UserJpaEntity();
         entity.setId(user.getId());
+        entity.setFirstName(user.getFirstName());
+        entity.setLastName(user.getLastName());
         entity.setUsername(user.getUsername());
         entity.setEmail(user.getEmail());
         entity.setPasswordHash(user.getPasswordHash());
@@ -73,15 +75,17 @@ public class UserRepositoryAdapter implements UserRepository {
 
     /** Mapeador manual: Transforma una Entidad JPA a un modelo de Dominio puro */
     private User toDomain(UserJpaEntity entity) {
-        return User.builder()
-                .id(entity.getId())
-                .username(entity.getUsername())
-                .email(entity.getEmail())
-                .passwordHash(entity.getPasswordHash())
-                .role(Role.valueOf(entity.getRole())) // Convierte String a Enum
-                .institution(entity.getInstitution())
-                .isActive(entity.isActive())
-                .createdAt(entity.getCreatedAt())
-                .build();
+        User user = new User();
+        user.setId(entity.getId());
+        user.setFirstName(entity.getFirstName());
+        user.setLastName(entity.getLastName());
+        user.setUsername(entity.getUsername());
+        user.setEmail(entity.getEmail());
+        user.setPasswordHash(entity.getPasswordHash());
+        user.setRole(Role.valueOf(entity.getRole())); // Convierte String a Enum
+        user.setInstitution(entity.getInstitution());
+        user.setActive(entity.isActive());
+        user.setCreatedAt(entity.getCreatedAt());
+        return user;
     }
 }
