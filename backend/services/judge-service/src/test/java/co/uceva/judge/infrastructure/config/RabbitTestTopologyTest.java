@@ -33,6 +33,9 @@ class RabbitTestTopologyTest {
     private static final String QUEUE = "otro.queue";
     private static final String DEAD_LETTER_EXCHANGE = "otro.dlx";
     private static final String DEAD_LETTER_QUEUE = "otro.dlq";
+    private static final String JUDGING_ROUTING_KEY = "otro.judging.routing-key";
+    private static final String JUDGING_QUEUE = "otro.judging.queue";
+    private static final String JUDGING_DEAD_LETTER_QUEUE = "otro.judging.dlq";
     private static final String JUDGED_ROUTING_KEY = "otro.judged.routing-key";
     private static final String JUDGED_QUEUE = "otro.judged.queue";
     private static final String JUDGED_DEAD_LETTER_QUEUE = "otro.judged.dlq";
@@ -46,6 +49,9 @@ class RabbitTestTopologyTest {
                     "app.messaging.submission.queue=" + QUEUE,
                     "app.messaging.submission.dead-letter-exchange=" + DEAD_LETTER_EXCHANGE,
                     "app.messaging.submission.dead-letter-queue=" + DEAD_LETTER_QUEUE,
+                    "app.messaging.submission.judging-routing-key=" + JUDGING_ROUTING_KEY,
+                    "app.messaging.submission.judging-queue=" + JUDGING_QUEUE,
+                    "app.messaging.submission.judging-dead-letter-queue=" + JUDGING_DEAD_LETTER_QUEUE,
                     "app.messaging.submission.judged-routing-key=" + JUDGED_ROUTING_KEY,
                     "app.messaging.submission.judged-queue=" + JUDGED_QUEUE,
                     "app.messaging.submission.judged-dead-letter-queue=" + JUDGED_DEAD_LETTER_QUEUE);
@@ -123,6 +129,46 @@ class RabbitTestTopologyTest {
             assertThat(judged.getExchange()).isEqualTo(evaluate.getExchange());
             assertThat(judged.getRoutingKey()).isNotEqualTo(evaluate.getRoutingKey());
             assertThat(judged.getDestination()).isNotEqualTo(evaluate.getDestination());
+        });
+    }
+
+    /**
+     * El aviso de inicio de evaluación: sin esta cola, el aviso que publica
+     * {@code RabbitSubmissionJudgingNotifierAdapter} llegaría al exchange sin
+     * cola que lo acepte, y como se publica con {@code mandatory}, se
+     * manifestaría como un {@code JudgingNotificationException}.
+     */
+    @Test
+    void shouldBindTheJudgingQueueToTheRoutingKeyThePublisherUses() {
+        contextRunner.run(context -> {
+            Binding binding = context.getBean("submissionJudgingBinding", Binding.class);
+            Queue judgingQueue = context.getBean("submissionJudgingQueue", Queue.class);
+
+            assertThat(judgingQueue.getName()).isEqualTo(JUDGING_QUEUE);
+            assertThat(binding.getExchange()).isEqualTo(EXCHANGE);
+            assertThat(binding.getDestination()).isEqualTo(JUDGING_QUEUE);
+            assertThat(binding.getRoutingKey()).isEqualTo(JUDGING_ROUTING_KEY);
+            assertThat(judgingQueue.getArguments())
+                    .containsEntry("x-dead-letter-exchange", DEAD_LETTER_EXCHANGE)
+                    .containsEntry("x-dead-letter-routing-key", JUDGING_DEAD_LETTER_QUEUE);
+        });
+    }
+
+    /**
+     * Las tres colas de trabajo comparten exchange pero ninguna routing key ni
+     * cola: si el aviso de inicio compartiera routing key con la evaluación o el
+     * veredicto, se entregaría al consumidor equivocado.
+     */
+    @Test
+    void shouldKeepTheJudgingQueueApartFromTheOthers() {
+        contextRunner.run(context -> {
+            Binding evaluate = context.getBean("submissionEvaluateBinding", Binding.class);
+            Binding judging = context.getBean("submissionJudgingBinding", Binding.class);
+            Binding judged = context.getBean("submissionJudgedBinding", Binding.class);
+
+            assertThat(judging.getExchange()).isEqualTo(evaluate.getExchange());
+            assertThat(judging.getRoutingKey()).isNotIn(evaluate.getRoutingKey(), judged.getRoutingKey());
+            assertThat(judging.getDestination()).isNotIn(evaluate.getDestination(), judged.getDestination());
         });
     }
 

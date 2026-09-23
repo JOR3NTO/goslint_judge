@@ -10,6 +10,7 @@ import co.uceva.judge.application.port.out.JudgeResultPublisher;
 import co.uceva.judge.application.port.out.ProblemLimits;
 import co.uceva.judge.application.port.out.ProblemLimitsPort;
 import co.uceva.judge.application.port.out.SandboxExecutor;
+import co.uceva.judge.application.port.out.SubmissionJudgingNotifier;
 import co.uceva.judge.application.usecase.EvaluateSubmissionUseCase;
 import co.uceva.judge.domain.model.JudgeResult;
 import co.uceva.judge.domain.model.JudgeTask;
@@ -30,39 +31,47 @@ public class EvaluateSubmissionUseCaseImpl implements EvaluateSubmissionUseCase 
     private final ProblemLimitsPort problemLimitsPort;
     private final SandboxExecutor sandboxExecutor;
     private final JudgeResultPublisher judgeResultPublisher;
+    private final SubmissionJudgingNotifier submissionJudgingNotifier;
 
     /**
      * Inyección de dependencias mediante constructor.
      *
-     * @param testCaseRepository   Puerto de salida para obtener los casos de prueba.
-     * @param problemLimitsPort    Puerto de salida para obtener los límites del problema.
-     * @param sandboxExecutor      Puerto de salida que ejecuta la solución en el sandbox.
-     * @param judgeResultPublisher Puerto de salida para publicar el resultado.
+     * @param testCaseRepository         Puerto de salida para obtener los casos de prueba.
+     * @param problemLimitsPort          Puerto de salida para obtener los límites del problema.
+     * @param sandboxExecutor            Puerto de salida que ejecuta la solución en el sandbox.
+     * @param judgeResultPublisher       Puerto de salida para publicar el resultado.
+     * @param submissionJudgingNotifier  Puerto de salida para avisar del inicio de la evaluación.
      */
     public EvaluateSubmissionUseCaseImpl(TestCaseRepository testCaseRepository, ProblemLimitsPort problemLimitsPort,
-            SandboxExecutor sandboxExecutor, JudgeResultPublisher judgeResultPublisher) {
+            SandboxExecutor sandboxExecutor, JudgeResultPublisher judgeResultPublisher,
+            SubmissionJudgingNotifier submissionJudgingNotifier) {
         this.testCaseRepository = testCaseRepository;
         this.problemLimitsPort = problemLimitsPort;
         this.sandboxExecutor = sandboxExecutor;
         this.judgeResultPublisher = judgeResultPublisher;
+        this.submissionJudgingNotifier = submissionJudgingNotifier;
     }
 
     /**
      * Ejecuta el flujo de evaluación:
      * <ol>
+     *   <li>Avisa a {@code submission-service} de que la evaluación empezó.</li>
      *   <li>Obtiene los casos de prueba y los límites del problema.</li>
      *   <li>Ensambla la {@link JudgeTask} y la ejecuta en el sandbox.</li>
      *   <li>Publica el resultado hacia {@code submission-service}.</li>
      * </ol>
-     * Los fallos del sistema (casos de prueba ausentes, sandbox averiado o
-     * publicación fallida) se propagan para que la mensajería reintente el
-     * envío y, agotados los reintentos, lo cierre desde la cola de fallidos.
+     * Los fallos del sistema (aviso de inicio no entregado, casos de prueba
+     * ausentes, sandbox averiado o publicación fallida) se propagan para que la
+     * mensajería reintente el envío completo y, agotados los reintentos, lo
+     * cierre desde la cola de fallidos.
      *
      * @param event Evento con el envío a evaluar.
      * @return El resultado de la evaluación.
      */
     @Override
     public JudgeResult execute(SubmissionReceivedEvent event) {
+        submissionJudgingNotifier.notifyJudgingStarted(event.submissionId());
+
         List<TestCase> testCases = testCaseRepository.findAllByProblemId(event.problemId());
         ProblemLimits limits = problemLimitsPort.findByProblemId(event.problemId());
 

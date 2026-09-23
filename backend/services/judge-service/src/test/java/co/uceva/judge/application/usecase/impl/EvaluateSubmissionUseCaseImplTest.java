@@ -8,14 +8,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import co.uceva.judge.application.exception.JudgingNotificationException;
 import co.uceva.judge.application.port.out.JudgeResultPublisher;
 import co.uceva.judge.application.port.out.ProblemLimits;
 import co.uceva.judge.application.port.out.ProblemLimitsPort;
 import co.uceva.judge.application.port.out.SandboxExecutor;
+import co.uceva.judge.application.port.out.SubmissionJudgingNotifier;
 import co.uceva.judge.domain.exception.SandboxExecutionException;
 import co.uceva.judge.domain.exception.TestCasesNotFoundException;
 import co.uceva.judge.domain.model.JudgeResult;
@@ -31,6 +34,8 @@ import co.uceva.shared.domain.event.SubmissionReceivedEvent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -42,6 +47,7 @@ class EvaluateSubmissionUseCaseImplTest {
     @Mock private ProblemLimitsPort problemLimitsPort;
     @Mock private SandboxExecutor sandboxExecutor;
     @Mock private JudgeResultPublisher judgeResultPublisher;
+    @Mock private SubmissionJudgingNotifier submissionJudgingNotifier;
     @InjectMocks private EvaluateSubmissionUseCaseImpl useCase;
 
     private SubmissionReceivedEvent event;
@@ -55,7 +61,7 @@ class EvaluateSubmissionUseCaseImplTest {
     }
 
     @Test
-    void shouldEvaluateAndPublishResult() {
+    void shouldNotifyJudgingStartedBeforeEvaluatingAndPublishResult() {
         JudgeResult expected = JudgeResult.create(event.submissionId(), VerdictStatus.ACCEPTED, 10, 100, null);
         when(testCaseRepository.findAllByProblemId(event.problemId())).thenReturn(testCases);
         when(problemLimitsPort.findByProblemId(event.problemId()))
@@ -72,6 +78,20 @@ class EvaluateSubmissionUseCaseImplTest {
         assertThat(captor.getValue().getTestCases()).isEqualTo(testCases);
         verify(judgeResultPublisher).publish(expected);
         assertThat(result).isSameAs(expected);
+
+        InOrder order = inOrder(submissionJudgingNotifier, sandboxExecutor, judgeResultPublisher);
+        order.verify(submissionJudgingNotifier).notifyJudgingStarted(event.submissionId());
+        order.verify(sandboxExecutor).execute(any(JudgeTask.class));
+        order.verify(judgeResultPublisher).publish(expected);
+    }
+
+    @Test
+    void shouldPropagateJudgingNotificationFailureWithoutEvaluating() {
+        doThrow(new JudgingNotificationException(event.submissionId(), "el broker no acusó recibo"))
+                .when(submissionJudgingNotifier).notifyJudgingStarted(event.submissionId());
+
+        assertThatThrownBy(() -> useCase.execute(event)).isInstanceOf(JudgingNotificationException.class);
+        verifyNoInteractions(testCaseRepository, problemLimitsPort, sandboxExecutor, judgeResultPublisher);
     }
 
     @Test
@@ -80,6 +100,7 @@ class EvaluateSubmissionUseCaseImplTest {
                 .thenThrow(new TestCasesNotFoundException(event.problemId()));
 
         assertThatThrownBy(() -> useCase.execute(event)).isInstanceOf(TestCasesNotFoundException.class);
+        verify(submissionJudgingNotifier).notifyJudgingStarted(event.submissionId());
         verifyNoInteractions(sandboxExecutor, judgeResultPublisher);
     }
 

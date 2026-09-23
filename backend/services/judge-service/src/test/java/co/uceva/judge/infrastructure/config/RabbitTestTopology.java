@@ -134,6 +134,78 @@ public class RabbitTestTopology {
     }
 
     /**
+     * Cola en la que aterriza el aviso de inicio de evaluación que publica
+     * {@code RabbitSubmissionJudgingNotifierAdapter}.
+     * <p>
+     * Mismo motivo que la cola de veredictos: sin ella, un aviso sin cola que lo
+     * acepte se manifestaría como un {@code JudgingNotificationException} en vez
+     * de perderse en silencio.
+     * </p>
+     *
+     * @param judgingQueue           Nombre de la cola del aviso de inicio.
+     * @param deadLetterExchange     Exchange al que derivar lo rechazado.
+     * @param judgingDeadLetterQueue Routing key de derivación, igual al nombre de su DLQ.
+     * @return Cola del aviso de inicio con su política de mensajes muertos.
+     */
+    @Bean
+    public Queue submissionJudgingQueue(
+            @Value("${app.messaging.submission.judging-queue}") String judgingQueue,
+            @Value("${app.messaging.submission.dead-letter-exchange}") String deadLetterExchange,
+            @Value("${app.messaging.submission.judging-dead-letter-queue}") String judgingDeadLetterQueue) {
+        return QueueBuilder.durable(judgingQueue)
+                .deadLetterExchange(deadLetterExchange)
+                .deadLetterRoutingKey(judgingDeadLetterQueue)
+                .build();
+    }
+
+    /**
+     * Cola donde acaban los avisos de inicio que no pudieron registrarse.
+     *
+     * @param judgingDeadLetterQueue Nombre de la cola de mensajes muertos del aviso de inicio.
+     * @return Cola de mensajes muertos del aviso de inicio.
+     */
+    @Bean
+    public Queue submissionJudgingDeadLetterQueue(
+            @Value("${app.messaging.submission.judging-dead-letter-queue}") String judgingDeadLetterQueue) {
+        return QueueBuilder.durable(judgingDeadLetterQueue).build();
+    }
+
+    /**
+     * Enlaza la cola del aviso de inicio con el exchange principal, con la misma
+     * routing key que usa el publicador de este servicio.
+     *
+     * @param submissionJudgingQueue Cola del aviso de inicio.
+     * @param submissionExchange     Exchange principal.
+     * @param judgingRoutingKey      Routing key del aviso de inicio de evaluación.
+     * @return Binding de la cola del aviso de inicio.
+     */
+    @Bean
+    public Binding submissionJudgingBinding(Queue submissionJudgingQueue,
+            TopicExchange submissionExchange,
+            @Value("${app.messaging.submission.judging-routing-key}") String judgingRoutingKey) {
+        return BindingBuilder.bind(submissionJudgingQueue)
+                .to(submissionExchange)
+                .with(judgingRoutingKey);
+    }
+
+    /**
+     * Enlaza la DLQ del aviso de inicio con el exchange de mensajes muertos.
+     *
+     * @param submissionJudgingDeadLetterQueue Cola de mensajes muertos del aviso de inicio.
+     * @param submissionDeadLetterExchange     Exchange de mensajes muertos.
+     * @param judgingDeadLetterQueue           Routing key de derivación.
+     * @return Binding de la DLQ del aviso de inicio.
+     */
+    @Bean
+    public Binding submissionJudgingDeadLetterBinding(Queue submissionJudgingDeadLetterQueue,
+            DirectExchange submissionDeadLetterExchange,
+            @Value("${app.messaging.submission.judging-dead-letter-queue}") String judgingDeadLetterQueue) {
+        return BindingBuilder.bind(submissionJudgingDeadLetterQueue)
+                .to(submissionDeadLetterExchange)
+                .with(judgingDeadLetterQueue);
+    }
+
+    /**
      * Cola en la que aterriza el veredicto que publica
      * {@code RabbitJudgeResultPublisherAdapter}.
      * <p>
