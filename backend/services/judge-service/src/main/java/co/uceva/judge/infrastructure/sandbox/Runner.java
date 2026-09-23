@@ -8,6 +8,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import co.uceva.judge.domain.exception.SandboxExecutionException;
 import co.uceva.judge.domain.model.MonitorLimits;
 import co.uceva.judge.domain.model.TestCase;
 import co.uceva.judge.domain.repository.MonitorLimitsRepository;
@@ -103,10 +104,11 @@ public class Runner {
                     break;
                 }
 
-            } catch (IOException | InterruptedException e) {
+            } catch (IOException | InterruptedException | SandboxExecutionException e) {
                 log.error("Error running solution: " + e.getMessage());
                 result.put("status", VerdictStatus.RUNTIME_ERROR);
                 result.put("failedTestCase", testCase.id());
+                break;
             } finally {
                 if (workspace != null) {
                     workspace.cleanup();
