@@ -14,10 +14,12 @@ import co.uceva.submission.domain.exception.DuplicateSubmissionException;
 import co.uceva.submission.domain.exception.SubmissionNotFoundException;
 import co.uceva.submission.domain.model.Submission;
 import co.uceva.submission.fixtures.SubmissionFixtures;
+import co.uceva.submission.infrastructure.config.JwtConfig;
 import co.uceva.submission.infrastructure.config.SecurityConfig;
 import co.uceva.submission.infrastructure.web.dto.SubmitCodeRequestDTO;
 import co.uceva.submission.infrastructure.web.exception.SubmissionExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -26,20 +28,33 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.TestPropertySource;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
+import static io.jsonwebtoken.security.Keys.hmacShaKeyFor;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(SubmissionController.class)
-@Import({SecurityConfig.class, SubmissionExceptionHandler.class})
+@Import({SecurityConfig.class, JwtConfig.class, SubmissionExceptionHandler.class})
+@TestPropertySource(properties = {
+        "app.security.jwt.secret=clave-de-pruebas-solo-para-tests-0123456789",
+        "app.security.jwt.issuer=goslint-judge"
+})
 class SubmissionControllerTest {
+
+    private static final String JWT_SECRET = "clave-de-pruebas-solo-para-tests-0123456789";
+    private static final String JWT_ISSUER = "goslint-judge";
 
     @Autowired
     private MockMvc mockMvc;
@@ -87,6 +102,32 @@ class SubmissionControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(submissionId.toString()))
                 .andExpect(jsonPath("$.verdict").value("PENDING"));
+    }
+
+    @Test
+    void shouldCreateSubmissionWithAValidJwt() throws Exception {
+        SubmitCodeRequestDTO request = SubmissionFixtures.submitCodeRequest();
+        when(submitCodeUseCase.execute(any())).thenReturn(SubmissionFixtures.aSubmission(submissionId));
+
+        mockMvc.perform(post("/api/v1/submissions")
+                        .header("Authorization", "Bearer " + studentToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(submissionId.toString()));
+    }
+
+    private String studentToken() {
+        SecretKey key = hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .issuer(JWT_ISSUER)
+                .subject(UUID.randomUUID().toString())
+                .claim("role", "STUDENT")
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusSeconds(300)))
+                .signWith(key)
+                .compact();
     }
 
     @Test

@@ -111,11 +111,11 @@ Un solo tipo de mensaje hoy, [`SubmissionStatusEventDTO`](../src/main/java/co/uc
 
 > ⚠️ El query param tiene una pega conocida: las URL suelen acabar en los registros de acceso de proxies y servidores, con el token dentro. Por eso los tokens deben ser de vida corta y, en producción, la conexión ir siempre sobre TLS.
 
-La validación la hace [`JwtTokenValidator`](../../../shared/common-infrastructure/src/main/java/co/uceva/shared/infrastructure/security/JwtTokenValidator.java), en `shared/common-infrastructure`: verifica **firma, emisor y vigencia** antes de leer ningún claim, y extrae `sub` (id de usuario) y `role`. El bean se declara en [`JwtConfig`](../src/main/java/co/uceva/submission/infrastructure/config/JwtConfig.java) — aparte de `SecurityConfig`, porque son cosas distintas: aquella configura la cadena de filtros HTTP, esto provee la pieza que reconoce a un usuario. Cuando llegue el filtro JWT de los endpoints HTTP usará **este mismo bean**, y ambos lados validarán exactamente igual.
+La validación la hace [`JwtTokenValidator`](../../../shared/common-infrastructure/src/main/java/co/uceva/shared/infrastructure/security/JwtTokenValidator.java), en `shared/common-infrastructure`: verifica **firma, emisor y vigencia** antes de leer ningún claim, y extrae `sub` (id de usuario) y `role`. El bean se declara en [`JwtConfig`](../src/main/java/co/uceva/submission/infrastructure/config/JwtConfig.java) y lo comparten el filtro JWT HTTP y el handshake, por lo que ambos validan los tokens de la misma forma.
 
 Si el token es válido, la identidad (`AuthenticatedUser`) se deja en los atributos de la sesión bajo la clave `authenticatedUser`, y el handler la recupera desde ahí. Nunca es `null`: una conexión sin usuario autenticado no llega a abrirse.
 
-> **Nota sobre el estado actual del servicio:** el WebSocket es hoy **el único punto que autentica de verdad**. Los endpoints REST aún no tienen filtro JWT; en desarrollo local se usa `TemporaryAuthBypassFilter` (`app.security.bypass-auth=true`), que debe quedar en `false` en cualquier otro entorno.
+> **Nota sobre el estado actual del servicio:** tanto el WebSocket como los endpoints REST validan JWT. Las rutas REST aplican además los roles indicados por `@PreAuthorize` en cada operación.
 
 ---
 

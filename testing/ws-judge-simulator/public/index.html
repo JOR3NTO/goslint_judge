@@ -109,13 +109,9 @@
         </button>
       </div>
       <p class="hint warn">
-        <code>SubmissionController</code> exige un rol vía <code>@PreAuthorize</code>, pero todavía no
-        hay filtro JWT para peticiones HTTP (solo el handshake del WebSocket valida el token de
-        verdad). Con <code>AUTH_BYPASS=true</code> en <code>backend/.env</code>,
-        <code>submission-service</code> registra un bypass temporal
-        (<code>TemporaryAuthBypassFilter</code>) que autentica cualquier petición REST con todos los
-        roles, así que este botón funciona sin necesidad de un token válido. Si el bypass está
-        desactivado, responde <strong>403</strong>.
+        <code>SubmissionController</code> exige un rol vía <code>@PreAuthorize</code>. Envía un token
+        JWT válido con rol <code>STUDENT</code>, <code>ADMIN</code> u
+        <code>ORGANIZER</code> para autorizar esta petición.
       </p>
     </section>
 
