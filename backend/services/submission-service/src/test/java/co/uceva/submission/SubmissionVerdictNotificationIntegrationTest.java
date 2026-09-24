@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +61,25 @@ class SubmissionVerdictNotificationIntegrationTest extends AbstractIntegrationTe
     @MockBean
     private TeamMembershipPort teamMembershipPort;
 
+    @Test
+    void shouldPersistAndNotifyTheQueuedStatusAfterSuccessfulEnqueue() {
+        UUID teamId = UUID.randomUUID();
+        UUID integrante = UUID.randomUUID();
+        when(teamMembershipPort.findTeam(teamId)).thenReturn(new TeamDTO(teamId, List.of(integrante)));
+
+        Submission submission = givenASubmission(teamId);
+
+        Submission persisted = submissionRepository.findById(submission.getId()).orElseThrow();
+        assertThat(persisted.getStatus()).isEqualTo(SubmissionStatus.QUEUED);
+
+        ArgumentCaptor<Submission> notificado = ArgumentCaptor.forClass(Submission.class);
+        ArgumentCaptor<List<UUID>> destinatarios = ArgumentCaptor.forClass(List.class);
+        verify(submissionStatusNotifier).notifyStatusChanged(notificado.capture(), destinatarios.capture());
+        assertThat(notificado.getValue().getId()).isEqualTo(submission.getId());
+        assertThat(notificado.getValue().getStatus()).isEqualTo(SubmissionStatus.QUEUED);
+        assertThat(destinatarios.getValue()).containsExactly(integrante);
+    }
+
     /**
      * El criterio de aceptación completo: el veredicto y sus métricas quedan
      * registrados y el cambio sale hacia el dueño del envío sin que nadie recargue
@@ -71,6 +91,7 @@ class SubmissionVerdictNotificationIntegrationTest extends AbstractIntegrationTe
         UUID integrante = UUID.randomUUID();
         when(teamMembershipPort.findTeam(teamId)).thenReturn(new TeamDTO(teamId, List.of(integrante)));
         Submission submission = givenASubmission(teamId);
+        clearInvocations(submissionStatusNotifier);
 
         updateSubmissionVerdictUseCase.execute(new UpdateSubmissionVerdictCommand(
                 submission.getId(), VerdictStatus.ACCEPTED, 120, 2048));
@@ -99,6 +120,7 @@ class SubmissionVerdictNotificationIntegrationTest extends AbstractIntegrationTe
         UUID integrante = UUID.randomUUID();
         when(teamMembershipPort.findTeam(teamId)).thenReturn(new TeamDTO(teamId, List.of(integrante)));
         Submission submission = givenASubmission(teamId);
+        clearInvocations(submissionStatusNotifier);
 
         markSubmissionSystemErrorUseCase.execute(submission.getId(), "el juez agotó los reintentos");
 
