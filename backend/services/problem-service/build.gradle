@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation project(':shared:common-infrastructure')
+    implementation 'org.flywaydb:flyway-core'
     runtimeOnly 'org.postgresql:postgresql'
     testRuntimeOnly 'com.h2database:h2'
 }
