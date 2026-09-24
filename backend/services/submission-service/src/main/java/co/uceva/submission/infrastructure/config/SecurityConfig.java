@@ -1,5 +1,6 @@
 package co.uceva.submission.infrastructure.config;
 
+import co.uceva.shared.infrastructure.security.JwtTokenValidator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -8,23 +9,20 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
  * Configuración de seguridad para el servicio de envíos de código fuente.
  * <p>
  * Habilita la seguridad a nivel de métodos mediante {@link EnableMethodSecurity},
  * lo que permite utilizar anotaciones como {@code @PreAuthorize} en los
- * controladores REST. La validación real del JWT será implementada en el futuro;
- * por ahora todos los requests son permitidos a nivel de filtro HTTP para no
- * romper el comportamiento actual mientras se agregan las restricciones por rol.
+ * controladores REST. {@link JwtAuthenticationFilter} valida el JWT y deja la
+ * identidad y su rol en el contexto de seguridad antes de comprobar los permisos.
  * </p>
  * <p>
- * El canal WebSocket es la excepción y ya autentica de verdad, pero no a través de
- * esta cadena: lo hace {@code JwtHandshakeInterceptor}, que valida el token durante
- * el handshake y rechaza la conexión antes de aceptarla. Un canal que empuja datos
- * de un usuario concreto no puede quedar abierto esperando a que el filtro HTTP
- * llegue en una historia futura. El validador que ambos compartirán se declara en
- * {@link JwtConfig}.
+ * El canal WebSocket también autentica con JWT, mediante
+ * {@code JwtHandshakeInterceptor} durante el handshake. El filtro HTTP y el
+ * handshake comparten el validador declarado en {@link JwtConfig}.
  * </p>
  */
 @Configuration
@@ -37,19 +35,24 @@ public class SecurityConfig {
      * <p>
      * - Deshabilita CSRF porque se trata de una API stateless.<br>
      * - Configura la política de sesiones como STATELESS.<br>
-     * - Permite cualquier request a nivel de filtro; la autorización se define
-     *   con {@code @PreAuthorize} en cada método del controller.<br>
+     * - Registra el filtro JWT antes de {@code UsernamePasswordAuthenticationFilter}.<br>
+     * - Permite cualquier request a nivel de cadena; los roles se exigen con
+     *   {@code @PreAuthorize} en cada método del controller.<br>
      * </p>
      *
-     * @param http        el configurador de seguridad HTTP de Spring.
+     * @param http           el configurador de seguridad HTTP de Spring.
+     * @param tokenValidator validador de tokens declarado en {@link JwtConfig}.
      * @return la cadena de filtros configurada.
      * @throws Exception si ocurre un error al construir la cadena.
      */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http,
+            JwtTokenValidator tokenValidator) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(new JwtAuthenticationFilter(tokenValidator),
+                        UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
 
         return http.build();

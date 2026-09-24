@@ -24,9 +24,9 @@ vivo, desde el navegador, cómo cambia el estado de un envío por el canal
    set -a && source backend/.env && set +a
    ./gradlew :services:submission-service:bootRun
    ```
-   El envío HTTP requiere autenticación por rol. Como aún no hay filtro JWT
-   para peticiones HTTP, el POST responde `403`; el simulador sirve para probar
-   el handshake WebSocket con un JWT válido.
+   El envío HTTP requiere un JWT con rol `STUDENT`, `ADMIN` u `ORGANIZER`.
+   El simulador genera un token válido para probar tanto el POST como el
+   handshake WebSocket.
 
 ## Uso
 

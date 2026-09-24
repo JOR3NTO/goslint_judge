@@ -109,10 +109,9 @@
         </button>
       </div>
       <p class="hint warn">
-        <code>SubmissionController</code> exige un rol vía <code>@PreAuthorize</code>, pero todavía no
-        hay filtro JWT para peticiones HTTP (solo el handshake del WebSocket valida el token de
-        verdad). Esta petición responde <strong>403</strong> hasta que se implemente la autenticación
-        de los endpoints HTTP.
+        <code>SubmissionController</code> exige un rol vía <code>@PreAuthorize</code>. Envía un token
+        JWT válido con rol <code>STUDENT</code>, <code>ADMIN</code> u
+        <code>ORGANIZER</code> para autorizar esta petición.
       </p>
     </section>
 
