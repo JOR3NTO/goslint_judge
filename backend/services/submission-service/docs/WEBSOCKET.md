@@ -115,7 +115,7 @@ La validación la hace [`JwtTokenValidator`](../../../shared/common-infrastructu
 
 Si el token es válido, la identidad (`AuthenticatedUser`) se deja en los atributos de la sesión bajo la clave `authenticatedUser`, y el handler la recupera desde ahí. Nunca es `null`: una conexión sin usuario autenticado no llega a abrirse.
 
-> **Nota sobre el estado actual del servicio:** el WebSocket es hoy **el único punto que autentica de verdad**. Los endpoints REST aún no tienen filtro JWT; en desarrollo local se usa `TemporaryAuthBypassFilter` (`app.security.bypass-auth=true`), que debe quedar en `false` en cualquier otro entorno.
+> **Nota sobre el estado actual del servicio:** el WebSocket es hoy **el único punto que autentica de verdad**. Los endpoints REST aún no tienen filtro JWT, así que las operaciones protegidas por rol responden `403` hasta que se implemente.
 
 ---
 

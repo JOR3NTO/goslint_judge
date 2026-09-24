@@ -24,9 +24,9 @@ vivo, desde el navegador, cómo cambia el estado de un envío por el canal
    set -a && source backend/.env && set +a
    ./gradlew :services:submission-service:bootRun
    ```
-   `backend/.env` trae `AUTH_BYPASS=true`, necesario para que ese POST
-   funcione hoy sin un filtro JWT real para peticiones HTTP (ver
-   `TemporaryAuthBypassFilter`).
+   El envío HTTP requiere autenticación por rol. Como aún no hay filtro JWT
+   para peticiones HTTP, el POST responde `403`; el simulador sirve para probar
+   el handshake WebSocket con un JWT válido.
 
 ## Uso
 
