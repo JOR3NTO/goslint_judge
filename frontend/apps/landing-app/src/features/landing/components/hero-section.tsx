@@ -1,16 +1,25 @@
 "use client"
 
-import Link from "next/link"
 import { Button } from "@/shared/ui/primitives/button"
-import { ArrowRight, Code2, Sparkles, Terminal } from "lucide-react"
+import { env } from "@/core/config/env"
+import { ArrowRight, Terminal, Sparkles } from "lucide-react"
 
 export function HeroSection() {
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
       {/* Background Effects */}
-      <div className="absolute inset-0 from-primary/10 via-background to-background" style={{ backgroundImage: 'radial-gradient(ellipse at top, var(--tw-gradient-stops))' }} />
-      <div className="absolute inset-0 opacity-50" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%2300ff88%22%20fill-opacity%3D%220.03%22%3E%3Ccircle%20cx%3D%221%22%20cy%3D%221%22%20r%3D%221%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')" }} />
-      
+      <div
+        className="absolute inset-0 from-primary/10 via-background to-background"
+        style={{ backgroundImage: "radial-gradient(ellipse at top, var(--tw-gradient-stops))" }}
+      />
+      <div
+        className="absolute inset-0 opacity-50"
+        style={{
+          backgroundImage:
+            "url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%2300ff88%22%20fill-opacity%3D%220.03%22%3E%3Ccircle%20cx%3D%221%22%20cy%3D%221%22%20r%3D%221%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')",
+        }}
+      />
+
       {/* Floating Code Elements */}
       <div className="absolute top-1/4 left-10 opacity-20 text-primary font-mono text-sm hidden lg:block animate-pulse">
         {"while(true) { solve(); }"}
@@ -21,7 +30,7 @@ export function HeroSection() {
       <div className="absolute top-1/3 right-1/4 opacity-15 text-primary font-mono text-xs hidden lg:block">
         {"// O(n log n)"}
       </div>
-      
+
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
         <div className="text-center space-y-8">
           {/* Badge */}
@@ -39,28 +48,35 @@ export function HeroSection() {
 
           {/* Description */}
           <p className="max-w-2xl mx-auto text-lg sm:text-xl text-muted-foreground leading-relaxed">
-            Participa en maratones de programación, resuelve problemas desafiantes y recibe 
-            <span className="text-primary font-medium"> retroalimentación con IA </span> 
+            Participa en maratones de programación, resuelve problemas desafiantes y recibe
+            <span className="text-primary font-medium"> retroalimentación con IA </span>
             para mejorar tus habilidades de algoritmos.
           </p>
 
-          {/* CTA Buttons */}
+          {/* CTA Buttons — apuntan a student-app */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/register">
-              <Button size="lg" className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-green text-lg px-8 py-6">
+            <a href={`${env.APP_URL}/register`}>
+              <Button
+                size="lg"
+                className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-green text-lg px-8 py-6"
+              >
                 Comenzar Ahora
                 <ArrowRight className="h-5 w-5" />
               </Button>
-            </Link>
-            <Link href="/contests">
-              <Button size="lg" variant="outline" className="gap-2 border-border hover:border-primary hover:bg-primary/10 text-lg px-8 py-6">
+            </a>
+            <a href="#maratones">
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 border-border hover:border-primary hover:bg-primary/10 text-lg px-8 py-6"
+              >
                 <Terminal className="h-5 w-5" />
                 Ver Maratones
               </Button>
-            </Link>
+            </a>
           </div>
 
-          {/* Stats Preview */}
+          {/* Stats */}
           <div className="pt-12 grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto">
             {[
               { value: "10K+", label: "Usuarios Activos" },
@@ -68,7 +84,10 @@ export function HeroSection() {
               { value: "150+", label: "Maratones" },
               { value: "98%", label: "Satisfacción" },
             ].map((stat, i) => (
-              <div key={i} className="text-center p-4 rounded-lg bg-card/50 border border-border hover:border-primary/30 transition-colors">
+              <div
+                key={i}
+                className="text-center p-4 rounded-lg bg-card/50 border border-border hover:border-primary/30 transition-colors"
+              >
                 <p className="text-2xl sm:text-3xl font-bold text-primary">{stat.value}</p>
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
               </div>
@@ -97,9 +116,7 @@ export function HeroSection() {
                 <div className="text-muted-foreground">
                   Compilando... <span className="text-primary">✓</span>
                 </div>
-                <div className="text-muted-foreground">
-                  Ejecutando casos de prueba...
-                </div>
+                <div className="text-muted-foreground">Ejecutando casos de prueba...</div>
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">Test 1/10:</span>
                   <span className="text-primary">Accepted</span>
@@ -119,7 +136,7 @@ export function HeroSection() {
                   ✓ Todos los tests pasaron! Veredicto: ACCEPTED
                 </div>
                 <div className="text-muted-foreground cursor-blink">
-                  <span className="text-primary">$</span> 
+                  <span className="text-primary">$</span>{" "}
                 </div>
               </div>
             </div>
