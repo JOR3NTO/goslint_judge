@@ -63,7 +63,7 @@ public class MarkSubmissionSystemErrorUseCaseImpl implements MarkSubmissionSyste
                 .orElseThrow(() -> new SubmissionNotFoundException(submissionId));
 
         submission.markSystemError();
-        if (submission.getStatus() != SubmissionStatus.SYSTEM_ERROR) {
+        if (submission.getStatus() != SubmissionStatus.ENQUEUE_ERROR) {
             log.warn("El envío {} ya tenía veredicto; se ignora el aviso de fallo de evaluación: {}",
                     submissionId, reason);
             return submission;

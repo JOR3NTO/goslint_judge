@@ -22,5 +22,11 @@ public enum VerdictStatus {
     /** La solución finalizó con un error en tiempo de ejecución. */
     RUNTIME_ERROR,
     /** La solución no pudo compilarse correctamente. */
-    COMPILATION_ERROR
+    COMPILATION_ERROR,
+    /**
+     * El juez no pudo emitir un veredicto por un fallo propio al preparar o
+     * ejecutar el entorno de evaluación (por ejemplo, el sandbox), no por un
+     * problema del código del estudiante.
+     */
+    JUDGE_ERROR
 }

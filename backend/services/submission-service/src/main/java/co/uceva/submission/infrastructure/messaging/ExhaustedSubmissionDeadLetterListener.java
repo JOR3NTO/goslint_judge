@@ -19,7 +19,7 @@ import java.util.UUID;
  * Un mensaje llega a esas colas cuando su consumidor lo rechazó definitivamente
  * tras agotar los reintentos. Sin este listener, esos envíos quedarían retenidos
  * en el broker y el estudiante seguiría viendo indefinidamente un envío "en cola"
- * que nadie va a evaluar. Convertirlos en {@code SYSTEM_ERROR} es lo que cierra
+ * que nadie va a evaluar. Convertirlos en {@code ENQUEUE_ERROR} es lo que cierra
  * la espera y permite avisarle.
  * </p>
  * <p>

@@ -154,7 +154,7 @@ public class Submission {
      */
     public void markSystemError() {
         if (this.status != SubmissionStatus.JUDGED) {
-            this.status = SubmissionStatus.SYSTEM_ERROR;
+            this.status = SubmissionStatus.ENQUEUE_ERROR;
         }
     }
 
