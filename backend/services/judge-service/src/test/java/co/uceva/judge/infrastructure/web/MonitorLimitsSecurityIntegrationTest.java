@@ -34,7 +34,7 @@ class MonitorLimitsSecurityIntegrationTest {
     static final String SECRET = "una-clave-compartida-de-al-menos-32-bytes!!";
     private static final String URL = "/api/v1/judge/monitor-limits";
     private static final String VALID_BODY =
-            "{\"outputSizeBytes\":2048,\"errorSizeBytes\":4096,\"hardTimePercent\":0.5,\"watchIntervalMs\":100,\"absoluteTimeMs\":5000}";
+            "{\"outputSizeBytes\":2048,\"hardTimePercent\":0.5,\"watchIntervalMs\":100,\"absoluteTimeMs\":5000}";
 
     @Autowired private MockMvc mockMvc;
 
@@ -71,8 +71,7 @@ class MonitorLimitsSecurityIntegrationTest {
     @Test
     void adminCanReadAndUpdate() throws Exception {
         mockMvc.perform(put(URL).header("Authorization", bearer("ADMIN")).contentType(MediaType.APPLICATION_JSON)
-                .content(VALID_BODY)).andExpect(status().isOk()).andExpect(jsonPath("$.outputSizeBytes").value(2048))
-                .andExpect(jsonPath("$.errorSizeBytes").value(4096));
+                .content(VALID_BODY)).andExpect(status().isOk()).andExpect(jsonPath("$.outputSizeBytes").value(2048));
 
         mockMvc.perform(get(URL).header("Authorization", bearer("ADMIN"))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.hardTimePercent").value(0.5))
@@ -83,14 +82,7 @@ class MonitorLimitsSecurityIntegrationTest {
     @Test
     void adminGetsBadRequestForOutOfRangeValue() throws Exception {
         mockMvc.perform(put(URL).header("Authorization", bearer("ADMIN")).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"outputSizeBytes\":1,\"errorSizeBytes\":4096,\"hardTimePercent\":0.5,\"watchIntervalMs\":100,\"absoluteTimeMs\":5000}"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void adminGetsBadRequestForOutOfRangeErrorSize() throws Exception {
-        mockMvc.perform(put(URL).header("Authorization", bearer("ADMIN")).contentType(MediaType.APPLICATION_JSON)
-                .content("{\"outputSizeBytes\":2048,\"errorSizeBytes\":1,\"hardTimePercent\":0.5,\"watchIntervalMs\":100,\"absoluteTimeMs\":5000}"))
+                .content("{\"outputSizeBytes\":1,\"hardTimePercent\":0.5,\"watchIntervalMs\":100,\"absoluteTimeMs\":5000}"))
                 .andExpect(status().isBadRequest());
     }
 

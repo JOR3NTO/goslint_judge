@@ -76,7 +76,7 @@ public class Runner {
             long timeLimit, long memoryLimit) {
 
         MonitorLimits limits = monitorLimitsRepository.find();
-        TestCaseRunner testCaseRunner = new TestCaseRunner(limits.outputSize(), limits.errorSize(), limits.hardTimePercent(),
+        TestCaseRunner testCaseRunner = new TestCaseRunner(limits.outputSize(), limits.hardTimePercent(),
                 limits.watchInterval(), limits.absoluteTimeLimit());
 
         Map<String, Object> result = new HashMap<>();

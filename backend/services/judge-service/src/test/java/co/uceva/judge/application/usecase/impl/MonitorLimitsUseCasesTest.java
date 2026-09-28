@@ -8,7 +8,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import co.uceva.judge.domain.model.MonitorLimits;
 import co.uceva.judge.domain.repository.MonitorLimitsRepository;
 import co.uceva.judge.domain.valueobject.AbsoluteTimeLimit;
-import co.uceva.judge.domain.valueobject.ErrorSizeLimit;
 import co.uceva.judge.domain.valueobject.HardTimePercent;
 import co.uceva.judge.domain.valueobject.OutputSizeLimit;
 import co.uceva.judge.domain.valueobject.WatchIntervalMillis;
@@ -33,7 +32,7 @@ class MonitorLimitsUseCasesTest {
 
     @Test
     void shouldSaveAndReturnNewLimits() {
-        MonitorLimits updated = new MonitorLimits(new OutputSizeLimit(2_048), new ErrorSizeLimit(1_024), new HardTimePercent(0.5f),
+        MonitorLimits updated = new MonitorLimits(new OutputSizeLimit(2_048), new HardTimePercent(0.5f),
                 new WatchIntervalMillis(100), new AbsoluteTimeLimit(5_000));
 
         MonitorLimits result = new UpdateMonitorLimitsUseCaseImpl(repository).execute(updated);
@@ -44,7 +43,7 @@ class MonitorLimitsUseCasesTest {
 
     @Test
     void shouldRejectMissingLimit() {
-        assertThatThrownBy(() -> new MonitorLimits(null, ErrorSizeLimit.ofDefault(), HardTimePercent.ofDefault(), WatchIntervalMillis.ofDefault(),
+        assertThatThrownBy(() -> new MonitorLimits(null, HardTimePercent.ofDefault(), WatchIntervalMillis.ofDefault(),
                 AbsoluteTimeLimit.ofDefault())).isInstanceOf(IllegalArgumentException.class);
     }
 }
