@@ -1,37 +1,52 @@
 package co.uceva.problem.infrastructure.web.controller;
 
-import co.uceva.problem.application.usecase.*;
-import co.uceva.problem.domain.exception.ProblemNotFoundException;
-import co.uceva.problem.domain.model.Problem;
-import co.uceva.problem.fixtures.ProblemFixtures;
-import co.uceva.problem.infrastructure.config.SecurityConfig;
-import co.uceva.problem.infrastructure.web.dto.CreateProblemRequestDTO;
-import co.uceva.problem.infrastructure.web.dto.UpdateProblemRequestDTO;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.web.servlet.MockMvc;
-import jakarta.servlet.ServletException;
-
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import co.uceva.problem.application.usecase.CreateProblemUseCase;
+import co.uceva.problem.application.usecase.DeleteProblemUseCase;
+import co.uceva.problem.application.usecase.GetAllProblemsByTitleUseCase;
+import co.uceva.problem.application.usecase.GetAllProblemsUseCase;
+import co.uceva.problem.application.usecase.GetProblemByIdUseCase;
+import co.uceva.problem.application.usecase.UpdateProblemUseCase;
+import co.uceva.problem.domain.exception.ProblemNotFoundException;
+import co.uceva.problem.fixtures.ProblemFixtures;
+import co.uceva.problem.infrastructure.config.JwtConfig;
+import co.uceva.problem.infrastructure.config.SecurityConfig;
+import co.uceva.problem.infrastructure.web.dto.CreateProblemRequestDTO;
+import co.uceva.problem.infrastructure.web.dto.UpdateProblemRequestDTO;
+import jakarta.servlet.ServletException;
+
 @WebMvcTest(ProblemController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, JwtConfig.class})
+@TestPropertySource(properties = {
+        "app.security.jwt.secret=test-secret-key-at-least-32-bytes-long",
+        "app.security.jwt.issuer=goslint-judge"
+})
 class ProblemControllerTest {
+
 
     @Autowired
     private MockMvc mockMvc;

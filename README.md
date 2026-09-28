@@ -179,9 +179,7 @@ pnpm dev:admin
 
 ### Lo que falta para cerrar el flujo de extremo a extremo
 
-1. **Login en `auth-service`** — hoy no hay quien emita los JWT que el resto valida.
-2. **Filtro JWT para los endpoints HTTP** — las restricciones por rol están escritas pero no se aplican; en local se usa un bypass temporal (`AUTH_BYPASS=true`).
-3. **`judge-service`** — los envíos se encolan correctamente, pero nadie los evalúa todavía.
+1. **`judge-service`** — los envíos se encolan correctamente, pero nadie los evalúa todavía.
 
 ---
 

@@ -1,86 +1,81 @@
 package co.uceva.auth.infrastructure.config;
 
-import co.uceva.auth.application.port.out.PasswordEncoderPort;
+import co.uceva.auth.domain.service.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.stereotype.Component;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/**
- * Clase de Configuración de Spring Security.
- * Define qué rutas son públicas, cuáles requieren autenticación
- * y establece los algoritmos de encriptación para contraseñas.
- */
+import java.util.List;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     /**
-     * Configura el filtro de seguridad de Spring.
-     * Permite el acceso sin token a la ruta de registro.
+     * Origen(es) permitido(s) para CORS. Se lee de application.properties.
+     * Por defecto permite localhost:3000 (frontend Next.js en desarrollo).
+     * Para producción, configurar con la URL real del frontend.
      */
+    @Value("${cors.allowed-origins:http://localhost:3000}")
+    private String allowedOrigins;
+
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(AbstractHttpConfigurer::disable) // Deshabilita CSRF (Cross-Site Request Forgery) ya que usaremos APIs Stateless
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/register").permitAll() // Público para todos
-                .anyRequest().authenticated() // Cualquier otra ruta requiere token (Implementación de Login pendiente)
+                .requestMatchers("/api/v1/auth/**").permitAll()
+                .anyRequest().authenticated()
             );
         return http.build();
     }
 
     /**
-     * Bean de Spring que provee la implementación concreta de encriptación.
-     * Utilizamos BCrypt, estándar actual para hashing de contraseñas.
+     * Configuración de CORS que permite al frontend comunicarse con el backend.
+     * Sin esta configuración, el browser bloquea todas las peticiones cross-origin
+     * del frontend (localhost:3000) al backend (localhost:8081).
      */
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of(allowedOrigins.split(",")));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Content-Type", "Authorization"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 
     /**
-     * Adaptador interno que envuelve el PasswordEncoder de Spring
-     * y lo expone como el PasswordEncoderPort de la capa de aplicación.
-     * Así, el dominio no depende directamente de org.springframework.security.
+     * Implementación concreta del puerto de salida para el encriptador de contraseñas.
+     * Expone una clase anónima que implementa la interfaz del dominio.
      */
-    @Component
-    public static class BCryptPasswordEncoderAdapter implements PasswordEncoderPort {
-        // Inyección de dependencias del PasswordEncoder de Spring.
-        private final PasswordEncoder passwordEncoder;
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new PasswordEncoder() {
+            private final org.springframework.security.crypto.password.PasswordEncoder delegate = new BCryptPasswordEncoder();
 
-        /**
-         * Constructor de la clase.
-         * @param passwordEncoder Implementación concreta de PasswordEncoder de Spring.
-         */
-        public BCryptPasswordEncoderAdapter(PasswordEncoder passwordEncoder) {
-            this.passwordEncoder = passwordEncoder;
-        }
+            @Override
+            public String encode(String rawPassword) {
+                return delegate.encode(rawPassword);
+            }
 
-        /**
-         * Encripta la contraseña usando BCrypt.
-         * @param rawPassword Contraseña en texto plano.
-         * @return Contraseña encriptada.
-         */
-        @Override
-        public String encode(String rawPassword) {
-            return passwordEncoder.encode(rawPassword);
-        }
-
-        /**
-         * Verifica si la contraseña en texto plano coincide con la encriptada.
-         * @param rawPassword Contraseña en texto plano.
-         * @param encodedPassword Contraseña encriptada.
-         * @return true si la contraseña coincide, false en caso contrario.
-         */
-        @Override
-        public boolean matches(String rawPassword, String encodedPassword) {
-            return passwordEncoder.matches(rawPassword, encodedPassword);
-        }
+            @Override
+            public boolean matches(String rawPassword, String encodedPassword) {
+                return delegate.matches(rawPassword, encodedPassword);
+            }
+        };
     }
 }
+

@@ -171,9 +171,9 @@ public class Submission {
      * puede borrar un resultado válido que el estudiante ya vio.
      * </p>
      */
-    public void markSystemError() {
+    public void markEnqueueError() {
         if (this.status != SubmissionStatus.JUDGED) {
-            this.status = SubmissionStatus.SYSTEM_ERROR;
+            this.status = SubmissionStatus.ENQUEUE_ERROR;
         }
     }
 

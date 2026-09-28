@@ -1,8 +1,10 @@
 package co.uceva.submission;
 
 import co.uceva.submission.infrastructure.web.dto.SubmitCodeRequestDTO;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -17,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import co.uceva.shared.domain.ProgrammingLanguage;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -35,7 +39,7 @@ class SubmissionServiceIntegrationTest extends AbstractIntegrationTest {
 
         // 1. Create submission
         SubmitCodeRequestDTO request = new SubmitCodeRequestDTO(
-                teamId, problemId, co.uceva.shared.domain.ProgrammingLanguage.PYTHON, "print(1)"
+                teamId, problemId, ProgrammingLanguage.PYTHON, "print(1)"
         );
         MvcResult createResult = mockMvc.perform(post("/api/v1/submissions")
                         .with(user("student").roles("STUDENT"))

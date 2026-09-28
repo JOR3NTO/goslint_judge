@@ -24,4 +24,4 @@ ALTER TABLE submissions
 
 ALTER TABLE submissions
     ADD CONSTRAINT ck_submissions_status
-    CHECK (status IN ('PENDING', 'QUEUED', 'JUDGING', 'JUDGED', 'SYSTEM_ERROR'));
+    CHECK (status IN ('PENDING', 'QUEUED', 'JUDGING', 'JUDGED', 'ENQUEUE_ERROR'));
