@@ -73,7 +73,7 @@ public class ExhaustedSubmissionDeadLetterListener {
      */
     @RabbitListener(queues = "${app.messaging.submission.judging-dead-letter-queue}")
     public void onJudgingExhausted(SubmissionJudgingStartedEvent event) {
-        markAsSystemError(event.submissionId(),
+        markAsEnqueueError(event.submissionId(),
                 "se agotaron los reintentos de registro del aviso de inicio de evaluación");
     }
 

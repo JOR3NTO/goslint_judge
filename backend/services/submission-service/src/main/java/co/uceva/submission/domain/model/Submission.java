@@ -137,7 +137,7 @@ public class Submission {
      * </p>
      */
     public void markJudging() {
-        if (this.status != SubmissionStatus.JUDGED && this.status != SubmissionStatus.SYSTEM_ERROR) {
+        if (this.status != SubmissionStatus.JUDGED && this.status != SubmissionStatus.ENQUEUE_ERROR) {
             this.status = SubmissionStatus.JUDGING;
         }
     }
