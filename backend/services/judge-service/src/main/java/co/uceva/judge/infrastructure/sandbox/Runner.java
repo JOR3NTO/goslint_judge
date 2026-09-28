@@ -106,7 +106,7 @@ public class Runner {
 
             } catch (IOException | InterruptedException | SandboxExecutionException e) {
                 log.error("Error running solution: " + e.getMessage());
-                result.put("status", VerdictStatus.RUNTIME_ERROR);
+                result.put("status", VerdictStatus.JUDGE_ERROR);
                 result.put("failedTestCase", testCase.id());
                 break;
             } finally {
