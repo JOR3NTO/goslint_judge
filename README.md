@@ -54,7 +54,8 @@ goslint_judge/
 │   └── traefik/              ← Configuración del API Gateway
 │
 └── testing/                  ← Utilidades de prueba manual
-    └── ws-judge-simulator/   ← Simula judge-service para ver el WebSocket en vivo
+    ├── ws-judge-simulator/   ← Simula judge-service para ver el WebSocket en vivo
+    └── integration-runner/   ← Panel web: flujo completo auth → problema → envío → juez
 ```
 
 ---
@@ -165,21 +166,22 @@ pnpm dev:admin
 
 | Componente          | Estado                | Notas                                              |
 |---------------------|-----------------------|----------------------------------------------------|
-| `auth-service`      | 🟡 Parcial            | Solo registro de usuarios. **Falta el login**, y con él la emisión de JWT |
+| `auth-service`      | 🟢 Funcional          | Registro y login implementados. Emite JWT (access 15 min + refresh 8 h). Bloqueo de cuenta por intentos fallidos en Redis. Sin Flyway aún |
 | `problem-service`   | 🟢 Funcional          | CRUD de problemas y casos de prueba, con roles declarados. Falta su migración de Flyway |
 | `submission-service`| 🟢 Funcional          | Envío → RabbitMQ → veredicto → WebSocket, con reintentos y colas de fallidos |
-| `judge-service`     | 🔴 Esqueleto          | Sin implementar; lo simula `testing/ws-judge-simulator/` |
+| `judge-service`     | 🟡 Parcial            | Evalúa Python en sandbox (`bwrap` + cgroups v2). Validado en Manjaro x86_64 y OCI A1-flex ARM. C, C++ y Java pendientes |
 | `feedback-service`  | 🔴 Esqueleto          | Sin implementar                                    |
 | `contest-service`   | 🔴 Esqueleto          | Sin implementar; los equipos se tratan como individuales mientras tanto |
 | `student-app`       | 🟢 UI base lista      | Landing, Login, Register, Contests migrados        |
 | `admin-app`         | 🔴 Pendiente          | Placeholder - en construcción                      |
-| `docker-compose`    | 🟢 Listo              | Levanta PostgreSQL y RabbitMQ                      |
+| `docker-compose`    | 🟢 Listo              | Levanta PostgreSQL y RabbitMQ; perfil `sandbox` levanta `judge-service` |
 | `traefik`           | 🔴 Pendiente          | `traefik.yml` aún vacío                            |
 | `Gradle Wrapper`    | 🟢 Listo              | `./gradlew` disponible en `backend/`               |
 
 ### Lo que falta para cerrar el flujo de extremo a extremo
 
-1. **`judge-service`** — los envíos se encolan correctamente, pero nadie los evalúa todavía.
+1. **Lenguajes en `judge-service`** — Python funciona; C, C++ y Java requieren el compilador (`Compiler`), que va en otra HU.
+2. **Detección de MLE** — en kernels modernos el OOM killer sale con EXIT=0; `TestCaseRunner` debe usar `oom_kill` de `memory.events` en lugar de comparar `memory.peak > memory.max`.
 
 ---
 

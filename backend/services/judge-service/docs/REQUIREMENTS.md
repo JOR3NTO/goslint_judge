@@ -50,6 +50,8 @@ Si alguno falla, ver la sección correspondiente.
 
 ## Entorno en el que se validó
 
+### Validación 1 — prototipo (aarch64)
+
 | Elemento | Valor |
 |---|---|
 | Arquitectura | aarch64 |
@@ -58,10 +60,52 @@ Si alguno falla, ver la sección correspondiente.
 | Imagen base | `ubuntu:24.04` |
 | Capabilities efectivas del usuario | 0 (`CapEff: 0000000000000000`) |
 | `Privileged` / `CapAdd` | `false` / `[]` |
+| Humo | filtro seccomp 19/19, `prueba_humo.sh` 17/17 |
 
-> Lo validado fue el prototipo del sandbox. Su `Dockerfile`, entrypoint, generador de seccomp y pruebas de humo ya están integrados en [`services/judge-service/docker/`](../docker/), pero la imagen empaqueta ahora además el propio `judge-service`, y **esa imagen todavía no se ha ejecutado sobre una `goslint.slice` real**.
+Esta validación cubrió el prototipo `goslint-sandbox` antes de integrar el `judge-service` en la imagen. Su resultado sigue vigente para el sandbox aislado.
 
-**No validado:** hosts x86_64, Ubuntu 22.04 con HWE, Docker Desktop, y cualquier carga con Java o C++.
+### Validación 2 — integración completa (x86_64, `goslint.slice` real)
+
+| Elemento | Valor |
+|---|---|
+| Arquitectura | x86_64 |
+| Distro del host | Manjaro Linux |
+| Kernel del host | `6.18.49-1-MANJARO` |
+| cgroup | v2 (`cgroup2fs`) |
+| Driver cgroup de Docker | `systemd` |
+| Docker Engine | 29.7.2 (nativo, sin Desktop) |
+| Imagen base | `ubuntu:24.04` |
+| `Privileged` / `CapAdd` | `false` / `[]` |
+| `cgroupParent` | `goslint.slice` |
+| `cgroupns` | `host` |
+| `goslint.slice` | unit file en `/etc/systemd/system/` — persistente tras reinicio |
+| `subtree_control` | `cpuset cpu io memory hugetlb pids rdma misc dmem` |
+| Delegación al arrancar | `[entrypoint] delegacion de cgroups OK (/cg)` |
+| Humo (`prueba_humo.sh`) | **16 OK, 1 FALLO** (ver nota) |
+| Flujo de integración | envío Python → `ACCEPTED` (7 ms, 3 328 KB) |
+
+> **Nota sobre el FALLO en prueba_humo.sh:** el test de límite de memoria espera que el proceso muera por OOM (exit ≠ 0) cuando `memory.peak > memory.max`, pero en este host el kernel mata el proceso vía OOM pero lo registra en `memory.events` (`oom_kill`) y el proceso sale con EXIT=0. El límite sí se aplica; la detección de MLE debe usar el contador `oom_kill` de `memory.events`, **no** comparar `memory.peak > memory.max`. El test de la prueba de humo asume la segunda estrategia.
+
+### Validación 3 — integración completa (aarch64, OCI Always Free A1-flex)
+
+| Elemento | Valor |
+|---|---|
+| Arquitectura | aarch64 |
+| Proveedor | Oracle Cloud Infrastructure — Always Free Tier |
+| Instancia | A1-flex (Ampere) |
+| Distro del host | Ubuntu |
+| Kernel del host | `6.8.0-xxxx-oracle` (familia Oracle, mismo árbol que Validación 1) |
+| cgroup | v2 (`cgroup2fs`) |
+| Driver cgroup de Docker | `systemd` |
+| Docker Engine | nativo (sin Desktop) |
+| Imagen base | `ubuntu:24.04` |
+| `Privileged` / `CapAdd` | `false` / `[]` |
+| `cgroupParent` | `goslint.slice` |
+| `cgroupns` | `host` |
+| `goslint.slice` | unit file persistente (`/etc/systemd/system/`) |
+| Flujo de integración | envío Python → `ACCEPTED` |
+
+> **Relación con Validación 1:** Validación 1 cubrió el prototipo `goslint-sandbox` en este mismo entorno (OCI A1-flex, kernel `6.8.0-1060-oracle`) antes de integrar `judge-service`. Validación 3 confirma que el **flujo end-to-end completo** (submission → RabbitMQ → judge → veredicto) funciona en la misma instancia una vez integrado el servicio.
 
 ---
 
@@ -310,18 +354,26 @@ Si bwrap falla al crear el namespace (por ejemplo, `setting up uid map: Permissi
 
 ## 10. Estado de la validación y pendientes
 
-**Comprobado** en un host aarch64 con kernel `6.8.0-1060-oracle`, sobre el prototipo `goslint-sandbox`: la imagen construye, la delegación de cgroups funciona, el filtro seccomp pasa 19 de 19, las pruebas de humo dan 17 de 17, y el contenedor no es privilegiado ni tiene capabilities añadidas.
+### Validado
 
-**Pendiente:**
+**Validación 1 (aarch64, prototipo):** imagen construye, delegación de cgroups funciona, filtro seccomp 19/19, `prueba_humo.sh` 17/17, contenedor sin privilegios ni capabilities.
 
-1. **Levantar la imagen sobre una `goslint.slice` real** y repetir `prueba_humo.sh`. La imagen construye y su filtro seccomp pasa las 19 comprobaciones, pero el código de `infrastructure/sandbox` nunca se ha ejecutado contra cgroups de verdad.
+**Validación 2 (x86_64, integración completa):** imagen con `judge-service` levantada sobre una `goslint.slice` real en Manjaro (kernel 6.18.49, Docker Engine 29.7.2 nativo, driver `systemd`). Resultado de `prueba_humo.sh`: **16 OK, 1 FALLO** (ver tabla de entorno). Flujo de integración end-to-end completo: submission-service → RabbitMQ → judge → veredicto `ACCEPTED` (Python, 7 ms, 3 328 KB).
+
+**Validación 3 (aarch64, OCI A1-flex, integración completa):** flujo end-to-end confirmado en instancia Ubuntu OCI Always Free Tier A1-flex (Ampere, aarch64), con `judge-service` en Docker Engine nativo, `goslint.slice` real y `cgroupns=host`. Mismo entorno donde se realizó la Validación 1 del prototipo; ahora con el servicio completo.
+
+**Hallazgo sobre detección de MLE:** en el kernel `6.18.49`, cuando el programa supera `memory.max`, el OOM killer actúa pero el proceso sale con EXIT=0. La detección de MLE **no puede basarse** en `memory.peak > memory.max`; debe leer el contador `oom_kill` de `memory.events`. Registrado como pendiente de ajuste en `TestCaseRunner`.
+
+### Pendiente
+
+1. **Ajustar `TestCaseRunner`** para detectar MLE leyendo `oom_kill` en `memory.events` en lugar de comparar `memory.peak > memory.max`. Actualizar `prueba_humo.sh` en consecuencia.
 2. **Control de `systempaths=unconfined`:** quitar el flag, recrear el contenedor y repetir las pruebas. Si el primer check falla al montar `/proc`, el flag es necesario; si pasa, se puede eliminar.
 3. Java y C++ dentro del sandbox, con el filtro seccomp y los montajes que necesiten.
 4. Métricas de una ejecución mientras otra consume CPU a fondo, y carga concurrente sostenida.
 5. `pids.max` adecuado para la JVM.
-6. Topes globales en la slice (`MemoryMax`, `TasksMax`) y el drop-in de arranque de Docker.
-7. Un host x86_64.
-8. Perfil AppArmor propio como alternativa a `apparmor=unconfined`.
+6. Topes globales en la slice (`MemoryMax`, `TasksMax`) y el drop-in de arranque de Docker (sección 4.3).
+7. Perfil AppArmor propio como alternativa a `apparmor=unconfined`.
+8. Fijar `memory.swap.max=0` en cada hoja para evitar que el exceso se pague en disco (sección 8).
 
 ---
 

@@ -162,7 +162,7 @@ Candidatos a residir aquí:
 | `auth-service` | 8081 | 🟢 Funcional | Registro de usuarios (`POST /register`) y Login (`POST /login`) implementados. Emite JWT (Access Token 15 min y Refresh Token 8h). Implementa bloqueo de cuenta por intentos fallidos usando Redis. Esquema aún con `ddl-auto=update`, sin Flyway. Falta filtro JWT para rutas protegidas. |
 | `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Falta el filtro JWT y su migración base de Flyway |
 | `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción del envío, encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Esquema versionado con Flyway (`V1`–`V3`). Es el único servicio que **autentica de verdad**, y solo en el handshake del WebSocket |
-| `judge-service` | 8084 | 🟡 Parcial | Dominio, aplicación e infraestructura completos: consume `submission.evaluate`, obtiene casos de prueba y límites de `problem-service` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) y publica el veredicto en `submission.judged`. **Solo evalúa Python**: el `Compiler` (C, C++, Java) va en otra HU, y esos lenguajes terminan como `SYSTEM_ERROR`. El JWT `SERVICE` hacia `problem-service` lo firma el propio juez con el secreto compartido. Se despliega en su propia imagen con `bubblewrap` y seccomp (perfil `sandbox` del compose) |
+| `judge-service` | 8084 | 🟡 Parcial | Dominio, aplicación e infraestructura completos: consume `submission.evaluate`, obtiene casos de prueba y límites de `problem-service` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) y publica el veredicto en `submission.judged`. **Solo evalúa Python**: el `Compiler` (C, C++, Java) va en otra HU, y esos lenguajes terminan como `ENQUEUE_ERROR` tras agotar los reintentos. El JWT `SERVICE` hacia `problem-service` lo firma el propio juez con el secreto compartido. Validado end-to-end en Manjaro x86_64 y en Ubuntu OCI A1-flex aarch64. Se despliega en su propia imagen con `bubblewrap` y seccomp (perfil `sandbox` del compose) |
 | `feedback-service` | 8085 | 🔴 Esqueleto | Solo la clase de arranque |
 | `contest-service` | 8086 | 🔴 Esqueleto | Solo la clase de arranque. Mientras no exista, `submission-service` resuelve cada equipo como individual mediante `NoOpTeamMembershipAdapter` |
 
@@ -351,6 +351,8 @@ Detalles que conviene conocer antes de desplegar sobre una base de datos ya exis
 sudo cp infrastructure/systemd/goslint.slice /etc/systemd/system/ && sudo systemctl enable --now goslint.slice
 JWT_SECRET=<mínimo 32 bytes> docker compose --profile sandbox up -d --build judge-service
 ```
+
+La imagen es **multi-arch**: construye y funciona en x86_64 y en aarch64. Validado en Manjaro Linux (x86_64, kernel 6.18.49, Docker Engine 29.7.2) y en Ubuntu sobre Oracle Cloud A1-flex (aarch64, kernel familia 6.8-oracle). Ver [`REQUIREMENTS.md`](./services/judge-service/docs/REQUIREMENTS.md) para los requisitos del host en cada arquitectura.
 
 **Endpoints de `judge-service`:**
 
@@ -741,4 +743,4 @@ Antes de enviar cambios en cualquier microservicio, verificar:
 
 ---
 
-*Documento generado el 2026-06-10; última actualización el 2026-09-05. Actualizar cuando cambien decisiones arquitectónicas.*
+*Documento generado el 2026-06-10; última actualización el 2026-09-28. Actualizar cuando cambien decisiones arquitectónicas.*
