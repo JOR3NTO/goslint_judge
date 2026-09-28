@@ -2,7 +2,7 @@ package co.uceva.submission.application.usecase.impl;
 
 import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.submission.application.event.SubmissionStatusChangedEvent;
-import co.uceva.submission.application.usecase.MarkSubmissionSystemErrorUseCase;
+import co.uceva.submission.application.usecase.MarkSubmissionEnqueueErrorUseCase;
 import co.uceva.submission.domain.exception.SubmissionNotFoundException;
 import co.uceva.submission.domain.model.Submission;
 import co.uceva.submission.domain.repository.SubmissionRepository;
@@ -24,9 +24,9 @@ import java.util.UUID;
  * </p>
  */
 @Service
-public class MarkSubmissionSystemErrorUseCaseImpl implements MarkSubmissionSystemErrorUseCase {
+public class MarkSubmissionEnqueueErrorUseCaseImpl implements MarkSubmissionEnqueueErrorUseCase {
 
-    private static final Logger log = LoggerFactory.getLogger(MarkSubmissionSystemErrorUseCaseImpl.class);
+    private static final Logger log = LoggerFactory.getLogger(MarkSubmissionEnqueueErrorUseCaseImpl.class);
 
     private final SubmissionRepository submissionRepository;
     private final ApplicationEventPublisher applicationEventPublisher;
@@ -37,7 +37,7 @@ public class MarkSubmissionSystemErrorUseCaseImpl implements MarkSubmissionSyste
      * @param submissionRepository      Puerto de salida para consultar y persistir envíos.
      * @param applicationEventPublisher Publicador de eventos internos de la aplicación.
      */
-    public MarkSubmissionSystemErrorUseCaseImpl(SubmissionRepository submissionRepository,
+    public MarkSubmissionEnqueueErrorUseCaseImpl(SubmissionRepository submissionRepository,
             ApplicationEventPublisher applicationEventPublisher) {
         this.submissionRepository = submissionRepository;
         this.applicationEventPublisher = applicationEventPublisher;
@@ -62,8 +62,8 @@ public class MarkSubmissionSystemErrorUseCaseImpl implements MarkSubmissionSyste
         Submission submission = submissionRepository.findById(submissionId)
                 .orElseThrow(() -> new SubmissionNotFoundException(submissionId));
 
-        submission.markSystemError();
-        if (submission.getStatus() != SubmissionStatus.SYSTEM_ERROR) {
+        submission.markEnqueueError();
+        if (submission.getStatus() != SubmissionStatus.ENQUEUE_ERROR) {
             log.warn("El envío {} ya tenía veredicto; se ignora el aviso de fallo de evaluación: {}",
                     submissionId, reason);
             return submission;
