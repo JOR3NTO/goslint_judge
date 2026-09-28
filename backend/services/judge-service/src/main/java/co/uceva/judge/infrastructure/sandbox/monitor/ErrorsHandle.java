@@ -16,20 +16,14 @@ import co.uceva.judge.infrastructure.sandbox.kill.CgroupKiller;
 
 /**
  * Hilo que consume el flujo de error estándar (stderr) del proceso en ejecución
- * dentro del sandbox. Acumula la salida de error, detecta patrones de errores
- * de tiempo de ejecución y, en caso de superar el tamaño máximo permitido o de
- * detectar un error en ejecución, termina el cgroup del proceso.
+ * dentro del sandbox. Valida cada línea contra los patrones de errores en
+ * tiempo de ejecución sin retener la salida ya procesada y, al detectar un
+ * error en ejecución, termina el cgroup del proceso.
  */
 public class ErrorsHandle extends Thread {
     private static final Logger log = LoggerFactory.getLogger(ErrorsHandle.class);
     /** Flujo de error estándar (stderr) del proceso. */
     private final InputStream inputStream;
-    /** Tamaño máximo en bytes permitido para la salida de error. */
-    private final long maxErrorsSize;
-    /** Acumulador de la salida de error leída hasta el momento. */
-    private final StringBuilder errorsBuilder = new StringBuilder();
-    /** Indica si la salida de error acumulada coincide con un patrón de error en ejecución. */
-    private boolean hasErrors;
     /** Instancia del asistente para matar el cgroup del proceso. */
     private final CgroupKiller cgroupKiller;
     /** Indica si el proceso fue terminado por detectarse un error en tiempo de ejecución. */
@@ -42,45 +36,48 @@ public class ErrorsHandle extends Thread {
      *
      * @param cgLeafPath    Ruta del cgroup del proceso, usada para terminarlo si es necesario.
      * @param inputStream   Flujo de error estándar (stderr) del proceso.
-     * @param maxErrorsSize Tamaño máximo en bytes permitido para la salida de error.
      */
-    public ErrorsHandle(Path cgLeafPath, InputStream inputStream, long maxErrorsSize) {
+    public ErrorsHandle(Path cgLeafPath, InputStream inputStream) {
         this.inputStream = inputStream;
-        this.maxErrorsSize = maxErrorsSize;
         this.cgroupKiller = new CgroupKiller(cgLeafPath);
     }
 
     /**
      * Lee de forma continua el flujo de error del proceso mientras este siga vivo.
-     * Si el total de bytes leídos supera {@code maxErrorsSize} o la salida acumulada
-     * coincide con algún patrón de error en tiempo de ejecución definido en
-     * {@link ErrorsHandlePredicate}, marca el proceso como terminado por error y
-     * fuerza la finalización del cgroup.
+     * Los patrones de {@link ErrorsHandlePredicate} solo pueden coincidir dentro de
+     * una única línea, así que no hace falta conservar la salida completa: se
+     * valida cada línea completa contra ellos en cuanto llega y se descarta,
+     * reteniendo únicamente el fragmento incompleto de la última línea en espera
+     * de su salto de línea. Si alguna línea coincide con un patrón de error en
+     * tiempo de ejecución, marca el proceso como terminado por error y fuerza la
+     * finalización del cgroup.
      */
     @Override
     public void run() {
         try {
             byte[] buffer = new byte[1024];
             int bytesRead;
-            long totalBytesRead = 0;
+            String pendingLine = "";
 
             while ((bytesRead = inputStream.read(buffer)) != -1) {
-                totalBytesRead += bytesRead;
-                errorsBuilder.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
-                List<String> lines = Arrays.asList(errorsBuilder.toString().split("\n"));
-                boolean isSandboxFailure = lines.stream().anyMatch(ErrorsHandlePredicate.SANDBOX_FAILURE);
-                hasErrors = lines.stream().anyMatch(ErrorsHandlePredicate.ERROR_RUNTIME);
+                pendingLine += new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+                List<String> lines = Arrays.asList(pendingLine.split("\n", -1));
+                // El último elemento es el fragmento sin salto de línea aún: se conserva para la siguiente lectura.
+                pendingLine = lines.get(lines.size() - 1);
+                List<String> completedLines = lines.subList(0, lines.size() - 1);
+
+                boolean isSandboxFailure = completedLines.stream().anyMatch(ErrorsHandlePredicate.SANDBOX_FAILURE);
+                boolean hasErrors = completedLines.stream().anyMatch(ErrorsHandlePredicate.ERROR_RUNTIME);
                 if (isSandboxFailure) {
                     isSandboxErrorKilled.set(true);
                     cgroupKiller.killCgroup();
                     break;
                 }
-                if (totalBytesRead > maxErrorsSize || hasErrors) {
+                if (hasErrors) {
                     isRuntimeErrorKilled.set(true);
                     cgroupKiller.killCgroup();
                     break;
                 }
-
             }
         } catch (IOException e) {
             log.error("Error reading process output: {}", e.getMessage(), e);
