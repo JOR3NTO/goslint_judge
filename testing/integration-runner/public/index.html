@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Probador de Integración · goslint-judge</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header>
+  <h1>Probador de Integración</h1>
+  <p class="subtitle">Flujo completo: auth → problema → envío → juez → resultado en vivo.</p>
+</header>
+
+<div class="service-bar">
+  <div class="service-item">
+    <span class="dot dot-unknown" id="dot-auth"></span>
+    <span>auth-service <code>:8081</code></span>
+  </div>
+  <div class="service-item">
+    <span class="dot dot-unknown" id="dot-problem"></span>
+    <span>problem-service <code>:8082</code></span>
+  </div>
+  <div class="service-item">
+    <span class="dot dot-unknown" id="dot-submission"></span>
+    <span>submission-service <code>:8083</code></span>
+  </div>
+  <div class="service-item">
+    <span class="dot dot-unknown" id="dot-judge"></span>
+    <span>judge-service <code>:8084</code></span>
+  </div>
+  <button type="button" id="btn-health" class="btn-small">Verificar servicios</button>
+</div>
+
+<main>
+
+  <!-- ── Panel 1: Configuración ─────────────────────────────── -->
+  <section class="panel">
+    <h2>1. Configuración</h2>
+    <p class="hint">JWT_SECRET es necesario para firmar tokens en el navegador. Debe coincidir con el de <code>backend/services/submission-service/.env</code>.</p>
+    <div class="grid">
+      <label class="full">
+        JWT_SECRET (hex o texto, mín 32 bytes)
+        <input id="jwt-secret" type="text"
+               placeholder="1004d399e8881577d2024c2a04ee4eff039afec96ea9a54fff8833d8a140639f" />
+      </label>
+      <label>
+        JWT Issuer
+        <input id="jwt-issuer" type="text" value="goslint-judge" />
+      </label>
+      <label>
+        TTL del token (segundos)
+        <input id="jwt-ttl" type="number" value="3600" min="60" />
+      </label>
+    </div>
+  </section>
+
+  <!-- ── Panel 2: Auth ──────────────────────────────────────── -->
+  <section class="panel">
+    <h2>2. Auth — token del estudiante</h2>
+    <div class="panel-tabs">
+      <button type="button" class="tab-btn active" data-tab="tab-login">Login</button>
+      <button type="button" class="tab-btn" data-tab="tab-register">Registro</button>
+      <button type="button" class="tab-btn" data-tab="tab-manual">JWT manual</button>
+    </div>
+
+    <!-- Login -->
+    <div class="tab-pane active" id="tab-login">
+      <div class="grid">
+        <label>Email <input id="login-email" type="email" placeholder="user@example.com" /></label>
+        <label>Contraseña <input id="login-pass" type="password" placeholder="Contraseña123!" /></label>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-login" class="primary">Iniciar sesión</button>
+        <span id="login-status" class="status status-offline">Sin sesión</span>
+      </div>
+    </div>
+
+    <!-- Registro -->
+    <div class="tab-pane" id="tab-register">
+      <div class="grid">
+        <label>Nombre <input id="reg-fname" type="text" value="Test" /></label>
+        <label>Apellido <input id="reg-lname" type="text" value="User" /></label>
+        <label>Username <input id="reg-username" type="text" placeholder="testuser42" /></label>
+        <label>Email <input id="reg-email" type="email" placeholder="test@example.com" /></label>
+        <label>Contraseña <input id="reg-pass" type="text" value="Testpass123!" /></label>
+        <label>Institución <input id="reg-inst" type="text" value="UCEVA" /></label>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-register" class="primary">Registrar</button>
+        <span id="register-status" class="status status-offline">Sin cuenta</span>
+      </div>
+    </div>
+
+    <!-- JWT manual -->
+    <div class="tab-pane" id="tab-manual">
+      <p class="hint">Firma un JWT directamente en el navegador sin necesidad de auth-service.</p>
+      <div class="grid">
+        <label>
+          userId (UUID del sujeto)
+          <div class="input-with-button">
+            <input id="manual-user-id" type="text" placeholder="UUID" />
+            <button type="button" id="btn-manual-uuid">Generar</button>
+          </div>
+        </label>
+        <label>
+          Rol
+          <select id="manual-role">
+            <option value="STUDENT" selected>STUDENT</option>
+            <option value="ADMIN">ADMIN</option>
+            <option value="ORGANIZER">ORGANIZER</option>
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-manual-sign" class="primary">Firmar JWT</button>
+      </div>
+    </div>
+
+    <!-- Token display (shared) -->
+    <div id="auth-result" hidden>
+      <hr class="divider" />
+      <div class="result-box">
+        <div>
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:2px;">userId</div>
+          <code id="display-user-id">—</code>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:2px;">Access Token (inicio)</div>
+          <code id="display-token-short">—</code>
+        </div>
+        <button type="button" id="btn-copy-token">Copiar token</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Panel 3: Problema ──────────────────────────────────── -->
+  <section class="panel">
+    <h2>3. Problema</h2>
+    <p class="hint">Requiere rol <strong>ADMIN</strong> u <strong>ORGANIZER</strong>. Si el token actual es STUDENT, se firma un JWT de ADMIN automáticamente con el JWT_SECRET del panel 1.</p>
+
+    <div class="grid">
+      <label>
+        createdBy (UUID)
+        <div class="input-with-button">
+          <input id="prob-created-by" type="text" placeholder="UUID del creador" />
+          <button type="button" id="btn-sync-creator">= userId</button>
+        </div>
+      </label>
+      <label>
+        Título
+        <input id="prob-title" type="text" value="Suma de dos números" />
+      </label>
+      <label class="full">
+        Enunciado
+        <textarea id="prob-statement" rows="3">Dado dos enteros a y b, imprimir su suma.</textarea>
+      </label>
+      <label>timeLimitMs <input id="prob-time" type="number" value="2000" /></label>
+      <label>memoryLimitKb <input id="prob-memory" type="number" value="65536" /></label>
+      <label>Dificultad (800-3500) <input id="prob-diff" type="number" value="800" min="800" max="3500" /></label>
+    </div>
+    <div class="actions">
+      <button type="button" id="btn-create-problem" class="primary">Crear problema</button>
+    </div>
+
+    <div id="problem-result" hidden>
+      <hr class="divider" />
+      <div class="result-box">
+        <div>
+          <span style="font-size:11px;color:var(--text-dim);">Problem ID</span><br/>
+          <code id="display-problem-id">—</code>
+        </div>
+        <button type="button" id="btn-copy-problem-id">Copiar</button>
+      </div>
+
+      <hr class="divider" />
+      <h3 style="font-size:14px;margin:0 0 10px;">Agregar caso de prueba</h3>
+      <div class="grid">
+        <label>Entrada<textarea id="tc-input" rows="3">1 2</textarea></label>
+        <label>Salida esperada<textarea id="tc-output" rows="3">3</textarea></label>
+        <label>Orden <input id="tc-order" type="number" value="1" /></label>
+        <label class="checkbox">
+          <input id="tc-sample" type="checkbox" checked />
+          Caso de muestra (visible)
+        </label>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-add-tc" class="primary">Agregar caso de prueba</button>
+      </div>
+      <div id="tc-list" class="tc-list"></div>
+    </div>
+  </section>
+
+  <!-- ── Panel 4: Enviar código ─────────────────────────────── -->
+  <section class="panel">
+    <h2>4. Enviar código</h2>
+    <div class="grid">
+      <label>
+        teamId
+        <div class="input-with-button">
+          <input id="sub-team-id" type="text" placeholder="UUID del equipo" />
+          <button type="button" id="btn-sync-team">= userId</button>
+        </div>
+      </label>
+      <label>
+        problemId
+        <div class="input-with-button">
+          <input id="sub-problem-id" type="text" placeholder="UUID del problema" />
+          <button type="button" id="btn-sync-problem">= paso 3</button>
+        </div>
+      </label>
+      <label>
+        Lenguaje
+        <select id="sub-language">
+          <option value="PYTHON" selected>PYTHON (único implementado)</option>
+          <option value="C">C</option>
+          <option value="CPP">CPP</option>
+          <option value="JAVA">JAVA</option>
+        </select>
+      </label>
+      <label class="full">
+        Código fuente
+        <textarea id="sub-code" rows="5">a, b = map(int, input().split())
+print(a + b)</textarea>
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" id="btn-submit" class="primary">Enviar</button>
+    </div>
+
+    <div id="submission-result" hidden>
+      <hr class="divider" />
+      <div class="result-box">
+        <div>
+          <span style="font-size:11px;color:var(--text-dim);">Submission ID</span><br/>
+          <code id="display-submission-id">—</code>
+        </div>
+        <span id="submission-badge" class="card-badge badge-pending">PENDING</span>
+        <button type="button" id="btn-poll">Sondear estado</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Panel 5: Estado en vivo (WebSocket) ────────────────── -->
+  <section class="panel">
+    <h2>5. Estado en vivo — WebSocket</h2>
+    <div class="grid">
+      <label>
+        URL del WebSocket
+        <input id="ws-url" type="text" value="ws://localhost:8083/ws/submissions" />
+      </label>
+      <label>
+        Subprotocolo
+        <input id="ws-subprotocol" type="text" value="goslint-judge" />
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" id="btn-ws-connect" class="primary">Conectar</button>
+      <button type="button" id="btn-ws-disconnect" disabled>Desconectar</button>
+      <span id="ws-status" class="status status-offline">Desconectado</span>
+    </div>
+
+    <hr class="divider" />
+    <div id="cards" class="cards">
+      <p class="empty">Aún no hay envíos que seguir.</p>
+    </div>
+  </section>
+
+  <!-- ── Panel 6: Log ───────────────────────────────────────── -->
+  <section class="panel">
+    <h2>6. Registro de eventos</h2>
+    <pre id="log"></pre>
+  </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
