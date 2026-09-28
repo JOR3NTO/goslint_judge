@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class MarkSubmissionSystemErrorUseCaseImplTest {
+class MarkSubmissionEnqueueErrorUseCaseImplTest {
 
     @Mock
     private SubmissionRepository submissionRepository;
@@ -35,14 +35,14 @@ class MarkSubmissionSystemErrorUseCaseImplTest {
     private ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks
-    private MarkSubmissionSystemErrorUseCaseImpl useCase;
+    private MarkSubmissionEnqueueErrorUseCaseImpl useCase;
 
     /**
      * Sin este cierre, un envío que el juez nunca consigue evaluar se quedaría
      * indefinidamente aparentando estar en cola.
      */
     @Test
-    void shouldCloseTheSubmissionWithSystemErrorWhenRetriesAreExhausted() {
+    void shouldCloseTheSubmissionWithEnqueueErrorWhenRetriesAreExhausted() {
         Submission submission = SubmissionFixtures.aSubmission(
                 SubmissionFixtures.SUBMISSION_ID, SubmissionStatus.QUEUED);
         when(submissionRepository.findById(submission.getId())).thenReturn(Optional.of(submission));
@@ -50,7 +50,7 @@ class MarkSubmissionSystemErrorUseCaseImplTest {
 
         Submission result = useCase.execute(submission.getId(), "el juez agotó los reintentos");
 
-        assertThat(result.getStatus()).isEqualTo(SubmissionStatus.SYSTEM_ERROR);
+        assertThat(result.getStatus()).isEqualTo(SubmissionStatus.ENQUEUE_ERROR);
         verify(submissionRepository).save(submission);
     }
 
@@ -83,7 +83,7 @@ class MarkSubmissionSystemErrorUseCaseImplTest {
         ArgumentCaptor<SubmissionStatusChangedEvent> event =
                 ArgumentCaptor.forClass(SubmissionStatusChangedEvent.class);
         verify(applicationEventPublisher).publishEvent(event.capture());
-        assertThat(event.getValue().submission().getStatus()).isEqualTo(SubmissionStatus.SYSTEM_ERROR);
+        assertThat(event.getValue().submission().getStatus()).isEqualTo(SubmissionStatus.ENQUEUE_ERROR);
     }
 
     /**

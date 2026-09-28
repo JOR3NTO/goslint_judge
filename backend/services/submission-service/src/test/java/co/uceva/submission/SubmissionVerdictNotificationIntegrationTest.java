@@ -6,7 +6,7 @@ import co.uceva.shared.domain.VerdictStatus;
 import co.uceva.submission.application.port.out.SubmissionStatusNotifier;
 import co.uceva.submission.application.port.out.TeamDTO;
 import co.uceva.submission.application.port.out.TeamMembershipPort;
-import co.uceva.submission.application.usecase.MarkSubmissionSystemErrorUseCase;
+import co.uceva.submission.application.usecase.MarkSubmissionEnqueueErrorUseCase;
 import co.uceva.submission.application.usecase.SubmitCodeUseCase;
 import co.uceva.submission.application.usecase.UpdateSubmissionVerdictUseCase;
 import co.uceva.submission.application.usecase.UpdateSubmissionVerdictUseCase.UpdateSubmissionVerdictCommand;
@@ -50,7 +50,7 @@ class SubmissionVerdictNotificationIntegrationTest extends AbstractIntegrationTe
     private UpdateSubmissionVerdictUseCase updateSubmissionVerdictUseCase;
 
     @Autowired
-    private MarkSubmissionSystemErrorUseCase markSubmissionSystemErrorUseCase;
+    private MarkSubmissionEnqueueErrorUseCase markSubmissionEnqueueErrorUseCase;
 
     @Autowired
     private SubmissionRepository submissionRepository;
@@ -115,22 +115,22 @@ class SubmissionVerdictNotificationIntegrationTest extends AbstractIntegrationTe
      * queda colgado y su nuevo estado viaja por el mismo canal.
      */
     @Test
-    void shouldMarkSystemErrorAndNotifyItThroughTheSameChannel() {
+    void shouldMarkEnqueueErrorAndNotifyItThroughTheSameChannel() {
         UUID teamId = UUID.randomUUID();
         UUID integrante = UUID.randomUUID();
         when(teamMembershipPort.findTeam(teamId)).thenReturn(new TeamDTO(teamId, List.of(integrante)));
         Submission submission = givenASubmission(teamId);
         clearInvocations(submissionStatusNotifier);
 
-        markSubmissionSystemErrorUseCase.execute(submission.getId(), "el juez agotó los reintentos");
+        markSubmissionEnqueueErrorUseCase.execute(submission.getId(), "el juez agotó los reintentos");
 
         Submission persisted = submissionRepository.findById(submission.getId()).orElseThrow();
-        assertThat(persisted.getStatus()).isEqualTo(SubmissionStatus.SYSTEM_ERROR);
+        assertThat(persisted.getStatus()).isEqualTo(SubmissionStatus.ENQUEUE_ERROR);
         assertThat(persisted.getVerdict()).isEqualTo(VerdictStatus.PENDING);
 
         ArgumentCaptor<Submission> notificado = ArgumentCaptor.forClass(Submission.class);
         verify(submissionStatusNotifier).notifyStatusChanged(notificado.capture(), anyList());
-        assertThat(notificado.getValue().getStatus()).isEqualTo(SubmissionStatus.SYSTEM_ERROR);
+        assertThat(notificado.getValue().getStatus()).isEqualTo(SubmissionStatus.ENQUEUE_ERROR);
     }
 
     /**

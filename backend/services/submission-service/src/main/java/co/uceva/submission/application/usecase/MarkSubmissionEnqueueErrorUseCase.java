@@ -14,7 +14,7 @@ import java.util.UUID;
  * llegar.
  * </p>
  */
-public interface MarkSubmissionSystemErrorUseCase {
+public interface MarkSubmissionEnqueueErrorUseCase {
 
     /**
      * Marca el envío con un estado de error del sistema y señala el cambio para
