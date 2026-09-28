@@ -124,6 +124,22 @@ public final class ErrorsHandlePredicate {
     );
 
     /**
+     * Fallos propios de {@code bwrap} al preparar o lanzar el sandbox (montajes,
+     * namespaces, seccomp, o el {@code execvp} del intérprete), por ejemplo:
+     * bwrap: Can't bind mount /usr on /newroot/usr: Permission denied
+     * bwrap: execvp python3: No such file or directory
+     * bwrap: Creating new namespace failed
+     * <p>
+     * No son un error del código del estudiante sino del propio juez: se
+     * distinguen del resto de patrones porque {@code bwrap} siempre antepone
+     * su propio nombre al mensaje.
+     * </p>
+     */
+    private static final Pattern BWRAP_FAILURE = Pattern.compile(
+        "(?m)^\\s*bwrap:\\s*.+$"
+    );
+
+    /**
      * Predicado agregado que evalúa una línea de la salida de error contra
      * todos los patrones definidos (Java, Python, C/C++ y fallos del sistema)
      * y determina si dicha línea corresponde a un error de tiempo de ejecución.
@@ -146,5 +162,23 @@ public final class ErrorsHandlePredicate {
             || SANITIZER_FAILURE.matcher(text).find()
             || C_CPP_RUNTIME_ERROR.matcher(text).find()
             || SYSTEM_FAILURE.matcher(text).find();
+    };
+
+    /**
+     * Predicado que evalúa si una línea de la salida de error corresponde a un
+     * fallo propio de {@code bwrap} al preparar o lanzar el sandbox, y no a un
+     * error del código del estudiante.
+     *
+     * @param text Línea de la salida de error a evaluar.
+     * @return {@code true} si la línea coincide con el patrón de fallo de
+     *         {@code bwrap}; {@code false} en caso contrario o si el texto es
+     *         nulo o está en blanco.
+     */
+    public static final Predicate<String> SANDBOX_FAILURE = text -> {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+
+        return BWRAP_FAILURE.matcher(text).find();
     };
 }

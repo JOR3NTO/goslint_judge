@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
@@ -33,6 +34,8 @@ public class ErrorsHandle extends Thread {
     private final CgroupKiller cgroupKiller;
     /** Indica si el proceso fue terminado por detectarse un error en tiempo de ejecución. */
     private final AtomicBoolean isRuntimeErrorKilled = new AtomicBoolean(false);
+    /** Indica si el proceso fue terminado por detectarse un fallo propio del sandbox (p. ej. {@code bwrap}). */
+    private final AtomicBoolean isSandboxErrorKilled = new AtomicBoolean(false);
 
     /**
      * Crea el manejador de errores para un proceso del sandbox.
@@ -64,8 +67,14 @@ public class ErrorsHandle extends Thread {
             while ((bytesRead = inputStream.read(buffer)) != -1) {
                 totalBytesRead += bytesRead;
                 errorsBuilder.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
-                hasErrors = Arrays.asList(errorsBuilder.toString().split("\n")).stream().
-                    anyMatch(ErrorsHandlePredicate.ERROR_RUNTIME);
+                List<String> lines = Arrays.asList(errorsBuilder.toString().split("\n"));
+                boolean isSandboxFailure = lines.stream().anyMatch(ErrorsHandlePredicate.SANDBOX_FAILURE);
+                hasErrors = lines.stream().anyMatch(ErrorsHandlePredicate.ERROR_RUNTIME);
+                if (isSandboxFailure) {
+                    isSandboxErrorKilled.set(true);
+                    cgroupKiller.killCgroup();
+                    break;
+                }
                 if (totalBytesRead > maxErrorsSize || hasErrors) {
                     isRuntimeErrorKilled.set(true);
                     cgroupKiller.killCgroup();
@@ -84,5 +93,14 @@ public class ErrorsHandle extends Thread {
      */
     public AtomicBoolean getIsRuntimeErrorKilled() {
         return isRuntimeErrorKilled;
+    }
+
+    /**
+     * @return Indicador atómico de si el proceso fue terminado por detectarse
+     *         un fallo propio del sandbox (p. ej. {@code bwrap}), y no un
+     *         error del código del estudiante.
+     */
+    public AtomicBoolean getIsSandboxErrorKilled() {
+        return isSandboxErrorKilled;
     }
 }

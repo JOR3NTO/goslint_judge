@@ -109,6 +109,10 @@ public class TestCaseRunner {
         if (watchdog.getForcedTLE().get() || utime > timeLimit * 1000) {
             return new TestCaseResult(VerdictStatus.TIME_LIMIT_EXCEEDED, utime, memoryUsed, null);
         }
+        if (errorsHandle.getIsSandboxErrorKilled().get()) {
+            // bwrap falló al preparar o lanzar el sandbox: no es un error del código del estudiante.
+            return new TestCaseResult(VerdictStatus.JUDGE_ERROR, utime, memoryUsed, null);
+        }
         if (process.exitValue() != 0 || errorsHandle.getIsRuntimeErrorKilled().get()) {
             return new TestCaseResult(VerdictStatus.RUNTIME_ERROR, utime, memoryUsed, null);
         }
