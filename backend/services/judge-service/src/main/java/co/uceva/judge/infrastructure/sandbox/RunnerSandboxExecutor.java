@@ -14,6 +14,7 @@ import co.uceva.judge.application.port.out.SandboxExecutor;
 import co.uceva.judge.domain.exception.SandboxExecutionException;
 import co.uceva.judge.domain.model.JudgeResult;
 import co.uceva.judge.domain.model.JudgeTask;
+import co.uceva.judge.infrastructure.sandbox.workspace.SolutionFileWriter;
 import co.uceva.shared.domain.ProgrammingLanguage;
 import co.uceva.shared.domain.VerdictStatus;
 
@@ -48,17 +49,11 @@ public class RunnerSandboxExecutor implements SandboxExecutor {
      */
     @Override
     public JudgeResult execute(JudgeTask task) {
-        ProgrammingLanguage language = task.getLanguage();
-        if (language != ProgrammingLanguage.PYTHON) {
-            throw new SandboxExecutionException("El lenguaje " + language + " aún no está soportado por el sandbox.", null);
-        }
-
         Path workDir = null;
         try {
-            workDir = Files.createTempDirectory("judge-" + task.getSubmissionId() + "-");
-            Path source = workDir.resolve("solution.py");
-            Files.writeString(source, task.getSourceCode().content(), StandardCharsets.UTF_8);
-
+            workDir = Files.createTempDirectory("judge-" + task.getSubmissionId());
+            String source = SolutionFileWriter.execute(task.getLanguage(), task.getSourceCode().content(), workDir, task.getSubmissionId());
+            
             Map<String, Object> result = runner.runSolution("python3", source.toString(), task.getTestCases(),
                     task.getTimeLimit().milliseconds(), task.getMemoryLimit().kilobytes() * 1024L);
             return toJudgeResult(task.getSubmissionId(), result);
