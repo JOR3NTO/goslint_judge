@@ -84,6 +84,57 @@ class SubmissionTest {
     }
 
     @Test
+    void shouldMarkSubmissionAsJudging() {
+        Submission submission = Submission.create(
+                UUID.randomUUID(), UUID.randomUUID(), ProgrammingLanguage.PYTHON, "print(1)"
+        );
+        submission.markQueued();
+
+        submission.markJudging();
+
+        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.JUDGING);
+    }
+
+    @Test
+    void shouldMarkSubmissionAsJudgingEvenIfStillPending() {
+        // El aviso de judge-service puede adelantarse a la confirmación de encolado.
+        Submission submission = Submission.create(
+                UUID.randomUUID(), UUID.randomUUID(), ProgrammingLanguage.PYTHON, "print(1)"
+        );
+
+        submission.markJudging();
+
+        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.JUDGING);
+    }
+
+    @Test
+    void shouldNotRollBackAJudgedSubmissionToJudging() {
+        Submission submission = Submission.create(
+                UUID.randomUUID(), UUID.randomUUID(), ProgrammingLanguage.PYTHON, "print(1)"
+        );
+        submission.updateVerdict(VerdictStatus.ACCEPTED, 10, 1024);
+
+        // Un aviso de inicio que llega tarde no puede hacer parecer "en curso" un
+        // envío que el estudiante ya vio cerrado.
+        submission.markJudging();
+
+        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.JUDGED);
+    }
+
+    @Test
+    void shouldNotRollBackASystemErrorSubmissionToJudging() {
+        Submission submission = Submission.create(
+                UUID.randomUUID(), UUID.randomUUID(), ProgrammingLanguage.PYTHON, "print(1)"
+        );
+        submission.markQueued();
+        submission.markSystemError();
+
+        submission.markJudging();
+
+        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.SYSTEM_ERROR);
+    }
+
+    @Test
     void shouldSetSourceCodeAndRecalculateSize() {
         Submission submission = Submission.create(
                 UUID.randomUUID(), UUID.randomUUID(), ProgrammingLanguage.CPP, "int main(){}"

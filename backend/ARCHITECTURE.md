@@ -162,7 +162,7 @@ Candidatos a residir aquí:
 | `auth-service` | 8081 | 🟢 Funcional | Registro de usuarios (`POST /register`) y Login (`POST /login`) implementados. Emite JWT (Access Token 15 min y Refresh Token 8h). Implementa bloqueo de cuenta por intentos fallidos usando Redis. Esquema aún con `ddl-auto=update`, sin Flyway. Falta filtro JWT para rutas protegidas. |
 | `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Falta el filtro JWT y su migración base de Flyway |
 | `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción del envío, encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Esquema versionado con Flyway (`V1`–`V3`). Es el único servicio que **autentica de verdad**, y solo en el handshake del WebSocket |
-| `judge-service` | 8084 | 🔴 Esqueleto | Solo la clase de arranque. Su papel lo simula hoy [`testing/ws-judge-simulator/`](../testing/ws-judge-simulator/README.md) |
+| `judge-service` | 8084 | 🟡 Parcial | Dominio, aplicación e infraestructura completos: consume `submission.evaluate`, obtiene casos de prueba y límites de `problem-service` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) y publica el veredicto en `submission.judged`. **Solo evalúa Python**: el `Compiler` (C, C++, Java) va en otra HU, y esos lenguajes terminan como `ENQUEUE_ERROR` tras agotar los reintentos. El JWT `SERVICE` hacia `problem-service` lo firma el propio juez con el secreto compartido. Validado end-to-end en Manjaro x86_64 y en Ubuntu OCI A1-flex aarch64. Se despliega en su propia imagen con `bubblewrap` y seccomp (perfil `sandbox` del compose) |
 | `feedback-service` | 8085 | 🔴 Esqueleto | Solo la clase de arranque |
 | `contest-service` | 8086 | 🔴 Esqueleto | Solo la clase de arranque. Mientras no exista, `submission-service` resuelve cada equipo como individual mediante `NoOpTeamMembershipAdapter` |
 
@@ -172,6 +172,9 @@ Candidatos a residir aquí:
 |-----------|-----------|
 | [`services/submission-service/docs/RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md) | Topología, contrato de mensajes con `judge-service`, garantías de entrega, DLQ y reintentos |
 | [`services/submission-service/docs/WEBSOCKET.md`](./services/submission-service/docs/WEBSOCKET.md) | Canal `/ws/submissions`: autenticación en el handshake, contrato del mensaje, alcance por equipo y limitaciones |
+| [`services/judge-service/docs/BWRAP.md`](./services/judge-service/docs/BWRAP.md) | Aislamiento de la ejecución con bubblewrap: comando, qué ve el programa, filtro seccomp y códigos de salida |
+| [`services/judge-service/docs/CGROUPS.md`](./services/judge-service/docs/CGROUPS.md) | Límites y métricas por ejecución con cgroups v2: hoja por evaluación, memoria, PIDs, CPU y de dónde sale cada veredicto |
+| [`services/judge-service/docs/REQUIREMENTS.md`](./services/judge-service/docs/REQUIREMENTS.md) | Lo que hay que preparar en el host: kernel, slice de cgroups y flags del contenedor |
 
 ---
 
@@ -308,15 +311,66 @@ Detalles que conviene conocer antes de desplegar sobre una base de datos ya exis
 ### `judge-service` — Puerto `8084`
 **Responsabilidad:** Motor de evaluación (Judging Engine). Consume la cola de RabbitMQ, crea contenedores Docker aislados, ejecuta el código contra los casos de prueba y emite el veredicto.
 
-| Entidad de dominio | Descripción |
-|--------------------|-------------|
-| `JudgeTask`        | submissionId, language, sourceCode, testCases, timeLimitMs, memoryLimitKb |
-| `JudgeResult`      | submissionId, verdict, executionTimeMs, memoryUsedKb, failedTestCase |
+| Elemento de dominio | Descripción |
+|---------------------|-------------|
+| `JudgeTask`         | submissionId, language, sourceCode, testCases, timeLimit, memoryLimit. Se ensambla con `JudgeTask.create(...)` y valida sus invariantes (al menos un caso de prueba, límites en rango) |
+| `JudgeResult`       | submissionId, verdict, executionTimeMs, memoryUsedKb, failedTestCase (`null` si es `ACCEPTED` o si falló antes de ejecutar, p. ej. compilación). Se crea con `JudgeResult.create(...)` |
+| `TestCase`          | VO propio del juez: id, input, expectedOutput, orderIndex. No comparte modelo con `problem-service` |
+| Límites del sandbox | VOs validados: `TimeLimit`, `MemoryLimit`, `PidsLimit`, `VolumeSizeLimit`, `OutputSizeLimit`, `ErrorSizeLimit`, `HardTimePercent`, `WatchIntervalMillis`, `AbsoluteTimeLimit` |
 
-**Casos de uso principales:**
-- `EvaluateSubmissionUseCase` — Orquesta el pipeline de compilación y ejecución
-- `RunInSandboxUseCase` — Lanza contenedor Docker, aplica límites de CPU/RAM, captura stdout/stderr
-- `CompareOutputUseCase` — I/O Matching contra el expected output del test case
+**Puertos de dominio y excepciones:**
+- `TestCaseRepository` (`domain/repository`) — lectura de los casos de prueba de un problema; los datos pertenecen a `problem-service`.
+- `TestCasesNotFoundException` — el problema no tiene casos de prueba.
+- `SandboxExecutionException` — fallo del propio sistema en el sandbox, distinto de un veredicto que culpa al estudiante.
+
+**Caso de uso:**
+- `EvaluateSubmissionUseCase` — recibe el `SubmissionReceivedEvent`, obtiene casos de prueba y límites, ensambla el `JudgeTask`, lo ejecuta en el sandbox y publica el `JudgeResult`. Los fallos del sistema se propagan sin publicar, para que la mensajería reintente y, agotados los reintentos, lo cierre la DLQ.
+
+**Puertos de salida (`application/port/out`):** `ProblemLimitsPort` (límites de tiempo y memoria del problema), `SandboxExecutor` (ejecuta la tarea y devuelve el `JudgeResult`) y `JudgeResultPublisher` (publica el resultado hacia `submission-service`).
+
+> La compilación (`Compiler`) está pendiente y se abordará en otra historia de usuario.
+
+**Infraestructura (`infrastructure/`):**
+
+| Pieza | Rol |
+|-------|-----|
+| `messaging/SubmissionEvaluationListener` | Consume `submission.evaluate`. Un fallo transitorio se propaga para el reintento (3 intentos, luego DLQ); uno permanente (`TestCasesNotFoundException`, `IllegalArgumentException`) se rechaza sin reintentar |
+| `messaging/RabbitJudgeResultPublisherAdapter` | Publica `SubmissionJudgedEvent` en `submission.exchange` con routing key `submission.judged`, persistente y esperando la confirmación del broker |
+| `security/ServiceTokenProvider` | Emite el JWT `role=SERVICE` del juez (HS256, secreto y emisor compartidos, `sub` = `app.security.jwt.service-id`, vigencia 5 min) y lo reutiliza hasta 30 s antes de expirar. Exige `JWT_SECRET` (mín. 32 bytes, sin valor por defecto) |
+| `client/ProblemServiceTestCaseRepositoryAdapter` | `TestCaseRepository` sobre `GET /api/v1/problems/test-cases/{id}/all` (JWT `SERVICE` en cada petición); un `404` o lista vacía es `TestCasesNotFoundException` |
+| `client/ProblemServiceLimitsAdapter` | `ProblemLimitsPort` sobre `GET /api/v1/problems/{id}` |
+| `sandbox/RunnerSandboxExecutor` | `SandboxExecutor` sobre `Runner`: escribe el fuente a un temporal, ejecuta y traduce el mapa de resultados a `JudgeResult` |
+| `web/MonitorLimitsController` | Consulta y modificación de los límites de los monitores del sandbox (solo `ADMIN`) |
+| `security/JwtAuthenticationFilter` + `config/SecurityConfig` | Autentica el HTTP con el JWT y el mismo `JwtTokenValidator` que el resto; el rol pasa a `ROLE_<rol>` para `@PreAuthorize` |
+| `persistence/InMemoryMonitorLimitsRepository` | Guarda los límites vigentes en memoria (el juez no tiene BD) |
+| `config/` | Convertidor JSON de RabbitMQ, bean del `Runner` y `RestClient` hacia `problem-service` |
+
+**Imagen del sandbox (`docker/`):** `judge-service` es el único servicio que **no se ejecuta con `./gradlew bootRun`** para evaluar de verdad: necesita `bubblewrap`, el filtro seccomp y una rama de cgroups delegada. Su [`Dockerfile`](./services/judge-service/docker/Dockerfile) compila el jar y lo empaqueta sobre Ubuntu con `bubblewrap` y `python3`, `gen_seccomp.py` genera el filtro en el build, y `entrypoint.sh` prepara `/cg` al arrancar. El contenedor se declara en [`infrastructure/docker/docker-compose.yml`](../infrastructure/docker/docker-compose.yml) bajo el perfil `sandbox`, de modo que un `docker compose up` normal siga levantando solo PostgreSQL y RabbitMQ:
+
+```bash
+sudo cp infrastructure/systemd/goslint.slice /etc/systemd/system/ && sudo systemctl enable --now goslint.slice
+JWT_SECRET=<mínimo 32 bytes> docker compose --profile sandbox up -d --build judge-service
+```
+
+La imagen es **multi-arch**: construye y funciona en x86_64 y en aarch64. Validado en Manjaro Linux (x86_64, kernel 6.18.49, Docker Engine 29.7.2) y en Ubuntu sobre Oracle Cloud A1-flex (aarch64, kernel familia 6.8-oracle). Ver [`REQUIREMENTS.md`](./services/judge-service/docs/REQUIREMENTS.md) para los requisitos del host en cada arquitectura.
+
+**Endpoints de `judge-service`:**
+
+| Método | Endpoint | Acceso | Notas |
+|--------|----------|--------|-------|
+| GET    | `/api/v1/judge/monitor-limits` | ADMIN | Límites vigentes de los monitores |
+| PUT    | `/api/v1/judge/monitor-limits` | ADMIN | Reemplaza los cinco límites: `outputSizeBytes`, `errorSizeBytes`, `hardTimePercent`, `watchIntervalMs`, `absoluteTimeMs`. Un valor fuera de rango o ausente responde `400` |
+| GET    | `/actuator/health` | Público | Estado del servicio, sin detalles |
+
+Los límites (`OutputHandle` usa `outputSizeBytes`, `ErrorsHandle` usa `errorSizeBytes` y `TimeWatchdog` usa los otros tres) arrancan con `app.sandbox.monitor.*`. El `Runner` los lee al empezar cada evaluación, así que un cambio solo aplica a las que empiecen después, y **se pierde al reiniciar**: no hay base de datos donde persistirlos.
+
+> 📖 El detalle del sandbox —el comando de bwrap y el filtro seccomp, los límites y
+> métricas de cgroups, y lo que hay que preparar en el host— está en
+> [`BWRAP.md`](./services/judge-service/docs/BWRAP.md),
+> [`CGROUPS.md`](./services/judge-service/docs/CGROUPS.md) y
+> [`REQUIREMENTS.md`](./services/judge-service/docs/REQUIREMENTS.md).
+
+`judge-service` **no declara topología**: exchange, colas y DLQ las declara `submission-service`, dueño del contrato (ver su [`RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md)). No usa base de datos; se excluye la autoconfiguración de JPA que el `build.gradle` raíz aplica a todos los módulos.
 
 **Veredictos emitidos:** `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `RUNTIME_ERROR`, `COMPILATION_ERROR`
 
@@ -602,7 +656,7 @@ dependencies {
 }
 ```
 
-> Todos los servicios aplican ya el plugin. Los que siguen siendo esqueleto (`judge`, `feedback`, `contest`) aún no declaran sus dependencias reales (Docker client, cliente HTTP del LLM, etc.): se añaden al implementarlos.
+> Todos los servicios aplican ya el plugin. Los que siguen siendo esqueleto (`feedback`, `contest`; `judge` está a medias) aún no declaran sus dependencias reales (Docker client, cliente HTTP del LLM, etc.): se añaden al implementarlos.
 
 ### Gradle Wrapper
 Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` desde `backend/`; no hace falta Gradle instalado globalmente.
@@ -613,16 +667,15 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 
 | # | Problema | Criticidad | Acción requerida |
 |---|----------|-----------|------------------|
-| 1 | **Ningún endpoint HTTP valida el JWT**: los `@PreAuthorize` están escritos pero la autenticación llega anónima | 🔴 Alta | Escribir el filtro JWT reutilizando `JwtTokenValidator` (ya usado por el handshake del WebSocket) y retirar configuraciones temporales de seguridad en los servicios |
-| 2 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
-| 3 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que deje de depender de lo que Hibernate decida en cada arranque |
-| 4 | **`judge-service` no existe**: los envíos se encolan y nadie los consume | 🔴 Alta | Implementar el consumidor de `submission.evaluate`. El contrato ya está fijado en `docs/RABBITMQ.md`; `testing/ws-judge-simulator/` lo simula mientras tanto |
-| 5 | **`contest-service` no existe**: la composición real de los equipos se desconoce | 🟡 Media | `NoOpTeamMembershipAdapter` trata cada equipo como individual. Al llegar el servicio, añadir un adaptador y cambiar `app.team-membership.provider` |
-| 6 | **El registro de sesiones WebSocket es local a la instancia** | 🟡 Media | Con varias réplicas, la instancia que recibe el veredicto puede no tener la conexión del estudiante. Escalar horizontalmente exige compartir el registro (p. ej. Redis) |
-| 7 | **`traefik.yml` está vacío** | 🟡 Media | Sin API Gateway cada servicio se expone por su puerto. Al configurarlo, cuidar el reenvío de `Upgrade`/`Sec-WebSocket-Protocol` o el handshake del WebSocket no se completa |
-| 8 | **`app.websocket.allowed-origins=*`** | 🟡 Media | Cómodo en desarrollo; restringir a los orígenes del frontend antes de exponer el servicio |
-| 9 | **Test package incorrecto** en `auth-service` y `problem-service` | 🟢 Baja | La clase de test usa `co.uceva.judge.auth_service` en lugar de `co.uceva.auth` |
-| 10 | **`services/users-service/` conviven con `auth-service`** | 🟢 Baja | Hay dos módulos para la misma responsabilidad; decidir cuál queda y retirar el otro de `settings.gradle` |
+| 1 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
+| 2 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que deje de depender de lo que Hibernate decida en cada arranque |
+| 3 | **`judge-service` solo evalúa Python** | 🟡 Media | El `Compiler` (C, C++, Java) va en otra HU; hasta entonces esos envíos acaban en `ENQUEUE_ERROR` tras agotar los reintentos |
+| 4 | **`contest-service` no existe**: la composición real de los equipos se desconoce | 🟡 Media | `NoOpTeamMembershipAdapter` trata cada equipo como individual. Al llegar el servicio, añadir un adaptador y cambiar `app.team-membership.provider` |
+| 5 | **El registro de sesiones WebSocket es local a la instancia** | 🟡 Media | Con varias réplicas, la instancia que recibe el veredicto puede no tener la conexión del estudiante. Escalar horizontalmente exige compartir el registro (p. ej. Redis) |
+| 6 | **`traefik.yml` está vacío** | 🟡 Media | Sin API Gateway cada servicio se expone por su puerto. Al configurarlo, cuidar el reenvío de `Upgrade`/`Sec-WebSocket-Protocol` o el handshake del WebSocket no se completa |
+| 7 | **`app.websocket.allowed-origins=*`** | 🟡 Media | Cómodo en desarrollo; restringir a los orígenes del frontend antes de exponer el servicio |
+| 8 | **Test package incorrecto** en `auth-service` y `problem-service` | 🟢 Baja | La clase de test usa `co.uceva.judge.auth_service` en lugar de `co.uceva.auth` |
+| 9 | **`services/users-service/` conviven con `auth-service`** | 🟢 Baja | Hay dos módulos para la misma responsabilidad; decidir cuál queda y retirar el otro de `settings.gradle` |
 
 ---
 
@@ -690,4 +743,4 @@ Antes de enviar cambios en cualquier microservicio, verificar:
 
 ---
 
-*Documento generado el 2026-06-10; última actualización el 2026-09-05. Actualizar cuando cambien decisiones arquitectónicas.*
+*Documento generado el 2026-06-10; última actualización el 2026-09-28. Actualizar cuando cambien decisiones arquitectónicas.*

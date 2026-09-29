@@ -3,7 +3,7 @@ package co.uceva.submission.domain.model;
 import co.uceva.shared.domain.ProgrammingLanguage;
 import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.shared.domain.VerdictStatus;
-import co.uceva.submission.domain.valueobject.SourceCode;
+import co.uceva.shared.domain.valueobject.SourceCode;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -120,6 +120,25 @@ public class Submission {
     public void markQueued() {
         if (this.status == SubmissionStatus.PENDING) {
             this.status = SubmissionStatus.QUEUED;
+        }
+    }
+
+    /**
+     * Marca el envío como en proceso de evaluación, una vez que
+     * {@code judge-service} confirma que lo tomó.
+     * <p>
+     * A diferencia de {@link #markQueued()}, esta operación no exige partir de un
+     * estado concreto: puede llegar mientras el envío todavía figura como
+     * {@code PENDING} (el aviso de {@code judge-service} adelantó a la
+     * confirmación de encolado) o ya como {@code QUEUED}, y en ambos casos avanza
+     * a {@code JUDGING}. Lo único que protege es no retroceder un envío que ya
+     * tiene un desenlace: un aviso de inicio que llega tarde no puede hacer
+     * parecer "en curso" un envío que el estudiante ya vio cerrado.
+     * </p>
+     */
+    public void markJudging() {
+        if (this.status != SubmissionStatus.JUDGED && this.status != SubmissionStatus.ENQUEUE_ERROR) {
+            this.status = SubmissionStatus.JUDGING;
         }
     }
 
