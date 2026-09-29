@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.util.List;
 
 import co.uceva.judge.domain.valueobject.AbsoluteTimeLimit;
+import co.uceva.judge.domain.valueobject.ErrorSizeLimit;
 import co.uceva.judge.domain.valueobject.HardTimePercent;
 import co.uceva.judge.domain.valueobject.OutputSizeLimit;
 import co.uceva.judge.domain.valueobject.WatchIntervalMillis;
@@ -27,7 +28,9 @@ public class TestCaseRunner {
 
     /** Tamaño máximo permitido para la salida estándar (stdout) del proceso. */
     private final OutputSizeLimit maxOutputSize;
-    /** Porcentaje adicional sobre el límite de tiempo antes de forzar la terminación del proceso. */
+    /** Tamaño máximo permitido para la salida de error (stderr) del proceso. */
+    private final ErrorSizeLimit maxErrorSize;
+    /** Porcentaje adicional sobre el límite de tiempo antes de que el watchdog fuerce la terminación del proceso. */
     private final HardTimePercent hardTimePercent;
     /** Intervalo con el que el watchdog verifica el tiempo de CPU utilizado por el proceso. */
     private final WatchIntervalMillis watchInterval;
@@ -39,13 +42,15 @@ public class TestCaseRunner {
      * proceso lanzado.
      *
      * @param maxOutputSize     Tamaño máximo permitido para la salida estándar (stdout) del proceso.
+     * @param maxErrorSize      Tamaño máximo permitido para la salida de error (stderr) del proceso.
      * @param hardTimePercent   Porcentaje adicional sobre el límite de tiempo antes de forzar la terminación del proceso.
      * @param watchInterval     Intervalo con el que se verifica el tiempo de CPU utilizado por el proceso.
      * @param absoluteTimeLimit Tiempo máximo absoluto que puede durar el proceso, sin importar el límite configurado.
      */
-    public TestCaseRunner(OutputSizeLimit maxOutputSize, HardTimePercent hardTimePercent,
+    public TestCaseRunner(OutputSizeLimit maxOutputSize, ErrorSizeLimit maxErrorSize, HardTimePercent hardTimePercent,
             WatchIntervalMillis watchInterval, AbsoluteTimeLimit absoluteTimeLimit) {
         this.maxOutputSize = maxOutputSize;
+        this.maxErrorSize = maxErrorSize;
         this.hardTimePercent = hardTimePercent;
         this.watchInterval = watchInterval;
         this.absoluteTimeLimit = absoluteTimeLimit;
@@ -77,7 +82,7 @@ public class TestCaseRunner {
         pb.environment().put("PATH", "/usr/bin:/bin");
         pb.environment().put("SECCOMP_PROFILE", workspace.seccompProfile());
         Process process = pb.start();
-        ErrorsHandle errorsHandle = new ErrorsHandle(workspace.cgLeafPath(), process.getErrorStream());
+        ErrorsHandle errorsHandle = new ErrorsHandle(workspace.cgLeafPath(), process.getErrorStream(), maxErrorSize.bytes());
         OutputHandle outputHelper = new OutputHandle(workspace.cgLeafPath(), process.getInputStream(), maxOutputSize.bytes());
         outputHelper.start();
         errorsHandle.start();
@@ -111,7 +116,7 @@ public class TestCaseRunner {
         if (process.exitValue() != 0 || errorsHandle.getIsRuntimeErrorKilled().get()) {
             return new TestCaseResult(VerdictStatus.RUNTIME_ERROR, utime, memoryUsed, null);
         }
-        if (outputHelper.getOutputSizeExceeded().get()) {
+        if (outputHelper.getOutputSizeExceeded().get() || errorsHandle.getIsErrorSizeExceeded().get()) {
             // VerdictStatus no distingue un límite de salida excedido; se reporta como RUNTIME_ERROR.
             return new TestCaseResult(VerdictStatus.RUNTIME_ERROR, utime, memoryUsed, null);
         }

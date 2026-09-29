@@ -26,20 +26,26 @@ public class ErrorsHandle extends Thread {
     private final InputStream inputStream;
     /** Instancia del asistente para matar el cgroup del proceso. */
     private final CgroupKiller cgroupKiller;
+    /** Tamaño máximo permitido para la salida de error (stderr) del proceso, en bytes. */
+    private final long maxErrorSize;
     /** Indica si el proceso fue terminado por detectarse un error en tiempo de ejecución. */
     private final AtomicBoolean isRuntimeErrorKilled = new AtomicBoolean(false);
     /** Indica si el proceso fue terminado por detectarse un fallo propio del sandbox (p. ej. {@code bwrap}). */
     private final AtomicBoolean isSandboxErrorKilled = new AtomicBoolean(false);
+    /** Indica si el proceso fue terminado por superar el límite de tamaño de stderr. */
+    private final AtomicBoolean isErrorSizeExceeded = new AtomicBoolean(false);
 
     /**
      * Crea el manejador de errores para un proceso del sandbox.
      *
      * @param cgLeafPath    Ruta del cgroup del proceso, usada para terminarlo si es necesario.
      * @param inputStream   Flujo de error estándar (stderr) del proceso.
+     * @param maxErrorSize  Tamaño máximo permitido para la salida de error, en bytes.
      */
-    public ErrorsHandle(Path cgLeafPath, InputStream inputStream) {
+    public ErrorsHandle(Path cgLeafPath, InputStream inputStream, long maxErrorSize) {
         this.inputStream = inputStream;
         this.cgroupKiller = new CgroupKiller(cgLeafPath);
+        this.maxErrorSize = maxErrorSize;
     }
 
     /**
@@ -57,9 +63,16 @@ public class ErrorsHandle extends Thread {
         try {
             byte[] buffer = new byte[1024];
             int bytesRead;
+            long totalBytesRead = 0;
             String pendingLine = "";
 
             while ((bytesRead = inputStream.read(buffer)) != -1) {
+                totalBytesRead += bytesRead;
+                if (totalBytesRead > maxErrorSize) {
+                    isErrorSizeExceeded.set(true);
+                    cgroupKiller.killCgroup();
+                    break;
+                }
                 pendingLine += new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
                 List<String> lines = Arrays.asList(pendingLine.split("\n", -1));
                 // El último elemento es el fragmento sin salto de línea aún: se conserva para la siguiente lectura.
@@ -81,7 +94,14 @@ public class ErrorsHandle extends Thread {
             }
         } catch (IOException e) {
             log.error("Error reading process output: {}", e.getMessage(), e);
+            isRuntimeErrorKilled.set(true);
+            cgroupKiller.killCgroup();
         }
+    }
+
+    /** @return Indicador atómico de si el proceso fue terminado por superar el límite de tamaño de stderr. */
+    public AtomicBoolean getIsErrorSizeExceeded() {
+        return isErrorSizeExceeded;
     }
 
     /**

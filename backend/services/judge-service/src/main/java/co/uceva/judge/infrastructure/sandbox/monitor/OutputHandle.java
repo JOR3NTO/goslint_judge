@@ -9,7 +9,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import co.uceva.judge.infrastructure.sandbox.Runner;
 import co.uceva.judge.infrastructure.sandbox.kill.CgroupKiller;
 
 /**
