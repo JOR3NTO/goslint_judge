@@ -88,7 +88,7 @@ export function Footer() {
 
         <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © 2025 Goslint Judge. Todos los derechos reservados.
+            © 2026 Goslint Judge. Todos los derechos reservados.
           </p>
           <div className="flex items-center gap-4">
             <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
