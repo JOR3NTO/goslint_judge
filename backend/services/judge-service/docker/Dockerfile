@@ -37,14 +37,19 @@ FROM ubuntu:24.04
 ARG WITH_DEBUG_TOOLS=false
 
 # bubblewrap: el sandbox de cada ejecucion.
-# python3: interprete de las soluciones evaluadas, y el unico lenguaje soportado hoy.
+# gcc / g++ / libc6-dev: compilacion y ejecucion de soluciones en C y C++.
+# python3: interprete de soluciones Python.
 # python3-seccomp: lo usa gen_seccomp.py para construir el filtro.
-# openjdk-17-jre-headless: para ejecutar el propio judge-service (no las soluciones).
+# openjdk-17-jdk-headless: javac (compilacion de soluciones Java) + java (ejecucion
+#   del propio judge-service y de las soluciones dentro del sandbox).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         bubblewrap \
+        gcc \
+        g++ \
+        libc6-dev \
         python3 \
         python3-seccomp \
-        openjdk-17-jre-headless \
+        openjdk-17-jdk-headless \
     && if [ "$WITH_DEBUG_TOOLS" = "true" ]; then \
          apt-get install -y --no-install-recommends procps strace; \
        fi \
