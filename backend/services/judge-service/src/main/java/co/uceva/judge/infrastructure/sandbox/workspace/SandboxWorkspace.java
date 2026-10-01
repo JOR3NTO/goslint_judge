@@ -105,7 +105,13 @@ public class SandboxWorkspace {
             workDirPath.toFile().mkdirs();
         }
         Path origen = Path.of(solutionPath).toAbsolutePath();
-        Files.copy(origen, Path.of(workDir, origen.getFileName().toString()));
+        try (var stream = Files.list(origen.getParent())) {
+            for (Path file : (Iterable<Path>) stream::iterator) {
+                if (Files.isRegularFile(file)) {
+                    Files.copy(file, Path.of(workDir, file.getFileName().toString()));
+                }
+            }
+        }
 
         return new SandboxWorkspace(cgLeafPath, memoryPeakPath, memoryEventsPath, cpuStatsPath, cgroupProcs,
                 workDirPath, workDir, seccompProfile, origen);

@@ -1,7 +1,6 @@
 package co.uceva.judge.infrastructure.sandbox;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -14,8 +13,8 @@ import co.uceva.judge.application.port.out.SandboxExecutor;
 import co.uceva.judge.domain.exception.SandboxExecutionException;
 import co.uceva.judge.domain.model.JudgeResult;
 import co.uceva.judge.domain.model.JudgeTask;
+import co.uceva.judge.infrastructure.sandbox.command.RunCommandFactory;
 import co.uceva.judge.infrastructure.sandbox.workspace.SolutionFileWriter;
-import co.uceva.shared.domain.ProgrammingLanguage;
 import co.uceva.shared.domain.VerdictStatus;
 
 /**
@@ -53,8 +52,21 @@ public class RunnerSandboxExecutor implements SandboxExecutor {
         try {
             workDir = Files.createTempDirectory("judge-" + task.getSubmissionId());
             String source = SolutionFileWriter.execute(task.getLanguage(), task.getSourceCode().content(), workDir, task.getSubmissionId());
+            int exitCompilation = Compiler.compile(task.getLanguage(), source, workDir);
+            if(exitCompilation != 0){
+                return JudgeResult.create(
+                    task.getSubmissionId(),
+                    VerdictStatus.COMPILATION_ERROR,
+                    0,
+                    0,
+                    null
+                ); 
+            }
+
             
-            Map<String, Object> result = runner.runSolution("python3", source.toString(), task.getTestCases(),
+            Map<String, Object> result = runner.runSolution(
+                    RunCommandFactory.build(task.getLanguage(), source),
+                    source, task.getTestCases(),
                     task.getTimeLimit().milliseconds(), task.getMemoryLimit().kilobytes() * 1024L);
             return toJudgeResult(task.getSubmissionId(), result);
         } catch (IOException e) {

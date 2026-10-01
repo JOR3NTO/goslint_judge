@@ -72,7 +72,7 @@ public class Runner {
      *         solución no fue aceptada, el identificador del caso de prueba en el que
      *         falló ({@code failedTestCase}).
      */
-    public Map<String, Object> runSolution(String command, String solutionPath, List<TestCase> testCases,
+    public Map<String, Object> runSolution(List<String> execArgs, String solutionPath, List<TestCase> testCases,
             long timeLimit, long memoryLimit) {
 
         MonitorLimits limits = monitorLimitsRepository.find();
@@ -88,7 +88,7 @@ public class Runner {
             SandboxWorkspace workspace = null;
             try {
                 workspace = SandboxWorkspace.create(memoryLimit, maxPids, solutionPath);
-                List<String> runCommand = BwrapCommandFactory.build(workspace, maxVolumeSize, command);
+                List<String> runCommand = BwrapCommandFactory.build(workspace, maxVolumeSize, execArgs);
 
                 TestCaseResult testResult = testCaseRunner.run(workspace, runCommand, testCase.input(), timeLimit);
                 maxCpuTime = Math.max(maxCpuTime, testResult.cpuTimeUsec());

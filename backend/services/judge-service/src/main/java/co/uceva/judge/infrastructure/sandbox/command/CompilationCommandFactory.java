@@ -74,14 +74,4 @@ public final class CompilationCommandFactory {
         }
         return command;
     }
-
-    /**
-     * Determina si un lenguaje de programación requiere una etapa previa de compilación o verificación sintáctica.
-     *
-     * @param language Lenguaje de programación a evaluar.
-     * @return {@code true} si el lenguaje es soportado y requiere compilación o verificación previa.
-     */
-    public static boolean requiresCompilation(ProgrammingLanguage language) {
-        return language != null;
-    }
 }

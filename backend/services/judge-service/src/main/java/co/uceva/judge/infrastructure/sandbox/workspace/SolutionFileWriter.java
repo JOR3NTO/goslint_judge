@@ -4,8 +4,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import co.uceva.judge.domain.exception.CompilationException;
 import co.uceva.shared.domain.ProgrammingLanguage;
 
 /**
@@ -35,7 +39,7 @@ public final class SolutionFileWriter {
     public static String execute(ProgrammingLanguage language,
                                  String content,
                                  Path workDir,
-                                 UUID submissionId) throws IOException {
+                                 UUID submissionId) throws IOException, CompilationException {
 
         String extension = "";
         switch (language) {
@@ -52,9 +56,27 @@ public final class SolutionFileWriter {
                 extension = ".py";
                 break;
         }
-        Path source = workDir.resolve("solution" + extension);
+        
+        Path source;
+        if(language == ProgrammingLanguage.JAVA){
+            source = workDir.resolve(getClassName(content) + extension);
+            
+        }else{
+            source = workDir.resolve("solution" + extension);
+        }
         Files.writeString(source, content, StandardCharsets.UTF_8);
 
         return source.toString();
+    }
+
+    public static String getClassName(String content) {
+        Pattern pattern = Pattern.compile("\\bclass\\s+([A-Za-z0-9_]+)");
+        Matcher finder = pattern.matcher(content);
+
+        if (finder.find()) {
+            return finder.group(1);
+        }else{
+            throw new CompilationException("No se pudo encontrar el nombre de la clase.");
+        }
     }
 }
