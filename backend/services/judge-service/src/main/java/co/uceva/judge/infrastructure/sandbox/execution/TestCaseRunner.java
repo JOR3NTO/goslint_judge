@@ -5,6 +5,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import co.uceva.judge.domain.valueobject.AbsoluteTimeLimit;
 import co.uceva.judge.domain.valueobject.ErrorSizeLimit;
 import co.uceva.judge.domain.valueobject.HardTimePercent;
@@ -25,6 +28,8 @@ import co.uceva.shared.domain.VerdictStatus;
  * excedido.
  */
 public class TestCaseRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(TestCaseRunner.class);
 
     /** Tamaño máximo permitido para la salida estándar (stdout) del proceso. */
     private final OutputSizeLimit maxOutputSize;
@@ -95,6 +100,19 @@ public class TestCaseRunner {
         outputHelper.join();
         errorsHandle.join();
         watchdog.join();
+        // Volcado de la ejecución. El guard evita construir los mensajes (stdout y
+        // stderr completos) cuando la traza está apagada.
+        if (log.isDebugEnabled()) {
+            log.debug("comando: {}", runCommand);
+            log.debug("exitValue={}", process.exitValue());
+            log.debug("stdout:\n{}", outputHelper.getOutput());
+            log.debug("stderr:\n{}", errorsHandle.getTracedStderr());
+            log.debug("flags: runtimeErrorKilled={} sandboxErrorKilled={} errorSizeExceeded={} outputSizeExceeded={} forcedTLE={}",
+                    errorsHandle.getIsRuntimeErrorKilled().get(), errorsHandle.getIsSandboxErrorKilled().get(),
+                    errorsHandle.getIsErrorSizeExceeded().get(), outputHelper.getOutputSizeExceeded().get(),
+                    watchdog.getForcedTLE().get());
+        }
+
         long memoryUsed = Long.parseLong(Files.readString(workspace.memoryPeakPath()).trim()) / 1024;
         long utime = Files.readAllLines(workspace.cpuStatsPath()).stream()
                 .filter(line -> line.contains("usage_usec"))
@@ -104,19 +122,26 @@ public class TestCaseRunner {
         boolean isOomKilled = Files.readAllLines(workspace.memoryEventsPath()).stream()
                 .anyMatch(line -> line.contains("oom_kill") && !line.split(" ")[1].equals("0"));
         if (isOomKilled) {
+            log.debug("veredicto MEMORY_LIMIT_EXCEEDED (oom_kill en el cgroup)");
             return new TestCaseResult(VerdictStatus.MEMORY_LIMIT_EXCEEDED, utime, memoryUsed, null);
         }
         if (watchdog.getForcedTLE().get() || utime > timeLimit * 1000) {
+            log.debug("veredicto TIME_LIMIT_EXCEEDED (utime={}us, limite={}ms)", utime, timeLimit);
             return new TestCaseResult(VerdictStatus.TIME_LIMIT_EXCEEDED, utime, memoryUsed, null);
         }
         if (errorsHandle.getIsSandboxErrorKilled().get()) {
+            // Malfuncionamiento del juez, no del codigo evaluado: siempre visible.
+            log.warn("veredicto JUDGE_ERROR: bwrap no pudo preparar o lanzar el sandbox");
             // bwrap falló al preparar o lanzar el sandbox: no es un error del código del estudiante.
             return new TestCaseResult(VerdictStatus.JUDGE_ERROR, utime, memoryUsed, null);
         }
         if (process.exitValue() != 0 || errorsHandle.getIsRuntimeErrorKilled().get()) {
+            log.debug("veredicto RUNTIME_ERROR (exitValue={}, patrón de excepción detectado={})",
+                    process.exitValue(), errorsHandle.getIsRuntimeErrorKilled().get());
             return new TestCaseResult(VerdictStatus.RUNTIME_ERROR, utime, memoryUsed, null);
         }
         if (outputHelper.getOutputSizeExceeded().get() || errorsHandle.getIsErrorSizeExceeded().get()) {
+            log.debug("veredicto RUNTIME_ERROR por límite de salida excedido");
             // VerdictStatus no distingue un límite de salida excedido; se reporta como RUNTIME_ERROR.
             return new TestCaseResult(VerdictStatus.RUNTIME_ERROR, utime, memoryUsed, null);
         }

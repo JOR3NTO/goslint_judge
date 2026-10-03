@@ -95,17 +95,22 @@ public class Runner {
                 maxMemoryUsed = Math.max(maxMemoryUsed, testResult.memoryUsedKb());
 
                 if (testResult.status() != null) {
+                    log.debug("caso {} terminó con veredicto {}", testCase.id(), testResult.status());
                     result.put("status", testResult.status());
                     result.put("failedTestCase", testCase.id());
                     break;
                 }
                 if (!(testsPassed &= testResult.output().equals(testCase.expectedOutput().trim()))) {
+                    log.debug("caso {} con salida distinta.\n  esperado=[{}]\n  obtenido=[{}]",
+                            testCase.id(), testCase.expectedOutput().trim(), testResult.output());
                     result.put("failedTestCase", testCase.id());
                     break;
                 }
 
             } catch (IOException | InterruptedException | SandboxExecutionException e) {
-                log.error("Error running solution: " + e.getMessage());
+                // La traza va siempre: aqui el veredicto es JUDGE_ERROR, un fallo de la
+                // plataforma, y sin el stack trace no hay forma de localizar la causa.
+                log.error("Error running solution: {}", e.getMessage(), e);
                 result.put("status", VerdictStatus.JUDGE_ERROR);
                 result.put("failedTestCase", testCase.id());
                 break;

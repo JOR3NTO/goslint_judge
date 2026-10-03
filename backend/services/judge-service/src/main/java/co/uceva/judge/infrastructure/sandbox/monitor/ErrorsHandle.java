@@ -34,6 +34,20 @@ public class ErrorsHandle extends Thread {
     private final AtomicBoolean isSandboxErrorKilled = new AtomicBoolean(false);
     /** Indica si el proceso fue terminado por superar el límite de tamaño de stderr. */
     private final AtomicBoolean isErrorSizeExceeded = new AtomicBoolean(false);
+    /**
+     * Tamaño máximo de stderr que se retiene para la traza de depuración. Es
+     * independiente de {@code maxErrorSize}: ese es el límite que se le impone a la
+     * solución, este solo acota cuánto se guarda para poder volcarlo en el log.
+     */
+    private static final int TRACE_STDERR_CAP = 8 * 1024;
+    /**
+     * Fragmento inicial de stderr, retenido <strong>solo</strong> si la traza de
+     * depuración del sandbox está activa. Con la traza apagada queda vacío y la
+     * clase sigue sin conservar la salida ya procesada, como está diseñada.
+     */
+    private final StringBuilder tracedStderr = new StringBuilder();
+    /** Se evalúa una vez por ejecución: con la traza apagada no se retiene nada. */
+    private final boolean traceEnabled = log.isDebugEnabled();
 
     /**
      * Crea el manejador de errores para un proceso del sandbox.
@@ -69,11 +83,16 @@ public class ErrorsHandle extends Thread {
             while ((bytesRead = inputStream.read(buffer)) != -1) {
                 totalBytesRead += bytesRead;
                 if (totalBytesRead > maxErrorSize) {
+                    log.debug("stderr excedió el límite de {} bytes (leídos {})", maxErrorSize, totalBytesRead);
                     isErrorSizeExceeded.set(true);
                     cgroupKiller.killCgroup();
                     break;
                 }
-                pendingLine += new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+                String chunk = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+                if (traceEnabled && tracedStderr.length() < TRACE_STDERR_CAP) {
+                    tracedStderr.append(chunk);
+                }
+                pendingLine += chunk;
                 List<String> lines = Arrays.asList(pendingLine.split("\n", -1));
                 // El último elemento es el fragmento sin salto de línea aún: se conserva para la siguiente lectura.
                 pendingLine = lines.get(lines.size() - 1);
@@ -82,11 +101,17 @@ public class ErrorsHandle extends Thread {
                 boolean isSandboxFailure = completedLines.stream().anyMatch(ErrorsHandlePredicate.SANDBOX_FAILURE);
                 boolean hasErrors = completedLines.stream().anyMatch(ErrorsHandlePredicate.ERROR_RUNTIME);
                 if (isSandboxFailure) {
+                    // Un fallo de bwrap es un problema de la plataforma, no del código
+                    // evaluado: se registra siempre, no solo con la traza activa.
+                    completedLines.stream().filter(ErrorsHandlePredicate.SANDBOX_FAILURE)
+                            .forEach(line -> log.warn("fallo del sandbox detectado en stderr: {}", line));
                     isSandboxErrorKilled.set(true);
                     cgroupKiller.killCgroup();
                     break;
                 }
                 if (hasErrors) {
+                    completedLines.stream().filter(ErrorsHandlePredicate.ERROR_RUNTIME)
+                            .forEach(line -> log.debug("excepción/runtime error detectado en stderr: {}", line));
                     isRuntimeErrorKilled.set(true);
                     cgroupKiller.killCgroup();
                     break;
@@ -97,6 +122,14 @@ public class ErrorsHandle extends Thread {
             isRuntimeErrorKilled.set(true);
             cgroupKiller.killCgroup();
         }
+    }
+
+    /**
+     * @return Fragmento inicial de stderr retenido para la traza de depuración,
+     *         o cadena vacía si la traza del sandbox está desactivada.
+     */
+    public String getTracedStderr() {
+        return tracedStderr.toString();
     }
 
     /** @return Indicador atómico de si el proceso fue terminado por superar el límite de tamaño de stderr. */
