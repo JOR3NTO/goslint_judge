@@ -38,20 +38,19 @@
   <!-- ── Panel 1: Configuración ─────────────────────────────── -->
   <section class="panel">
     <h2>1. Configuración</h2>
-    <p class="hint">JWT_SECRET es necesario para firmar tokens en el navegador. Debe coincidir con el de <code>backend/services/submission-service/.env</code>.</p>
+    <p class="hint">Se rellenan al cargar la página desde <code>backend/services/submission-service/.env</code>, vía <code>GET /api/config</code>. Ningún valor está escrito en este HTML, que sí va al repositorio. Se pueden sobrescribir a mano para una prueba puntual.</p>
     <div class="grid">
       <label class="full">
         JWT_SECRET (hex o texto, mín 32 bytes)
-        <input id="jwt-secret" type="text"
-               placeholder="1004d399e8881577d2024c2a04ee4eff039afec96ea9a54fff8833d8a140639f" />
+        <input id="jwt-secret" type="password" autocomplete="off" placeholder="se carga desde .env" />
       </label>
       <label>
         JWT Issuer
-        <input id="jwt-issuer" type="text" value="goslint-judge" />
+        <input id="jwt-issuer" type="text" />
       </label>
       <label>
         TTL del token (segundos)
-        <input id="jwt-ttl" type="number" value="3600" min="60" />
+        <input id="jwt-ttl" type="number" min="60" />
       </label>
     </div>
   </section>
@@ -213,15 +212,15 @@
       <label>
         Lenguaje
         <select id="sub-language">
-          <option value="PYTHON" selected>PYTHON (único implementado)</option>
+          <option value="PYTHON" selected>Python</option>
           <option value="C">C</option>
-          <option value="CPP">CPP</option>
-          <option value="JAVA">JAVA</option>
+          <option value="CPP">C++</option>
+          <option value="JAVA">Java</option>
         </select>
       </label>
       <label class="full">
         Código fuente
-        <textarea id="sub-code" rows="5">a, b = map(int, input().split())
+        <textarea id="sub-code" rows="8">a, b = map(int, input().split())
 print(a + b)</textarea>
       </label>
     </div>
@@ -248,11 +247,11 @@ print(a + b)</textarea>
     <div class="grid">
       <label>
         URL del WebSocket
-        <input id="ws-url" type="text" value="ws://localhost:8083/ws/submissions" />
+        <input id="ws-url" type="text" />
       </label>
       <label>
         Subprotocolo
-        <input id="ws-subprotocol" type="text" value="goslint-judge" />
+        <input id="ws-subprotocol" type="text" />
       </label>
     </div>
     <div class="actions">

@@ -7,11 +7,25 @@ const express = require("express");
 const cors    = require("cors");
 const fetch   = require("node-fetch");
 
-const HTTP_PORT      = process.env.INTEGRATION_PORT   || 4200;
-const AUTH_URL       = `http://localhost:${process.env.AUTH_PORT       || 8081}`;
-const PROBLEM_URL    = `http://localhost:${process.env.PROBLEM_PORT    || 8082}`;
-const SUBMISSION_URL = `http://localhost:${process.env.SUBMISSION_PORT || 8083}`;
-const JUDGE_URL      = `http://localhost:${process.env.JUDGE_PORT      || 8084}`;
+const HTTP_PORT       = process.env.INTEGRATION_PORT   || 4200;
+const SERVICES_HOST   = process.env.SERVICES_HOST      || "localhost";
+const SUBMISSION_PORT = process.env.SUBMISSION_PORT    || 8083;
+const AUTH_URL       = `http://${SERVICES_HOST}:${process.env.AUTH_PORT    || 8081}`;
+const PROBLEM_URL    = `http://${SERVICES_HOST}:${process.env.PROBLEM_PORT || 8082}`;
+const SUBMISSION_URL = `http://${SERVICES_HOST}:${SUBMISSION_PORT}`;
+const JUDGE_URL      = `http://${SERVICES_HOST}:${process.env.JUDGE_PORT   || 8084}`;
+
+// Configuracion que el panel necesita en el navegador. Sale del .env cargado
+// arriba: no se escribe ningun valor en el HTML, que si esta en el repositorio.
+// El JWT_SECRET no tiene valor por defecto a proposito; si falta, el panel lo
+// dice y deja el campo vacio para que se pegue a mano.
+const PANEL_CONFIG = {
+  jwtSecret:       process.env.JWT_SECRET || "",
+  jwtIssuer:       process.env.JWT_ISSUER || "goslint-judge",
+  jwtTtlSeconds:   Number(process.env.JWT_TTL_SECONDS || 3600),
+  wsUrl:           process.env.WS_URL || `ws://${SERVICES_HOST}:${SUBMISSION_PORT}/ws/submissions`,
+  wsSubprotocol:   process.env.WS_SUBPROTOCOL || "goslint-judge",
+};
 
 async function proxyRequest(req, res, targetUrl) {
   try {
@@ -45,6 +59,13 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+
+// ── Configuracion del panel ───────────────────────────────────────────────────
+// Sirve el JWT_SECRET al navegador, que es lo que el panel necesita para firmar
+// tokens de prueba. Solo tiene sentido en local: no exponer este puerto fuera.
+app.get("/api/config", (_req, res) => {
+  res.json({ ...PANEL_CONFIG, jwtSecretPresent: PANEL_CONFIG.jwtSecret !== "" });
+});
 
 // ── Health ────────────────────────────────────────────────────────────────────
 app.get("/api/health", async (_req, res) => {

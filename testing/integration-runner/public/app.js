@@ -366,6 +366,18 @@ function escapeHtml(s) {
 
 // ─── Panel 4: Enviar código ───────────────────────────────────────────────────
 
+const SNIPPETS = {
+  PYTHON: `a, b = map(int, input().split())\nprint(a + b)`,
+  C: `#include <stdio.h>\nint main() {\n    int a, b;\n    scanf("%d %d", &a, &b);\n    printf("%d\\n", a + b);\n    return 0;\n}`,
+  CPP: `#include <iostream>\nusing namespace std;\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}`,
+  JAVA: `import java.util.Scanner;\npublic class Solution {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        int a = sc.nextInt(), b = sc.nextInt();\n        System.out.println(a + b);\n    }\n}`,
+};
+
+$("sub-language").addEventListener("change", () => {
+  const lang = $("sub-language").value;
+  if (SNIPPETS[lang]) $("sub-code").value = SNIPPETS[lang];
+});
+
 $("btn-sync-team").addEventListener("click", () => {
   if (state.userId) $("sub-team-id").value = state.userId;
 });
@@ -583,7 +595,32 @@ function handleWsEvent(data) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
+// Carga la configuracion del .env en los campos del panel. No se rellena nada
+// desde el HTML para no dejar el JWT_SECRET escrito en un fichero del repositorio.
+async function loadConfig() {
+  try {
+    const r = await fetch("/api/config");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const cfg = await r.json();
+
+    $("jwt-secret").value      = cfg.jwtSecret;
+    $("jwt-issuer").value      = cfg.jwtIssuer;
+    $("jwt-ttl").value         = cfg.jwtTtlSeconds;
+    $("ws-url").value          = cfg.wsUrl;
+    $("ws-subprotocol").value  = cfg.wsSubprotocol;
+
+    if (cfg.jwtSecretPresent) {
+      log("Configuración cargada desde .env.");
+    } else {
+      log("Configuración cargada, pero falta JWT_SECRET en el .env: pégalo en el panel 1.");
+    }
+  } catch (err) {
+    log(`No se pudo cargar /api/config (${err.message}). Rellena el panel 1 a mano.`);
+  }
+}
+
 (function init() {
   $("manual-user-id").value = crypto.randomUUID();
+  loadConfig();
   checkHealth();
 })();
