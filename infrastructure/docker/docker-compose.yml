@@ -83,8 +83,16 @@ services:
 
     # Directorios de trabajo por ejecucion (/work/<uuid>) en RAM: se pierden al
     # reiniciar y no dejan basura. uid/gid 1000 = usuario 'ubuntu' de la imagen.
+    #
+    # 'exec' es obligatorio para C y C++: Docker monta los tmpfs con noexec por
+    # defecto, y aqui viven los binarios ya compilados que luego se montan como
+    # /solution dentro del sandbox. Sin 'exec', el noexec se propaga al bind y el
+    # exec del binario falla con "Permission denied", que el juez reporta como
+    # RUNTIME_ERROR culpando al estudiante de una limitacion de la plataforma.
+    # No relaja el sandbox: el /work escribible que ve el codigo evaluado es otro
+    # tmpfs, el que monta bwrap, y ese ya era exec. nosuid y nodev siguen puestos.
     tmpfs:
-      - /work:mode=0755,uid=1000,gid=1000,size=${JUDGE_WORK_SIZE:-256m}
+      - /work:mode=0755,uid=1000,gid=1000,exec,size=${JUDGE_WORK_SIZE:-256m}
 
     security_opt:
       # bwrap necesita mount, pivot_root y unshare, que el perfil por defecto de
@@ -107,6 +115,11 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      # judge-service no usa Redis en su codigo, pero 'shared' arrastra
+      # spring-data-redis y el health indicator del actuator intenta conectar.
+      # Sin esto apunta a localhost:6379 dentro del contenedor, donde no hay nada,
+      # y /actuator/health queda DOWN llenando el log de stack traces.
+      SPRING_DATA_REDIS_HOST: redis
       # problem-service corre fuera de este compose (por Gradle, en el host).
       PROBLEM_SERVICE_URL: ${PROBLEM_SERVICE_URL:-http://host.docker.internal:8082}
       # OBLIGATORIA, minimo 32 bytes. Se comparte con auth-service; no se pone un
@@ -114,12 +127,21 @@ services:
       # Vacia, el contenedor arranca y muere al validar la clave.
       JWT_SECRET: ${JWT_SECRET:-}
       JWT_ISSUER: ${JWT_ISSUER:-goslint-judge}
+      # DEBUG vuelca, por caso de prueba, el comando de bwrap, stdout, stderr y el
+      # motivo del veredicto. Incluye la salida del codigo evaluado y la esperada
+      # de los casos de prueba, asi que se deja en INFO salvo cuando se depura.
+      # No requiere reconstruir la imagen: basta recrear el contenedor.
+      JUDGE_SANDBOX_LOG_LEVEL: ${JUDGE_SANDBOX_LOG_LEVEL:-INFO}
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
     depends_on:
       rabbitmq:
+        condition: service_healthy
+      # Aunque el judge no lo use, el health indicator de Redis esta activo: si el
+      # contenedor no esta arriba, 'up judge-service' arranca con el log inundado.
+      redis:
         condition: service_healthy
   redis:
     image: redis:7-alpine

@@ -55,6 +55,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
        fi \
     && rm -rf /var/lib/apt/lists/*
 
+# El sandbox monta /usr en solo lectura pero NO monta /etc, y en Ubuntu
+# /usr/bin/java es un symlink a /etc/alternatives/java: dentro de bwrap queda
+# roto y la solucion Java muere con "java: not found", que el juez reporta como
+# RUNTIME_ERROR culpando al estudiante de una limitacion de la plataforma. Se
+# reemplaza por un enlace directo al binario real, que si vive bajo /usr.
+# readlink resuelve la ruta en el build para no fijar arquitectura ni version
+# del JDK. javac no necesita esto: compila fuera del sandbox, donde /etc existe.
+RUN ln -sf "$(readlink -f /usr/bin/java)" /usr/bin/java \
+    && [ -x /usr/bin/java ]
+
 # Filtro seccomp (lista negra) para el codigo evaluado. Se genera AQUI, en la
 # imagen, porque el .bpf depende de la arquitectura y de la version de libseccomp.
 # La ruta es la que espera SandboxWorkspace: /opt/judge/filter.bpf.
