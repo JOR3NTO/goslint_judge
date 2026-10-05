@@ -81,7 +81,7 @@ services:
         bind:
           create_host_path: false
 
-    # Directorios de trabajo por ejecucion (/work/<uuid>) en RAM: se pierden al
+    # Directorios de trabajo por ejecucion (/work/worker-<n>/<uuid>) en RAM: se pierden al
     # reiniciar y no dejan basura. uid/gid 1000 = usuario 'ubuntu' de la imagen.
     #
     # 'exec' es obligatorio para C y C++: Docker monta los tmpfs con noexec por
@@ -132,6 +132,12 @@ services:
       # de los casos de prueba, asi que se deja en INFO salvo cuando se depura.
       # No requiere reconstruir la imagen: basta recrear el contenedor.
       JUDGE_SANDBOX_LOG_LEVEL: ${JUDGE_SANDBOX_LOG_LEVEL:-INFO}
+      # Evaluaciones simultaneas (workers). Dimensionar por nucleos y memoria: cada
+      # una puede llegar al limite de memoria de su problema, y /work (JUDGE_WORK_SIZE)
+      # guarda a la vez los fuentes y binarios de todas.
+      JUDGE_WORKERS: ${JUDGE_WORKERS:-2}
+      # Tiempo maximo de una evaluacion completa antes de dar al worker por colgado.
+      JUDGE_EVALUATION_TIMEOUT_SECONDS: ${JUDGE_EVALUATION_TIMEOUT_SECONDS:-300}
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
