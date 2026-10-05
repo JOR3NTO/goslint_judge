@@ -102,7 +102,21 @@ JUDGE_WORKERS=6 docker compose --profile sandbox up -d judge-service
 
 ---
 
-## 6. Mapa de archivos
+## 6. Cómo probarlo
+
+El panel de integración incluye una página que lanza muchos envíos a la vez y dibuja, por cada uno, cuánto espera en la cola y cuánto tarda en evaluarse:
+
+```bash
+backend/scripts/start-services.sh          # auth, problem y submission
+backend/scripts/start-judge.sh             # juez (necesita goslint.slice activa)
+testing/integration-runner/start.sh        # panel en http://localhost:4200
+```
+
+En <http://localhost:4200/workers.html> se elige el número de envíos, la carga y el lenguaje. La página crea su propio problema, firma sus tokens y, al terminar, comprueba que el pico de evaluaciones simultáneas coincide con `JUDGE_WORKERS` y que cada envío recibió el veredicto esperado.
+
+---
+
+## 7. Mapa de archivos
 
 | Archivo | Rol |
 |---|---|
@@ -115,9 +129,9 @@ JUDGE_WORKERS=6 docker compose --profile sandbox up -d judge-service
 
 ---
 
-## 7. Estado de la validación
+## 8. Estado de la validación
 
-Validado en Manjaro x86_64 (kernel 6.18, 16 núcleos) con las clases reales del servicio, `bwrap` real y una rama de cgroups v2 delegada, **fuera del contenedor**:
+Validado en Manjaro x86_64 (kernel 6.18, 16 núcleos). Las primeras comprobaciones se hicieron con las clases reales del servicio, `bwrap` real y una rama de cgroups v2 delegada, **fuera del contenedor**; las dos últimas, con la imagen del servicio y `goslint.slice` real:
 
 | Comprobación | Resultado |
 |---|---|
@@ -127,8 +141,10 @@ Validado en Manjaro x86_64 (kernel 6.18, 16 núcleos) con las clases reales del 
 | Programa que deja un hijo en segundo plano | No queda ningún proceso ni hoja al terminar la evaluación |
 | Worker colgado con tiempo máximo de 2 s | Abandonado a los 2,0 s; el otro worker sigue evaluando; sin residuos |
 | Apagado del pool | Desaparecen las ramas y los directorios de los workers |
+| Flujo completo por RabbitMQ (`submission-service`, cola, juez con 2 workers y WebSocket), con la página de prueba de workers | 8 envíos en los cuatro lenguajes y 12 con todos los veredictos: pico de 2 evaluaciones simultáneas, el resto en cola, veredictos correctos |
+| Lo mismo **dentro del contenedor**, con `JUDGE_WORKERS=2` | 12 envíos Java, 8 en los cuatro lenguajes y 12 con todos los veredictos: pico de 2, veredictos correctos, ningún worker reiniciado y sin hojas ni archivos residuales |
 
 Pendiente de validar:
 
-- **Dentro de la imagen**, con `goslint.slice` real y el flujo completo por RabbitMQ.
+- Un worker colgado y la aceleración frente a un solo worker, **dentro del contenedor** (solo se midieron fuera).
 - Carga sostenida durante una maratón y el dimensionamiento de `MemoryMax` y `TasksMax` de la slice.
