@@ -260,7 +260,7 @@ docker run -d \
 | `--security-opt seccomp=unconfined` | El perfil por defecto de Docker bloquea `mount`, `pivot_root`, `unshare`, `setns` y `umount2`. Sin esto, `bwrap` falla con `pivot_root: Permission denied`. No se resuelve añadiendo capabilities. El código del usuario **no** queda sin filtro: bwrap le carga el suyo |
 | `--security-opt apparmor=unconfined` | El perfil `docker-default` incluye una regla `deny mount,` que bloquea la propagación de montajes de `bwrap` (`Failed to make / slave: Permission denied`). Necesario en Ubuntu y Debian |
 | `--security-opt systempaths=unconfined` | Quita las máscaras de `/proc` que Docker aplica por defecto. Sin esto el kernel rechaza `bwrap --proc /proc` (sección 7) |
-| `--tmpfs /work:...size=256m` | Directorios de trabajo por ejecución (`/work/<uuid>`) en memoria: no dejan basura y se pierden al reiniciar |
+| `--tmpfs /work:...size=256m` | Directorios de trabajo por ejecución (`/work/worker-<n>/<uuid>`) en memoria: no dejan basura y se pierden al reiniciar |
 | `--init` | `tini` como PID 1, que recoge procesos zombi |
 
 > **Lo que NO hace falta:** ninguna capability añadida (`--cap-add`) y **nunca** `--privileged`. Si alguien propone `--privileged` «para que funcione», es señal de que falta alguno de los flags de arriba.

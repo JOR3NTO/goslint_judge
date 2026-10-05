@@ -174,6 +174,7 @@ Candidatos a residir aquí:
 | [`services/submission-service/docs/WEBSOCKET.md`](./services/submission-service/docs/WEBSOCKET.md) | Canal `/ws/submissions`: autenticación en el handshake, contrato del mensaje, alcance por equipo y limitaciones |
 | [`services/judge-service/docs/BWRAP.md`](./services/judge-service/docs/BWRAP.md) | Aislamiento de la ejecución con bubblewrap: comando, qué ve el programa, filtro seccomp y códigos de salida |
 | [`services/judge-service/docs/CGROUPS.md`](./services/judge-service/docs/CGROUPS.md) | Límites y métricas por ejecución con cgroups v2: hoja por evaluación, memoria, PIDs, CPU y de dónde sale cada veredicto |
+| [`services/judge-service/docs/WORKERS.md`](./services/judge-service/docs/WORKERS.md) | Evaluación en paralelo: pool de workers, cola, fallos y cómo dimensionarlo |
 | [`services/judge-service/docs/REQUIREMENTS.md`](./services/judge-service/docs/REQUIREMENTS.md) | Lo que hay que preparar en el host: kernel, slice de cgroups y flags del contenedor |
 
 ---
@@ -339,11 +340,12 @@ Detalles que conviene conocer antes de desplegar sobre una base de datos ya exis
 | `security/ServiceTokenProvider` | Emite el JWT `role=SERVICE` del juez (HS256, secreto y emisor compartidos, `sub` = `app.security.jwt.service-id`, vigencia 5 min) y lo reutiliza hasta 30 s antes de expirar. Exige `JWT_SECRET` (mín. 32 bytes, sin valor por defecto) |
 | `client/ProblemServiceTestCaseRepositoryAdapter` | `TestCaseRepository` sobre `GET /api/v1/problems/test-cases/{id}/all` (JWT `SERVICE` en cada petición); un `404` o lista vacía es `TestCasesNotFoundException` |
 | `client/ProblemServiceLimitsAdapter` | `ProblemLimitsPort` sobre `GET /api/v1/problems/{id}` |
-| `sandbox/RunnerSandboxExecutor` | `SandboxExecutor` sobre `Runner`: escribe el fuente a un temporal, ejecuta y traduce el mapa de resultados a `JudgeResult` |
+| `sandbox/worker/JudgeWorkerPool` | `SandboxExecutor` que reparte las evaluaciones entre N workers independientes (rama de cgroups y directorio propios, un hilo por evaluación) y reinicia al que falla o se cuelga. Ver [`docs/WORKERS.md`](./services/judge-service/docs/WORKERS.md) |
+| `sandbox/RunnerSandboxExecutor` | Evaluación que ejecuta cada worker sobre `Runner`: escribe el fuente en el directorio del worker, compila, ejecuta y traduce el mapa de resultados a `JudgeResult` |
 | `web/MonitorLimitsController` | Consulta y modificación de los límites de los monitores del sandbox (solo `ADMIN`) |
 | `security/JwtAuthenticationFilter` + `config/SecurityConfig` | Autentica el HTTP con el JWT y el mismo `JwtTokenValidator` que el resto; el rol pasa a `ROLE_<rol>` para `@PreAuthorize` |
 | `persistence/InMemoryMonitorLimitsRepository` | Guarda los límites vigentes en memoria (el juez no tiene BD) |
-| `config/` | Convertidor JSON de RabbitMQ, bean del `Runner` y `RestClient` hacia `problem-service` |
+| `config/` | Convertidor JSON de RabbitMQ, beans del `Runner` y del pool de workers, y `RestClient` hacia `problem-service` |
 
 **Imagen del sandbox (`docker/`):** `judge-service` es el único servicio que **no se ejecuta con `./gradlew bootRun`** para evaluar de verdad: necesita `bubblewrap`, el filtro seccomp y una rama de cgroups delegada. Su [`Dockerfile`](./services/judge-service/docker/Dockerfile) compila el jar y lo empaqueta sobre Ubuntu con `bubblewrap` y `python3`, `gen_seccomp.py` genera el filtro en el build, y `entrypoint.sh` prepara `/cg` al arrancar. El contenedor se declara en [`infrastructure/docker/docker-compose.yml`](../infrastructure/docker/docker-compose.yml) bajo el perfil `sandbox`, de modo que un `docker compose up` normal siga levantando solo PostgreSQL y RabbitMQ:
 
