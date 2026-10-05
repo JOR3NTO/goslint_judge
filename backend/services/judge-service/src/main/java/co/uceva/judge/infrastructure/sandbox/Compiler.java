@@ -35,8 +35,9 @@ public class Compiler {
             pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
             pb.redirectError(ProcessBuilder.Redirect.DISCARD);
         }
+        Process process = null;
         try {
-            Process process = pb.start();
+            process = pb.start();
             // Hay que leer antes del waitFor: si el compilador llena el buffer de la
             // tuberia se queda bloqueado escribiendo y nunca termina.
             String compilerOutput = traceEnabled
@@ -50,11 +51,21 @@ public class Compiler {
                 }
             }
             return exitCode;
-        } catch (IOException | InterruptedException ex) {
+        } catch (IOException ex) {
             // Falla el propio compilador, no el codigo evaluado: la traza va siempre.
             log.error("excepción compilando la solución {}", solutionPath, ex);
+            return -1;
+        } catch (InterruptedException ex) {
+            log.error("compilación de la solución {} interrumpida", solutionPath, ex);
             Thread.currentThread().interrupt();
             return -1;
+        } finally {
+            // Si la evaluacion se abandona, el compilador no puede quedar vivo: corre
+            // fuera del cgroup del worker y nadie mas lo mataria.
+            if (process != null && process.isAlive()) {
+                process.descendants().forEach(ProcessHandle::destroyForcibly);
+                process.destroyForcibly();
+            }
         }
     }
 }
