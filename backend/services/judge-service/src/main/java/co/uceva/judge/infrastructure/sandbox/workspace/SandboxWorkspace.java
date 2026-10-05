@@ -14,7 +14,8 @@ import co.uceva.judge.infrastructure.sandbox.kill.CgroupKiller;
 /**
  * Representa el entorno aislado (cgroup y directorio de trabajo) creado para
  * un único intento de ejecución dentro del sandbox. Se encarga de crear ese
- * entorno y, una vez terminado el intento, de limpiarlo.
+ * entorno y, una vez terminado el intento, de limpiarlo. Ambos cuelgan del
+ * {@link WorkerEnvironment} del worker que ejecuta el intento.
  */
 public class SandboxWorkspace {
 
@@ -60,6 +61,7 @@ public class SandboxWorkspace {
      * cgroup, crea el directorio de trabajo escribible y copia en él el
      * archivo fuente de la solución.
      *
+     * @param environment  Entorno del worker bajo el que se crean el cgroup y el directorio.
      * @param memoryLimit  Límite de memoria, en bytes, asignado al cgroup.
      * @param maxPids      Número máximo de procesos simultáneos permitidos dentro del sandbox.
      * @param solutionPath Ruta del archivo fuente de la solución a ejecutar.
@@ -67,8 +69,9 @@ public class SandboxWorkspace {
      * @throws IOException Si ocurre un error creando el cgroup, el directorio
      *                      de trabajo o copiando el archivo de la solución.
      */
-    public static SandboxWorkspace create(long memoryLimit, PidsLimit maxPids, String solutionPath) throws IOException {
-        String cgLeaf = "/cg/prog-" + UUID.randomUUID().toString();
+    public static SandboxWorkspace create(WorkerEnvironment environment, long memoryLimit, PidsLimit maxPids,
+            String solutionPath) throws IOException {
+        String cgLeaf = environment.cgroupDir().resolve("prog-" + UUID.randomUUID()).toString();
         String memoryPeak = cgLeaf + "/memory.peak";
         String memoryEvents = cgLeaf + "/memory.events";
         String memoryMax = cgLeaf + "/memory.max";
@@ -96,7 +99,7 @@ public class SandboxWorkspace {
             throw new SandboxExecutionException("Error preparando el entorno de ejecución", new IOException("No se pudo establecer el límite de procesos en " + maxPids.pids() + " procesos"));
         }
         String uuid = UUID.randomUUID().toString();
-        String workDir = "/work/" + uuid;
+        String workDir = environment.workDir().resolve(uuid).toString();
         Path cgroupProcs = Path.of(cgLeaf + "/cgroup.procs");
         String seccompProfile = "/opt/judge/filter.bpf";
         Path workDirPath = Path.of(workDir);
