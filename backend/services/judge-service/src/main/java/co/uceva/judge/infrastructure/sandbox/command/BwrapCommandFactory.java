@@ -6,6 +6,8 @@ import java.util.List;
 import co.uceva.judge.domain.valueobject.VolumeSizeLimit;
 import co.uceva.judge.infrastructure.sandbox.workspace.SandboxWorkspace;
 
+
+
 /**
  * Construye el comando del sistema que ejecuta una solución dentro del
  * sandbox de {@code bubblewrap} (bwrap), aplicando aislamiento de namespaces,
@@ -25,7 +27,7 @@ public final class BwrapCommandFactory {
      * @param command       Intérprete o comando usado para ejecutar la solución.
      * @return Lista de argumentos del comando completo.
      */
-    public static List<String> build(SandboxWorkspace workspace, VolumeSizeLimit maxVolumeSize, String command) {
+    public static List<String> build(SandboxWorkspace workspace, VolumeSizeLimit maxVolumeSize, List<String> execArgs) {
 
         List<String> runCommand = new ArrayList<>(List.of(
                 "/bin/sh",
@@ -34,7 +36,7 @@ public final class BwrapCommandFactory {
                 "sh"
         ));
 
-        List<String> argsDeBwrap = List.of(
+        List<String> argsDeBwrap = new ArrayList<>(List.of(
                 // Gestion del proceso
                 "--die-with-parent", // Termina el proceso del sandbox si el proceso padre (el shell) muere.
                 "--new-session", // Crea una nueva sesion de terminal, evitando que el proceso la controle.
@@ -80,10 +82,9 @@ public final class BwrapCommandFactory {
                 "--", // Marca el fin de las opciones de bwrap y el inicio del comando a ejecutar.
                 "/bin/sh", "-c",
                 "echo $$ > /run/cgp; exec \"$@\"", // Inscribe el proceso en el cgroup y luego ejecuta el comando real.
-                "--",
-                command, // Interprete o comando con el que se ejecuta la solucion.
-                "/solution/" + workspace.origen().getFileName().toString() // Ruta, dentro del sandbox, del archivo de la solucion.
-        );
+                "--"
+        ));
+        argsDeBwrap.addAll(execArgs); // Interprete/binario y argumentos del comando a ejecutar.
 
         runCommand.addAll(argsDeBwrap);
         return runCommand;
