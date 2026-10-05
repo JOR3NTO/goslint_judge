@@ -31,7 +31,9 @@ public final class RunCommandFactory {
                 String className = filename.contains(".")
                         ? filename.substring(0, filename.lastIndexOf('.'))
                         : filename;
-                return List.of("java", "-cp", "/solution", className);
+                // Sin locale la JVM lee stdin y escribe stdout en US-ASCII: una "ñ" de la
+                // entrada o de la respuesta se convierte en "?" y el envío sale WRONG_ANSWER.
+                return List.of("java", "-Dfile.encoding=UTF-8", "-cp", "/solution", className);
 
             case PYTHON:
                 return List.of("python3", "/solution/solution.py");
