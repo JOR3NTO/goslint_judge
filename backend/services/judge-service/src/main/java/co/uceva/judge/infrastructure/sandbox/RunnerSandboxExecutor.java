@@ -11,27 +11,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import co.uceva.judge.application.port.out.SandboxExecutor;
 import co.uceva.judge.domain.exception.SandboxExecutionException;
 import co.uceva.judge.domain.model.JudgeResult;
 import co.uceva.judge.domain.model.JudgeTask;
 import co.uceva.judge.infrastructure.sandbox.command.RunCommandFactory;
+import co.uceva.judge.infrastructure.sandbox.worker.TaskEvaluator;
 import co.uceva.judge.infrastructure.sandbox.workspace.SolutionFileWriter;
+import co.uceva.judge.infrastructure.sandbox.workspace.WorkerEnvironment;
 import co.uceva.shared.domain.VerdictStatus;
 
 /**
- * Adaptador de {@link SandboxExecutor} sobre {@link Runner}: escribe el código
- * fuente en un directorio temporal, lo ejecuta contra los casos de prueba y
- * traduce el mapa de resultados del {@code Runner} a un {@link JudgeResult}.
+ * Evaluación de una tarea sobre {@link Runner}: escribe el código fuente en un
+ * directorio temporal del worker, lo compila, lo ejecuta contra los casos de
+ * prueba y traduce el mapa de resultados del {@code Runner} a un
+ * {@link JudgeResult}.
  * <p>
- * Por ahora solo se soportan lenguajes interpretados. La compilación de C, C++
- * y Java llegará con el {@code Compiler}; mientras tanto esos lenguajes fallan
- * como error del sistema y no como veredicto, para no culpar al estudiante de
- * una limitación de la plataforma.
+ * No guarda estado entre evaluaciones: todo lo que crea vive en el
+ * {@link WorkerEnvironment} recibido, así que varios workers pueden compartir
+ * la misma instancia.
  * </p>
  */
 @Component
-public class RunnerSandboxExecutor implements SandboxExecutor {
+public class RunnerSandboxExecutor implements TaskEvaluator {
 
     private static final Logger log = LoggerFactory.getLogger(RunnerSandboxExecutor.class);
 
@@ -47,14 +48,14 @@ public class RunnerSandboxExecutor implements SandboxExecutor {
     /**
      * {@inheritDoc}
      *
-     * @throws SandboxExecutionException Si el lenguaje aún no está soportado, no se puede
-     *                                   preparar el archivo fuente o el {@code Runner} devuelve un resultado incompleto.
+     * @throws SandboxExecutionException Si no se puede preparar el archivo fuente o el
+     *                                   {@code Runner} devuelve un resultado incompleto.
      */
     @Override
-    public JudgeResult execute(JudgeTask task) {
+    public JudgeResult evaluate(JudgeTask task, WorkerEnvironment environment) {
         Path workDir = null;
         try {
-            workDir = Files.createTempDirectory("judge-" + task.getSubmissionId());
+            workDir = Files.createTempDirectory(environment.workDir(), "src-");
             log.debug("evaluando envío {} en {} ({} casos de prueba)",
                     task.getSubmissionId(), task.getLanguage(), task.getTestCases().size());
             String source = SolutionFileWriter.execute(task.getLanguage(), task.getSourceCode().content(), workDir, task.getSubmissionId());
@@ -71,7 +72,7 @@ public class RunnerSandboxExecutor implements SandboxExecutor {
             }
 
             
-            Map<String, Object> result = runner.runSolution(
+            Map<String, Object> result = runner.runSolution(environment,
                     RunCommandFactory.build(task.getLanguage(), source),
                     source, task.getTestCases(),
                     task.getTimeLimit().milliseconds(), task.getMemoryLimit().kilobytes() * 1024L);

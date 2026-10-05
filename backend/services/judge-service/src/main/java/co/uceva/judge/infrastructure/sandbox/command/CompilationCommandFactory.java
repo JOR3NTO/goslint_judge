@@ -55,8 +55,13 @@ public final class CompilationCommandFactory {
                 break;
 
             case JAVA:
+                // -encoding es obligatorio: SolutionFileWriter escribe en UTF-8, pero en el
+                // contenedor no hay locale y javac asume US-ASCII, con lo que una tilde en
+                // un comentario termina en "unmappable character" y COMPILATION_ERROR.
                 command = List.of(
                     "javac",
+                    "-encoding",
+                    "UTF-8",
                     "-d",
                     workDir.toString(),
                     solutionPath

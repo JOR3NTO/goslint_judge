@@ -1,5 +1,6 @@
-# Slice de cgroups v2 donde nacen el contenedor de judge-service y las hojas
-# prog-<uuid> de cada evaluacion.
+# Slice de cgroups v2 donde nacen el contenedor de judge-service y, por cada
+# worker de evaluacion, una rama worker-<n> con las hojas prog-<uuid> de sus
+# ejecuciones.
 #
 # Hace falta porque el contenedor no puede crear su propia rama delegada desde
 # dentro: el kernel exige escritura en el ancestro comun entre el cgroup de
@@ -20,8 +21,9 @@ Before=slices.target
 
 # Tope global de TODAS las evaluaciones (recomendado, sin validar). Las hojas
 # prog-* cuelgan de la slice y no del contenedor, asi que --memory y --pids-limit
-# del contenedor no las cubren. Dimensionar como: evaluaciones simultaneas x
-# memory.max de cada una, mas el propio servicio y el /work en memoria.
+# del contenedor no las cubren. Dimensionar como: evaluaciones simultaneas
+# (JUDGE_WORKERS) x memory.max de cada una, mas el propio servicio y el /work en
+# memoria.
 # [Slice]
 # MemoryMax=
 # TasksMax=
