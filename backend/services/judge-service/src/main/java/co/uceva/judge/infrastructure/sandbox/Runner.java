@@ -18,6 +18,7 @@ import co.uceva.judge.infrastructure.sandbox.command.BwrapCommandFactory;
 import co.uceva.judge.infrastructure.sandbox.execution.TestCaseResult;
 import co.uceva.judge.infrastructure.sandbox.execution.TestCaseRunner;
 import co.uceva.judge.infrastructure.sandbox.workspace.SandboxWorkspace;
+import co.uceva.judge.infrastructure.sandbox.workspace.WorkerEnvironment;
 import co.uceva.shared.domain.VerdictStatus;
 
 /**
@@ -62,6 +63,7 @@ public class Runner {
      * límites de memoria, tiempo, salida y la comparación con la salida
      * esperada.
      *
+     * @param environment  Entorno del worker que ejecuta la solución; cada workspace se crea dentro de él.
      * @param command      Intérprete o comando usado para ejecutar la solución.
      * @param solutionPath Ruta del archivo fuente de la solución a ejecutar.
      * @param testCases    Casos de prueba del problema, en el orden en que deben ejecutarse.
@@ -72,8 +74,8 @@ public class Runner {
      *         solución no fue aceptada, el identificador del caso de prueba en el que
      *         falló ({@code failedTestCase}).
      */
-    public Map<String, Object> runSolution(List<String> execArgs, String solutionPath, List<TestCase> testCases,
-            long timeLimit, long memoryLimit) {
+    public Map<String, Object> runSolution(WorkerEnvironment environment, List<String> execArgs, String solutionPath,
+            List<TestCase> testCases, long timeLimit, long memoryLimit) {
 
         MonitorLimits limits = monitorLimitsRepository.find();
         TestCaseRunner testCaseRunner = new TestCaseRunner(limits.outputSize(), limits.errorSize(), limits.hardTimePercent(),
@@ -87,7 +89,7 @@ public class Runner {
         for (TestCase testCase : testCases) {
             SandboxWorkspace workspace = null;
             try {
-                workspace = SandboxWorkspace.create(memoryLimit, maxPids, solutionPath);
+                workspace = SandboxWorkspace.create(environment, memoryLimit, maxPids, solutionPath);
                 List<String> runCommand = BwrapCommandFactory.build(workspace, maxVolumeSize, execArgs);
 
                 TestCaseResult testResult = testCaseRunner.run(workspace, runCommand, testCase.input(), timeLimit);
