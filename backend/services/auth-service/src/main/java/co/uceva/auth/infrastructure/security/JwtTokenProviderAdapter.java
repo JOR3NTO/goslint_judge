@@ -40,6 +40,22 @@ public class JwtTokenProviderAdapter implements TokenProvider {
         return jwtExpirationAccessMs;
     }
 
+    @Override
+    public long getRemainingValidityMillis(String rawToken) {
+        try {
+            Date expiration = Jwts.parser()
+                    .verifyWith(key())
+                    .build()
+                    .parseSignedClaims(rawToken)
+                    .getPayload()
+                    .getExpiration();
+            return Math.max(0, expiration.getTime() - System.currentTimeMillis());
+        } catch (Exception e) {
+            // Expirado, mal formado o con firma inválida: no hay nada que revocar.
+            return 0;
+        }
+    }
+
     private String generateToken(User user, long expirationMs) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMs);

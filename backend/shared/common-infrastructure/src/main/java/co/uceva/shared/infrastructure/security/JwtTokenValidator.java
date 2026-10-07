@@ -35,12 +35,28 @@ public class JwtTokenValidator {
 
     private final JwtParser parser;
 
+    private final TokenBlacklist tokenBlacklist;
+
     /**
+     * Crea un validador sin consulta de revocaciones.
+     *
      * @param secret Clave compartida con la que {@code auth-service} firma los tokens.
      * @param issuer Emisor esperado; un token emitido por cualquier otro se rechaza.
      * @throws IllegalArgumentException Si la clave es demasiado corta para HMAC-SHA256.
      */
     public JwtTokenValidator(String secret, String issuer) {
+        this(secret, issuer, null);
+    }
+
+    /**
+     * @param secret         Clave compartida con la que {@code auth-service} firma los tokens.
+     * @param issuer         Emisor esperado; un token emitido por cualquier otro se rechaza.
+     * @param tokenBlacklist Consulta de tokens revocados; puede ser {@code null} si el
+     *                       servicio no verifica revocaciones.
+     * @throws IllegalArgumentException Si la clave es demasiado corta para HMAC-SHA256.
+     */
+    public JwtTokenValidator(String secret, String issuer, TokenBlacklist tokenBlacklist) {
+        this.tokenBlacklist = tokenBlacklist;
         if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_LENGTH_BYTES) {
             throw new IllegalArgumentException(
                     "La clave de firma JWT debe tener al menos %d bytes.".formatted(MIN_SECRET_LENGTH_BYTES));
@@ -68,6 +84,10 @@ public class JwtTokenValidator {
     public AuthenticatedUser validate(String token) {
         if (token == null || token.isBlank()) {
             throw new InvalidTokenException("no se recibió ningún token");
+        }
+
+        if (tokenBlacklist != null && tokenBlacklist.isBlacklisted(token)) {
+            throw new InvalidTokenException("el token ha sido revocado (sesión cerrada)");
         }
 
         Claims claims;

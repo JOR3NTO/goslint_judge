@@ -1,6 +1,7 @@
 package co.uceva.auth.infrastructure.web.controller;
 
 import co.uceva.auth.application.usecase.LoginUserUseCase;
+import co.uceva.auth.application.usecase.LogoutUserUseCase;
 import co.uceva.auth.application.usecase.RegisterUserUseCase;
 import co.uceva.auth.domain.model.AuthToken;
 import co.uceva.auth.domain.model.User;
@@ -8,6 +9,7 @@ import co.uceva.auth.infrastructure.web.dto.LoginRequest;
 import co.uceva.auth.infrastructure.web.dto.LoginResponse;
 import co.uceva.auth.infrastructure.web.dto.RegisterRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,13 +28,33 @@ public class AuthController {
 
     private final RegisterUserUseCase registerUserUseCase;
     private final LoginUserUseCase loginUserUseCase;
+    private final LogoutUserUseCase logoutUserUseCase;
 
     /**
      * Inyección de dependencias para obtener el orquestador del caso de uso.
      */
-    public AuthController(RegisterUserUseCase registerUserUseCase, LoginUserUseCase loginUserUseCase) {
+    public AuthController(RegisterUserUseCase registerUserUseCase,
+                          LoginUserUseCase loginUserUseCase,
+                          LogoutUserUseCase logoutUserUseCase) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUserUseCase = loginUserUseCase;
+        this.logoutUserUseCase = logoutUserUseCase;
+    }
+
+    /**
+     * Cierra la sesión del usuario invalidando el access token activo.
+     * Siempre devuelve 200 OK: el logout es incondicional desde la perspectiva
+     * del cliente, independientemente del estado del token en el servidor.
+     *
+     * @param authHeader Header Authorization: Bearer &lt;token&gt; (puede ser null).
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            logoutUserUseCase.logout(authHeader.substring(7).strip());
+        }
+        return ResponseEntity.ok().build();
     }
 
     /**

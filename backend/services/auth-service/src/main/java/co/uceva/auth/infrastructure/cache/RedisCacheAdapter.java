@@ -1,19 +1,21 @@
 package co.uceva.auth.infrastructure.cache;
 
 import co.uceva.auth.domain.repository.AuthCacheRepository;
+import co.uceva.shared.infrastructure.security.TokenBlacklist;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
 @Component
-public class RedisCacheAdapter implements AuthCacheRepository {
+public class RedisCacheAdapter implements AuthCacheRepository, TokenBlacklist {
 
     private final StringRedisTemplate redisTemplate;
     
     private static final String FAILED_ATTEMPTS_PREFIX = "auth:failed_attempts:";
     private static final String LOCK_PREFIX = "auth:lock:";
     private static final String REFRESH_TOKEN_PREFIX = "auth:refresh_token:";
+    private static final String BLACKLIST_PREFIX = "auth:blacklist:";
 
     public RedisCacheAdapter(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
@@ -58,5 +60,20 @@ public class RedisCacheAdapter implements AuthCacheRepository {
     @Override
     public void saveRefreshToken(String userId, String token, long durationMillis) {
         redisTemplate.opsForValue().set(REFRESH_TOKEN_PREFIX + userId, token, Duration.ofMillis(durationMillis));
+    }
+
+    @Override
+    public void blacklistToken(String rawToken, long ttlMillis) {
+        redisTemplate.opsForValue().set(BLACKLIST_PREFIX + rawToken, "REVOKED", Duration.ofMillis(ttlMillis));
+    }
+
+    @Override
+    public boolean isTokenBlacklisted(String rawToken) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + rawToken));
+    }
+
+    @Override
+    public boolean isBlacklisted(String rawToken) {
+        return isTokenBlacklisted(rawToken);
     }
 }
