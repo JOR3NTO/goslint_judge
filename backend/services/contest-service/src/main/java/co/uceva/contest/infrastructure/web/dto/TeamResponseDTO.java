@@ -9,6 +9,7 @@ import java.util.UUID;
  *
  * @param id          Identificador del equipo.
  * @param contestId   Identificador del concurso.
+ * @param captainId   Capitán del equipo.
  * @param teamName    Nombre del equipo.
  * @param score       Puntos acumulados.
  * @param penaltyTime Tiempo de penalización acumulado.
@@ -18,6 +19,7 @@ import java.util.UUID;
 public record TeamResponseDTO(
     UUID id,
     UUID contestId,
+    UUID captainId,
     String teamName,
     int score,
     long penaltyTime,

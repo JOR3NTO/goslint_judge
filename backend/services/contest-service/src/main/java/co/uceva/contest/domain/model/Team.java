@@ -41,6 +41,8 @@ public class Team {
     private final UUID id;
     /** Identificador del concurso al que pertenece el equipo. */
     private final UUID contestId;
+    /** Capitán del equipo; es el único que puede invitar. Nulo solo en equipos anteriores a esta regla. */
+    private final UUID captainId;
     /** Nombre representativo del equipo. */
     private TeamName teamName;
     /** Puntaje acumulado y tiempo de penalización del equipo. */
@@ -61,7 +63,7 @@ public class Team {
      * @param members   Lista de integrantes iniciales.
      */
     @Builder
-    private Team(UUID id, UUID contestId, TeamName teamName, TeamScore teamScore,
+    private Team(UUID id, UUID contestId, UUID captainId, TeamName teamName, TeamScore teamScore,
                  Instant createdAt, List<Member> members) {
         if (contestId == null) {
             throw new InvalidTeamException("El identificador del concurso es obligatorio.");
@@ -71,6 +73,7 @@ public class Team {
         }
         this.id = id != null ? id : UUID.randomUUID();
         this.contestId = contestId;
+        this.captainId = captainId;
         this.teamName = teamName;
         this.teamScore = teamScore != null ? teamScore : TeamScore.ZERO;
         this.createdAt = createdAt != null ? createdAt : Instant.now();
@@ -100,7 +103,11 @@ public class Team {
      * @return Una instancia de {@link Team} con el creador como primer integrante.
      */
     public static Team create(UUID contestId, TeamName teamName, UUID creatorUserId) {
-        Team team = create(contestId, teamName);
+        Team team = Team.builder()
+                .contestId(contestId)
+                .captainId(creatorUserId)
+                .teamName(teamName)
+                .build();
         team.addMember(creatorUserId);
         return team;
     }
@@ -170,6 +177,14 @@ public class Team {
      * @param userId Identificador del usuario a consultar.
      * @return {@code true} si el usuario es miembro del equipo; {@code false} en caso contrario.
      */
+    public boolean isCaptain(UUID userId) {
+        return userId != null && userId.equals(this.captainId);
+    }
+
+    public boolean isFull() {
+        return this.members.size() >= DEFAULT_MAX_MEMBERS;
+    }
+
     public boolean hasMember(UUID userId) {
         if (userId == null) {
             return false;

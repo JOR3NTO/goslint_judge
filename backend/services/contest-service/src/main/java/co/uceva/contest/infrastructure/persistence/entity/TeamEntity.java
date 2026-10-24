@@ -39,6 +39,10 @@ public class TeamEntity {
     @Column(name = "contest_id", nullable = false, updatable = false)
     private UUID contestId;
 
+    /** Capitán del equipo; nulo en equipos anteriores a esta regla. */
+    @Column(name = "captain_id", updatable = false)
+    private UUID captainId;
+
     /** Nombre del equipo, único dentro del concurso. */
     @Column(name = "team_name", nullable = false)
     private String teamName;

@@ -6,14 +6,16 @@ import java.util.UUID;
 import co.uceva.contest.application.usecase.*;
 import co.uceva.contest.infrastructure.web.dto.*;
 import co.uceva.contest.infrastructure.web.mapper.TeamWebMapper;
+import co.uceva.shared.infrastructure.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * Controlador REST de equipos e integrantes. Delega toda la lógica en los casos de uso.
- * Crear, editar y gestionar integrantes exige estar autenticado; eliminar un equipo,
+ * Crear y editar equipos y quitar integrantes exige estar autenticado; eliminar un equipo,
  * rol {@code ADMIN} u {@code ORGANIZER}; las consultas son públicas.
  */
 @RestController
@@ -61,13 +63,14 @@ public class TeamController {
         this.getMembersByTeamUseCase = getMembersByTeamUseCase;
     }
 
-    /** Crea un equipo en el concurso; el creador queda como primer integrante. 201 CREATED. */
+    /** Crea un equipo en el concurso; el usuario autenticado queda como capitán y primer integrante. 201 CREATED. */
     @PostMapping("/contests/{contestId}/teams")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TeamResponseDTO> create(
             @PathVariable("contestId") UUID contestId,
+            @AuthenticationPrincipal AuthenticatedUser user,
             @RequestBody CreateTeamRequestDTO request) {
-        var created = createTeamUseCase.execute(TeamWebMapper.toCommand(contestId, request));
+        var created = createTeamUseCase.execute(TeamWebMapper.toCommand(contestId, user.userId(), request));
         return ResponseEntity.status(HttpStatus.CREATED).body(TeamWebMapper.toResponse(created));
     }
 
@@ -127,8 +130,9 @@ public class TeamController {
                 .map(TeamWebMapper::toResponse).toList());
     }
 
+    /** Agrega un integrante directamente, sin invitación; solo administradores y organizadores. */
     @PostMapping("/teams/{id}/members")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
     public ResponseEntity<MemberResponseDTO> addMember(
             @PathVariable("id") UUID id,
             @RequestBody AddMemberRequestDTO request) {

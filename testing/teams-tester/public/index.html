@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Equipos e invitaciones · goslint-judge</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header>
+  <h1><span class="logo">&lt;/&gt;</span> Probador de equipos e invitaciones</h1>
+  <p class="subtitle">contest-service: concursos → equipos (capitán) → invitaciones por correo → aceptar/rechazar → límite de 3 y cierre al iniciar.</p>
+</header>
+
+<div class="topbar">
+  <div class="service-item"><span class="dot dot-unknown" id="dot-contest"></span> contest-service <code id="contest-url">:8086</code></div>
+  <button type="button" id="btn-health" class="btn-small">Verificar</button>
+  <label class="actor-pick">Actuar como
+    <select id="actor"></select>
+  </label>
+  <span class="actor-badge" id="actor-badge"></span>
+</div>
+
+<main>
+  <section class="panel">
+    <h2>1. Configuración</h2>
+    <p class="hint">Se carga desde <code>backend/services/submission-service/.env</code> vía <code>GET /api/config</code>; ningún valor está en este HTML.</p>
+    <div class="grid">
+      <label class="full">JWT_SECRET
+        <input id="jwt-secret" type="password" autocomplete="off" placeholder="se carga desde .env" />
+      </label>
+      <label>JWT Issuer <input id="jwt-issuer" type="text" /></label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>2. Usuarios de prueba</h2>
+    <p class="hint">Cada uno tiene un UUID inventado y se firma su JWT en el navegador. El correo es el destino de la invitación: pon el tuyo para recibirla de verdad.</p>
+    <table class="table" id="actors-table">
+      <thead><tr><th>Nombre</th><th>Rol</th><th>Correo</th><th>userId</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row">
+      <button type="button" id="btn-add-student">+ Estudiante</button>
+      <button type="button" id="btn-add-organizer">+ Organizador</button>
+      <button type="button" id="btn-reset-actors" class="btn-ghost">Regenerar todos</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>3. Escenarios rápidos</h2>
+    <p class="hint">Usan el primer organizador y el primer estudiante (capitán), sin importar el actor seleccionado.</p>
+    <div class="row">
+      <button type="button" id="btn-scn-basic">Maratón (inicia en 1 h) + equipo</button>
+      <button type="button" id="btn-scn-soon">Maratón que inicia en 1 min + equipo</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>4. Concursos</h2>
+    <div class="grid">
+      <label>Título <input id="c-title" type="text" value="Maratón de prueba" /></label>
+      <label>Contraseña de inscripción <input id="c-password" type="text" value="clave123" /></label>
+      <label>Inicia en (minutos) <input id="c-start" type="number" value="60" min="1" /></label>
+      <label>Duración (minutos) <input id="c-duration" type="number" value="180" min="1" /></label>
+    </div>
+    <div class="row">
+      <button type="button" id="btn-create-contest">Crear concurso</button>
+      <button type="button" id="btn-list-contests" class="btn-ghost">Recargar lista</button>
+    </div>
+    <div id="contests" class="list"></div>
+  </section>
+
+  <section class="panel">
+    <h2>5. Equipos del concurso <span class="sel" id="sel-contest">— ninguno seleccionado</span></h2>
+    <div class="grid">
+      <label>Nombre del equipo <input id="t-name" type="text" value="Los Compiladores" /></label>
+      <label>Contraseña del concurso <input id="t-password" type="text" value="clave123" /></label>
+    </div>
+    <div class="row">
+      <button type="button" id="btn-create-team">Crear equipo (el actor queda como capitán)</button>
+      <button type="button" id="btn-list-teams" class="btn-ghost">Recargar equipos</button>
+      <button type="button" id="btn-scoreboard" class="btn-ghost">Scoreboard</button>
+      <label class="inline">Filtrar por nombre <input id="t-filter" type="text" placeholder="opcional" /></label>
+    </div>
+    <div id="teams" class="cards"></div>
+  </section>
+
+  <section class="panel">
+    <h2>6. Invitaciones <span class="sel" id="sel-team">— ningún equipo seleccionado</span></h2>
+    <div class="grid">
+      <label>Invitar a <select id="i-user"></select></label>
+      <label>Correo destino <input id="i-email" type="email" /></label>
+    </div>
+    <div class="row">
+      <button type="button" id="btn-invite">Invitar (como capitán = actor)</button>
+      <button type="button" id="btn-add-member" class="btn-ghost">Agregar directo sin invitación (admin/organizador)</button>
+    </div>
+    <h3>Mis invitaciones <span class="sel" id="my-inv-who"></span></h3>
+    <div class="row"><button type="button" id="btn-my-invitations" class="btn-ghost">Recargar</button></div>
+    <div id="invitations" class="list"></div>
+  </section>
+
+  <section class="panel">
+    <h2>7. Registro</h2>
+    <div class="row"><button type="button" id="btn-clear-log" class="btn-ghost">Limpiar</button></div>
+    <div id="log" class="log"></div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -60,6 +60,8 @@ public class CreateTeamUseCaseImpl implements CreateTeamUseCase {
         Contest contest = contestRepository.findById(command.contestId())
                 .orElseThrow(() -> new ContestNotFoundException(command.contestId()));
 
+        contest.assertRegistrationOpen();
+
         if (command.contestPassword() == null
                 || !passwordEncoder.matches(command.contestPassword(), contest.getPasswordHash())) {
             throw new InvalidContestPasswordException(command.contestId());

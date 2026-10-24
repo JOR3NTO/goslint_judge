@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import co.uceva.contest.domain.valueobject.ContestPeriod;
+import co.uceva.contest.domain.exception.RegistrationClosedException;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -150,5 +151,16 @@ public class Contest {
     /** @return La fecha y hora de finalización del concurso. */
     public Instant getEndTime() {
         return period != null ? period.getEndTime() : null;
+    }
+
+    /**
+     * Verifica que las inscripciones e invitaciones sigan abiertas, es decir, que el concurso no haya iniciado.
+     *
+     * @throws RegistrationClosedException si el concurso ya inició.
+     */
+    public void assertRegistrationOpen() {
+        if (!Instant.now().isBefore(getStartTime())) {
+            throw new RegistrationClosedException(id);
+        }
     }
 }
