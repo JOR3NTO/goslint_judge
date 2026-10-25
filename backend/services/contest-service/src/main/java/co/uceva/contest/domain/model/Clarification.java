@@ -3,6 +3,7 @@ package co.uceva.contest.domain.model;
 import java.time.Instant;
 import java.util.UUID;
 
+import co.uceva.contest.domain.exception.ClarificationAlreadyAnsweredException;
 import co.uceva.contest.domain.exception.InvalidClarificationException;
 import lombok.Builder;
 import lombok.Getter;
@@ -94,11 +95,12 @@ public class Clarification {
      * Responde la aclaración y la marca como {@link ClarificationStatus#ANSWERED}.
      *
      * @param text Respuesta; no vacía y de hasta {@value #MAX_TEXT_LENGTH} caracteres.
-     * @throws InvalidClarificationException si ya fue respondida o la respuesta es inválida.
+     * @throws ClarificationAlreadyAnsweredException si ya fue respondida.
+     * @throws InvalidClarificationException         si la respuesta es inválida.
      */
     public void answer(String text) {
         if (isAnswered()) {
-            throw new InvalidClarificationException("La aclaración ya fue respondida.");
+            throw new ClarificationAlreadyAnsweredException();
         }
         this.answer = validText(text, "La respuesta");
         this.status = ClarificationStatus.ANSWERED;
