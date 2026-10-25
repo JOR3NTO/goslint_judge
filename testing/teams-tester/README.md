@@ -36,6 +36,8 @@ No necesita `npm install`: usa solo módulos nativos de Node 20+.
    el de **3 problemas con globo** crea un concurso con los 3 primeros problemas de problem-service.
    En **Problemas del concurso** eliges un problema del catálogo (alias, posición y color se sugieren),
    lo asignas, y editas o retiras cada fila en el mismo lugar.
+   En **Aclaraciones** (públicas) el actor pregunta sobre un problema, siempre que esté en un equipo del
+   concurso, y el organizador responde desde la misma lista.
 3. **Invitaciones**: invita como capitán; luego cambia de actor al invitado para
    verlas en "Mis invitaciones" y responder por la API o con el enlace del correo.
 

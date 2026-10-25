@@ -127,7 +127,21 @@
   </section>
 
   <section class="panel">
-    <h2>8. Registro</h2>
+    <h2>8. Aclaraciones <span class="sel" id="sel-contest-clarifications">— ninguno seleccionado</span></h2>
+    <p class="hint">Son públicas: todos ven todas las del concurso. Pregunta el actor (debe estar en un equipo del concurso); responder exige organizador y se hace como el primero si el actor es estudiante.</p>
+    <div class="grid">
+      <label>Problema <select id="k-problem"></select></label>
+      <label class="full">Pregunta <textarea id="k-question" rows="2" maxlength="2000" placeholder="¿El límite incluye el 0?"></textarea></label>
+    </div>
+    <div class="row">
+      <button type="button" id="btn-ask">Preguntar (como el actor)</button>
+      <button type="button" id="btn-list-clarifications" class="btn-ghost">Recargar aclaraciones</button>
+    </div>
+    <div id="clarifications" class="list"></div>
+  </section>
+
+  <section class="panel">
+    <h2>9. Registro</h2>
     <div class="row"><button type="button" id="btn-clear-log" class="btn-ghost">Limpiar</button></div>
     <div id="log" class="log"></div>
   </section>

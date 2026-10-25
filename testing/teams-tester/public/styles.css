@@ -61,11 +61,11 @@ main { padding: 16px 32px 48px; display: grid; gap: 16px; max-width: 1200px; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--dim); }
 label.inline { flex-direction: row; align-items: center; gap: 8px; }
 
-input, select {
+input, select, textarea {
   background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
   border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 14px;
 }
-input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
 
@@ -91,7 +91,10 @@ code, .mono { font-family: "Geist Mono", Consolas, monospace; font-size: 12px; }
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px;
 }
-#contests, #problems, #invitations { max-height: 300px; overflow: auto; padding-right: 4px; }
+textarea { resize: vertical; font-family: inherit; }
+.answer { display: flex; gap: 8px; width: 100%; }
+.answer input { flex: 1; }
+#contests, #problems, #invitations, #clarifications { max-height: 300px; overflow: auto; padding-right: 4px; }
 .item.selected { border-color: var(--accent); }
 .item .grow { flex: 1; min-width: 200px; }
 .muted { color: var(--dim); }
@@ -105,7 +108,7 @@ code, .mono { font-family: "Geist Mono", Consolas, monospace; font-size: 12px; }
 
 .pill { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); }
 .pill-PENDING { color: var(--warn); border-color: #5a4a1f; }
-.pill-ACCEPTED { color: var(--ok); border-color: #1f5a28; }
+.pill-ACCEPTED, .pill-ANSWERED { color: var(--ok); border-color: #1f5a28; }
 .pill-REJECTED { color: var(--dim); }
 .pill-EXPIRED { color: var(--err); border-color: #5a1f22; }
 .pill-captain { color: var(--accent); border-color: #1f5a28; }

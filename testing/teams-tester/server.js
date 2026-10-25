@@ -62,6 +62,7 @@ function serveStatic(req, res) {
 }
 
 http.createServer((req, res) => {
+  if (req.url === "/favicon.ico") { res.writeHead(204); return res.end(); }
   if (req.url === "/api/config") return sendJson(res, 200, { ...CONFIG, jwtSecretPresent: CONFIG.jwtSecret !== "" });
   if (req.url.startsWith("/svc/")) return proxy(req, res, CONTEST_URL, "/svc");
   if (req.url.startsWith("/psvc/")) {

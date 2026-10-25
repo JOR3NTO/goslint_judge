@@ -49,6 +49,7 @@ const state = {
   teams: [],
   catalog: [],
   problems: [],
+  clarifications: [],
 };
 
 const STORAGE_KEY = "teams-tester:actors";
@@ -60,7 +61,7 @@ function saveActors() {
 // Sesión: concurso y equipo elegidos y lo escrito en los formularios, para seguir donde se dejó.
 const SESSION_KEY = "teams-tester:session";
 const FORM_FIELDS = ["c-title", "c-password", "c-start", "c-duration", "t-name", "t-password", "t-filter",
-  "p-alias", "p-order", "p-points", "p-penalty", "p-color", "i-user", "i-email"];
+  "k-question", "p-alias", "p-order", "p-points", "p-penalty", "p-color", "i-user", "i-email"];
 
 function saveSession() {
   const fields = Object.fromEntries(FORM_FIELDS.map(id => [id, $(id).value]));
@@ -131,7 +132,7 @@ async function api(method, path, body, as = actor()) {
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   const summary = data?.message
     ?? (Array.isArray(data) ? `${data.length} elemento(s)`
-      : data?.id ? `${data.teamName || data.title || data.status || ""} id=${short(data.id)}`.trim()
+      : data?.id ? `${data.teamName || data.title || data.alias || data.status || ""} id=${short(data.id)}`.trim()
         : (data ? JSON.stringify(data) : ""));
   log(`${as.name} (${as.role}) → ${method} ${path}  ⇒  ${res.status}  ${summary}`, res.ok ? "ok" : "err");
   return { ok: res.ok, status: res.status, data };
@@ -223,6 +224,7 @@ function showSelection() {
   const c = state.contestTitle ? `— ${state.contestTitle}` : "— ninguno seleccionado";
   $("sel-contest").textContent = c;
   $("sel-contest-problems").textContent = c;
+  $("sel-contest-clarifications").textContent = c;
   $("sel-team").textContent = state.teamName ? `— ${state.teamName}` : "— ningún equipo seleccionado";
 }
 
@@ -236,6 +238,7 @@ function selectContest(id, title) {
   loadContests();
   loadTeams();
   loadProblems();
+  loadClarifications();
 }
 
 // ─── Equipos ─────────────────────────────────────────────────────────────────
@@ -275,6 +278,7 @@ async function loadTeams() {
   state.teams = data;
   if (state.teamId && !data.some(t => t.id === state.teamId)) { state.teamId = null; state.teamName = null; showSelection(); saveSession(); }
   renderTeams(data);
+  renderClarifications();
 }
 
 function selectTeam(id, name) {
@@ -380,6 +384,8 @@ function renderProblems() {
       <button type="button" class="btn-small" data-save-problem="${p.id}">Guardar</button>
       <button type="button" class="btn-small btn-danger" data-remove-problem="${p.id}">Retirar</button>
     </div>`).join("") : '<p class="muted">Este concurso no tiene problemas.</p>';
+  fillClarificationProblems();
+  renderClarifications();
 }
 
 async function loadProblems() {
@@ -393,6 +399,45 @@ async function loadProblems() {
 
 async function addProblem(as, body) {
   return api("POST", `/contests/${state.contestId}/problems`, body, as);
+}
+
+// ─── Aclaraciones ────────────────────────────────────────────────────────────
+
+const teamLabel = teamId => state.teams.find(t => t.id === teamId)?.teamName || `equipo ${short(teamId)}`;
+const problemAlias = id => state.problems.find(p => p.id === id)?.alias || short(id);
+
+// El selector de problemas de la pregunta sigue a los problemas asignados al concurso (panel 5).
+function fillClarificationProblems() {
+  const keep = $("k-problem").value;
+  $("k-problem").innerHTML = state.problems.length
+    ? state.problems.map(p => `<option value="${p.id}">${esc(p.alias)} · ${esc(problemTitle(p.problemId))}</option>`).join("")
+    : '<option value="">(el concurso no tiene problemas)</option>';
+  if (state.problems.some(p => p.id === keep)) $("k-problem").value = keep;
+}
+
+function renderClarifications() {
+  $("clarifications").innerHTML = !state.contestId ? '<p class="muted">Selecciona un concurso (panel 4).</p>'
+    : state.clarifications.length ? state.clarifications.map(c => `
+    <div class="item">
+      <div class="grow">
+        <strong>${esc(problemAlias(c.problemId))}</strong> · ${esc(teamLabel(c.teamId))}
+        <span class="pill pill-${c.status}">${c.status}</span>
+        <div class="muted">preguntó ${fmtDate(c.createdAt)}${c.answeredAt ? ` · respondida ${fmtDate(c.answeredAt)}` : ""}</div>
+        <div>❓ ${esc(c.question)}</div>
+        ${c.answer ? `<div>💬 ${esc(c.answer)}</div>` : ""}
+      </div>
+      ${c.status === "PENDING" ? `<div class="answer">
+        <input type="text" placeholder="Respuesta…" maxlength="2000" aria-label="Respuesta" />
+        <button type="button" class="btn-small" data-answer="${c.id}">Responder</button></div>` : ""}
+    </div>`).join("") : '<p class="muted">Este concurso no tiene aclaraciones.</p>';
+}
+
+async function loadClarifications() {
+  if (!state.contestId) { state.clarifications = []; renderClarifications(); return; }
+  const { ok, data } = await api("GET", `/contests/${state.contestId}/clarifications`);
+  if (!ok) return;
+  state.clarifications = data;
+  renderClarifications();
 }
 
 // ─── Escenarios ──────────────────────────────────────────────────────────────
@@ -487,6 +532,19 @@ $("problems").addEventListener("click", async e => {
   if (d.removeProblem && (await api("DELETE", `/contest-problems/${d.removeProblem}`, undefined, staff())).ok) loadProblems();
 });
 
+$("btn-list-clarifications").onclick = () => requireContest() && loadClarifications();
+$("btn-ask").onclick = async () => {
+  if (!requireContest()) return;
+  const r = await api("POST", `/contest-problems/${$("k-problem").value}/clarifications`, { question: $("k-question").value });
+  if (r.ok) { $("k-question").value = ""; saveSession(); await loadClarifications(); }
+};
+$("clarifications").addEventListener("click", async e => {
+  const id = e.target.dataset.answer;
+  if (!id) return;
+  const text = e.target.closest(".answer").querySelector("input").value;
+  if ((await api("POST", `/clarifications/${id}/answer`, { answer: text }, staff())).ok) loadClarifications();
+});
+
 // Guarda la sesión al escribir en cualquier campo persistente.
 document.addEventListener("input", e => { if (FORM_FIELDS.includes(e.target.id)) saveSession(); });
 $("i-user").addEventListener("change", saveSession);
@@ -576,7 +634,8 @@ async function loadConfig() {
   checkHealth();
   await loadCatalog();
   loadContests();
-  loadProblems();
+  await loadProblems();
+  loadClarifications();
   loadTeams();
   loadMyInvitations();
 })();
