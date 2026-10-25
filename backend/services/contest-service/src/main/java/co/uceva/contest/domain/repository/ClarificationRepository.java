@@ -30,17 +30,10 @@ public interface ClarificationRepository {
 
     /**
      * Recupera las aclaraciones de todos los problemas de un concurso, de la más reciente a la más antigua.
+     * Las aclaraciones son públicas: la lista es la misma para todos los participantes.
      *
      * @param contestId Identificador del concurso.
      * @return Lista de aclaraciones del concurso.
      */
     List<Clarification> findAllByContestId(UUID contestId);
-
-    /**
-     * Recupera las aclaraciones enviadas por un equipo, de la más reciente a la más antigua.
-     *
-     * @param teamId Identificador del equipo.
-     * @return Lista de aclaraciones del equipo.
-     */
-    List<Clarification> findAllByTeamId(UUID teamId);
 }
