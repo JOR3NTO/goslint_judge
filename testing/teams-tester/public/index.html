@@ -10,12 +10,14 @@
 
 <header>
   <h1><span class="logo">&lt;/&gt;</span> Probador de equipos e invitaciones</h1>
-  <p class="subtitle">contest-service: concursos → equipos (capitán) → invitaciones por correo → aceptar/rechazar → límite de 3 y cierre al iniciar.</p>
+  <p class="subtitle">contest-service: concursos → problemas con globo → equipos (capitán) → invitaciones por correo → aceptar/rechazar → límite de 3 y cierre al iniciar.</p>
 </header>
 
 <div class="topbar">
   <div class="service-item"><span class="dot dot-unknown" id="dot-contest"></span> contest-service <code id="contest-url">:8086</code></div>
+  <div class="service-item"><span class="dot dot-unknown" id="dot-problem"></span> problem-service <code id="problem-url">:8082</code></div>
   <button type="button" id="btn-health" class="btn-small">Verificar</button>
+  <button type="button" id="btn-forget" class="btn-small btn-ghost" title="Olvida concurso, equipo y formularios guardados (los usuarios de prueba se conservan)">Olvidar sesión</button>
   <label class="actor-pick">Actuar como
     <select id="actor"></select>
   </label>
@@ -54,6 +56,7 @@
     <div class="row">
       <button type="button" id="btn-scn-basic">Maratón (inicia en 1 h) + equipo</button>
       <button type="button" id="btn-scn-soon">Maratón que inicia en 1 min + equipo</button>
+      <button type="button" id="btn-scn-problems">Maratón + 3 problemas con globo + equipo</button>
     </div>
   </section>
 
@@ -73,7 +76,27 @@
   </section>
 
   <section class="panel">
-    <h2>5. Equipos del concurso <span class="sel" id="sel-contest">— ninguno seleccionado</span></h2>
+    <h2>5. Problemas del concurso <span class="sel" id="sel-contest-problems">— ninguno seleccionado</span></h2>
+    <p class="hint">Asignar, editar y retirar exige organizador: si el actor es estudiante, se usa el primer organizador. El alias y la posición se sugieren solos.</p>
+    <div class="grid">
+      <label class="full">Problema (de problem-service)
+        <select id="p-problem"></select>
+      </label>
+      <label>Alias <input id="p-alias" type="text" maxlength="10" /></label>
+      <label>Posición <input id="p-order" type="number" min="0" value="0" /></label>
+      <label>Puntos <input id="p-points" type="number" min="1" value="1" /></label>
+      <label>Color del globo <input id="p-color" type="color" value="#e53935" /></label>
+    </div>
+    <div class="row">
+      <button type="button" id="btn-add-problem">Asignar al concurso</button>
+      <button type="button" id="btn-list-problems" class="btn-ghost">Recargar problemas</button>
+      <button type="button" id="btn-reload-catalog" class="btn-ghost">Recargar catálogo</button>
+    </div>
+    <div id="problems" class="list"></div>
+  </section>
+
+  <section class="panel">
+    <h2>6. Equipos del concurso <span class="sel" id="sel-contest">— ninguno seleccionado</span></h2>
     <div class="grid">
       <label>Nombre del equipo <input id="t-name" type="text" value="Los Compiladores" /></label>
       <label>Contraseña del concurso <input id="t-password" type="text" value="clave123" /></label>
@@ -88,7 +111,7 @@
   </section>
 
   <section class="panel">
-    <h2>6. Invitaciones <span class="sel" id="sel-team">— ningún equipo seleccionado</span></h2>
+    <h2>7. Invitaciones <span class="sel" id="sel-team">— ningún equipo seleccionado</span></h2>
     <div class="grid">
       <label>Invitar a <select id="i-user"></select></label>
       <label>Correo destino <input id="i-email" type="email" /></label>
@@ -103,7 +126,7 @@
   </section>
 
   <section class="panel">
-    <h2>7. Registro</h2>
+    <h2>8. Registro</h2>
     <div class="row"><button type="button" id="btn-clear-log" class="btn-ghost">Limpiar</button></div>
     <div id="log" class="log"></div>
   </section>

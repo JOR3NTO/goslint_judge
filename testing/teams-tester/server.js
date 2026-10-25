@@ -12,6 +12,7 @@ try {
 
 const PORT        = Number(process.env.TEAMS_TESTER_PORT || 4300);
 const CONTEST_URL = (process.env.CONTEST_URL || "http://localhost:8086").replace(/\/+$/, "");
+const PROBLEM_URL = (process.env.PROBLEM_URL || "http://localhost:8082").replace(/\/+$/, "");
 const PUBLIC_DIR  = path.join(__dirname, "public");
 
 // Sirve el JWT_SECRET al navegador para firmar tokens de prueba: solo en local.
@@ -19,6 +20,7 @@ const CONFIG = {
   jwtSecret:  process.env.JWT_SECRET || "",
   jwtIssuer:  process.env.JWT_ISSUER || "goslint-judge",
   contestUrl: CONTEST_URL,
+  problemUrl: PROBLEM_URL,
 };
 
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
@@ -28,14 +30,15 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-async function proxy(req, res) {
+// Reenvía /svc/* a contest-service y /psvc/* (solo lectura) a problem-service.
+async function proxy(req, res, baseUrl, prefix) {
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const headers = {};
   if (req.headers["content-type"])  headers["Content-Type"]  = req.headers["content-type"];
   if (req.headers.authorization)    headers["Authorization"] = req.headers.authorization;
   try {
-    const upstream = await fetch(CONTEST_URL + req.url.slice("/svc".length), {
+    const upstream = await fetch(baseUrl + req.url.slice(prefix.length), {
       method: req.method,
       headers,
       body: ["GET", "HEAD"].includes(req.method) ? undefined : Buffer.concat(chunks),
@@ -43,7 +46,7 @@ async function proxy(req, res) {
     res.writeHead(upstream.status, { "Content-Type": upstream.headers.get("content-type") || "text/plain" });
     res.end(Buffer.from(await upstream.arrayBuffer()));
   } catch (err) {
-    sendJson(res, 502, { message: `No se pudo conectar a contest-service (${CONTEST_URL}): ${err.message}` });
+    sendJson(res, 502, { message: `No se pudo conectar a ${baseUrl}: ${err.message}` });
   }
 }
 
@@ -60,8 +63,12 @@ function serveStatic(req, res) {
 
 http.createServer((req, res) => {
   if (req.url === "/api/config") return sendJson(res, 200, { ...CONFIG, jwtSecretPresent: CONFIG.jwtSecret !== "" });
-  if (req.url.startsWith("/svc/")) return proxy(req, res);
+  if (req.url.startsWith("/svc/")) return proxy(req, res, CONTEST_URL, "/svc");
+  if (req.url.startsWith("/psvc/")) {
+    if (req.method !== "GET") return sendJson(res, 405, { message: "problem-service es de solo lectura desde el probador" });
+    return proxy(req, res, PROBLEM_URL, "/psvc");
+  }
   serveStatic(req, res);
 }).listen(PORT, "127.0.0.1", () => {
-  console.log(`Probador de equipos e invitaciones: http://localhost:${PORT}  (contest-service: ${CONTEST_URL})`);
+  console.log(`Probador de equipos e invitaciones: http://localhost:${PORT}  (contest-service: ${CONTEST_URL}, problem-service: ${PROBLEM_URL})`);
 });

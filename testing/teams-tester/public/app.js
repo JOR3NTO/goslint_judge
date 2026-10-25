@@ -39,18 +39,46 @@ async function emailLink(invitationId, action) {
 
 const state = {
   contestUrl: "http://localhost:8086",
+  problemUrl: "http://localhost:8082",
   actors: [],
   actorId: null,
   contestId: null,
   contestTitle: null,
   teamId: null,
+  teamName: null,
   teams: [],
+  catalog: [],
+  problems: [],
 };
 
 const STORAGE_KEY = "teams-tester:actors";
 
 function saveActors() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ actors: state.actors, actorId: state.actorId })); } catch { }
+}
+
+// Sesión: concurso y equipo elegidos y lo escrito en los formularios, para seguir donde se dejó.
+const SESSION_KEY = "teams-tester:session";
+const FORM_FIELDS = ["c-title", "c-password", "c-start", "c-duration", "t-name", "t-password", "t-filter",
+  "p-alias", "p-order", "p-points", "p-color", "i-user", "i-email"];
+
+function saveSession() {
+  const fields = Object.fromEntries(FORM_FIELDS.map(id => [id, $(id).value]));
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({
+      contestId: state.contestId, contestTitle: state.contestTitle,
+      teamId: state.teamId, teamName: state.teamName, fields,
+    }));
+  } catch { }
+}
+
+function loadSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY));
+    if (!s) return;
+    Object.assign(state, { contestId: s.contestId, contestTitle: s.contestTitle, teamId: s.teamId, teamName: s.teamName });
+    for (const [id, v] of Object.entries(s.fields || {})) if ($(id) && v !== "") $(id).value = v;
+  } catch { }
 }
 
 function newActor(name, role) {
@@ -115,6 +143,10 @@ async function checkHealth() {
     const r = await fetch("/svc/api/v1/contests");
     dot.className = `dot ${r.status === 502 ? "dot-down" : "dot-up"}`;
   } catch { dot.className = "dot dot-down"; }
+  try {
+    const r = await fetch("/psvc/api/v1/problems/all");
+    $("dot-problem").className = `dot ${r.ok ? "dot-up" : "dot-down"}`;
+  } catch { $("dot-problem").className = "dot dot-down"; }
 }
 
 // ─── Usuarios de prueba ──────────────────────────────────────────────────────
@@ -187,14 +219,23 @@ async function loadContests() {
   }).join("") : '<p class="muted">No hay concursos.</p>';
 }
 
+function showSelection() {
+  const c = state.contestTitle ? `— ${state.contestTitle}` : "— ninguno seleccionado";
+  $("sel-contest").textContent = c;
+  $("sel-contest-problems").textContent = c;
+  $("sel-team").textContent = state.teamName ? `— ${state.teamName}` : "— ningún equipo seleccionado";
+}
+
 function selectContest(id, title) {
   state.contestId = id;
   state.contestTitle = title;
   state.teamId = null;
-  $("sel-contest").textContent = `— ${title}`;
-  $("sel-team").textContent = "— ningún equipo seleccionado";
+  state.teamName = null;
+  showSelection();
+  saveSession();
   loadContests();
   loadTeams();
+  loadProblems();
 }
 
 // ─── Equipos ─────────────────────────────────────────────────────────────────
@@ -205,7 +246,7 @@ function requireContest() {
 }
 
 function requireTeam() {
-  if (!state.teamId) { log("Selecciona un equipo primero (panel 5).", "err"); return false; }
+  if (!state.teamId) { log("Selecciona un equipo primero (panel 6).", "err"); return false; }
   return true;
 }
 
@@ -232,12 +273,15 @@ async function loadTeams() {
   const { ok, data } = await api("GET", `/contests/${state.contestId}/teams${filter ? `?name=${encodeURIComponent(filter)}` : ""}`);
   if (!ok) return;
   state.teams = data;
+  if (state.teamId && !data.some(t => t.id === state.teamId)) { state.teamId = null; state.teamName = null; showSelection(); saveSession(); }
   renderTeams(data);
 }
 
 function selectTeam(id, name) {
   state.teamId = id;
-  $("sel-team").textContent = `— ${name}`;
+  state.teamName = name;
+  showSelection();
+  saveSession();
   renderTeams(state.teams);
 }
 
@@ -265,6 +309,91 @@ async function afterChange() {
   await loadMyInvitations();
 }
 
+// ─── Problemas del concurso ──────────────────────────────────────────────────
+
+// Colores de globo habituales en maratones, en el orden en que se sugieren.
+const BALLOON_COLORS = ["#e53935", "#1e88e5", "#43a047", "#fdd835", "#fb8c00", "#8e24aa", "#ec407a", "#00acc1", "#6d4c41", "#757575"];
+
+// Mismo SVG que el componente Balloon (JSX) del frontend: relleno = color, contorno = stroke.
+// El contorno es claro porque el panel es oscuro y con #000 se perderían el brillo y el hilo.
+const balloonSvg = (color, size = 26) => `
+  <svg viewBox="0 0 100 172" width="${size}" height="${size * 1.72}" fill="none" stroke="#cfd3d6"
+       stroke-width="5" stroke-linecap="round" stroke-linejoin="round" style="overflow:visible;flex:none" aria-hidden="true">
+    <ellipse cx="50" cy="50" rx="44" ry="46" fill="${esc(color)}" />
+    <path d="M78 50 A28 28 0 0 1 50 78" />
+    <path d="M45 96 L39 109 L61 109 L55 96" fill="${esc(color)}" />
+    <path d="M50 109 C38 124 62 138 50 152 C44 160 50 166 53 169" />
+  </svg>`;
+
+const problemTitle = problemId => state.catalog.find(p => p.id === problemId)?.title || `problema ${short(problemId)}`;
+
+// Las operaciones de problemas exigen organizador: si el actor es estudiante se usa el primer organizador.
+function staff() {
+  const a = actor();
+  if (a.role !== "STUDENT") return a;
+  const org = firstOf("ORGANIZER");
+  if (org) log(`${a.name} es estudiante: esta operación se hace como ${org.name}.`);
+  return org || a;
+}
+
+async function loadCatalog() {
+  try {
+    const res = await fetch("/psvc/api/v1/problems/all");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    state.catalog = await res.json();
+  } catch (err) {
+    state.catalog = [];
+    log(`No se pudo leer el catálogo de problem-service (${err.message}).`, "err");
+  }
+  const keep = $("p-problem").value;
+  $("p-problem").innerHTML = state.catalog.length
+    ? state.catalog.map(p => `<option value="${p.id}">${esc(p.title)} · ${short(p.id)}</option>`).join("")
+    : '<option value="">(sin problemas en problem-service)</option>';
+  if (state.catalog.some(p => p.id === keep)) $("p-problem").value = keep;
+  renderProblems();
+}
+
+// Sugiere el siguiente alias libre (A, B, ... Z), la siguiente posición y el siguiente color.
+function suggestProblemDefaults() {
+  const used = new Set(state.problems.map(p => p.alias));
+  const letter = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].find(l => !used.has(l)) || "";
+  $("p-alias").value = letter;
+  $("p-order").value = state.problems.length ? Math.max(...state.problems.map(p => p.orderIndex)) + 1 : 0;
+  $("p-color").value = BALLOON_COLORS[state.problems.length % BALLOON_COLORS.length];
+  const taken = new Set(state.problems.map(p => p.problemId));
+  const free = state.catalog.find(p => !taken.has(p.id));
+  if (free && taken.has($("p-problem").value)) $("p-problem").value = free.id;
+}
+
+function renderProblems() {
+  $("problems").innerHTML = !state.contestId ? '<p class="muted">Selecciona un concurso (panel 4).</p>'
+    : state.problems.length ? state.problems.map(p => `
+    <div class="item problem-row" data-id="${p.id}">
+      ${balloonSvg(p.balloonColor)}
+      <div class="grow"><strong>${esc(p.alias)}</strong> · ${esc(problemTitle(p.problemId))}
+        <div class="muted">${p.points} pt · posición ${p.orderIndex} · ${esc(p.balloonColor)} · <code>${short(p.id)}</code></div></div>
+      <input type="text" data-f="alias" value="${esc(p.alias)}" maxlength="10" aria-label="Alias" />
+      <input type="number" data-f="orderIndex" value="${p.orderIndex}" min="0" aria-label="Posición" />
+      <input type="number" data-f="points" value="${p.points}" min="1" aria-label="Puntos" />
+      <input type="color" data-f="balloonColor" value="${esc(p.balloonColor.toLowerCase())}" aria-label="Color del globo" />
+      <button type="button" class="btn-small" data-save-problem="${p.id}">Guardar</button>
+      <button type="button" class="btn-small btn-danger" data-remove-problem="${p.id}">Retirar</button>
+    </div>`).join("") : '<p class="muted">Este concurso no tiene problemas.</p>';
+}
+
+async function loadProblems() {
+  if (!state.contestId) { state.problems = []; renderProblems(); return; }
+  const { ok, data } = await api("GET", `/contests/${state.contestId}/problems`);
+  if (!ok) return;
+  state.problems = data;
+  renderProblems();
+  suggestProblemDefaults();
+}
+
+async function addProblem(as, body) {
+  return api("POST", `/contests/${state.contestId}/problems`, body, as);
+}
+
 // ─── Escenarios ──────────────────────────────────────────────────────────────
 
 async function scenario(startMin) {
@@ -279,7 +408,22 @@ async function scenario(startMin) {
   await loadTeams();
   selectTeam(t.data.id, t.data.teamName);
   setActor(cap.id);
-  log(`Escenario listo: ${cap.name} es capitán de "Equipo ${tag}". Ahora invita desde el panel 6.`, "ok");
+  log(`Escenario listo: ${cap.name} es capitán de "Equipo ${tag}". Ahora invita desde el panel 7.`, "ok");
+}
+
+async function scenarioWithProblems() {
+  const org = firstOf("ORGANIZER");
+  if (!org) { log("El escenario necesita un organizador.", "err"); return; }
+  if (state.catalog.length < 3) { log("problem-service necesita al menos 3 problemas para este escenario.", "err"); return; }
+  const tag = Math.random().toString(36).slice(2, 6);
+  const c = await createContest(org, `Escenario ${tag} con problemas`, "clave123", 60, 120);
+  if (!c.ok) return;
+  state.contestId = c.data.id;
+  for (const [i, p] of state.catalog.slice(0, 3).entries()) {
+    await addProblem(org, { problemId: p.id, alias: "ABC"[i], orderIndex: i, points: 1, balloonColor: BALLOON_COLORS[i] });
+  }
+  selectContest(c.data.id, c.data.title);
+  log(`Escenario listo: concurso con 3 problemas y globos. Puedes crear un equipo en el panel 6.`, "ok");
 }
 
 // ─── Eventos ─────────────────────────────────────────────────────────────────
@@ -312,6 +456,38 @@ $("btn-reset-actors").onclick = () => { state.actors = defaultActors(); state.ac
 
 $("btn-scn-basic").onclick = () => scenario(60);
 $("btn-scn-soon").onclick = () => scenario(1);
+$("btn-scn-problems").onclick = scenarioWithProblems;
+$("btn-forget").onclick = () => {
+  try { localStorage.removeItem(SESSION_KEY); } catch { }
+  location.reload();
+};
+
+$("btn-reload-catalog").onclick = loadCatalog;
+$("btn-list-problems").onclick = () => requireContest() && loadProblems();
+$("btn-add-problem").onclick = async () => {
+  if (!requireContest()) return;
+  const r = await addProblem(staff(), {
+    problemId: $("p-problem").value, alias: $("p-alias").value, orderIndex: Number($("p-order").value),
+    points: Number($("p-points").value), balloonColor: $("p-color").value,
+  });
+  if (r.ok) await loadProblems();
+};
+$("problems").addEventListener("click", async e => {
+  const d = e.target.dataset;
+  if (d.saveProblem) {
+    const row = e.target.closest(".problem-row");
+    const val = f => row.querySelector(`[data-f="${f}"]`).value;
+    const r = await api("PUT", `/contest-problems/${d.saveProblem}`, {
+      alias: val("alias"), orderIndex: Number(val("orderIndex")), points: Number(val("points")), balloonColor: val("balloonColor"),
+    }, staff());
+    if (r.ok) loadProblems();
+  }
+  if (d.removeProblem && (await api("DELETE", `/contest-problems/${d.removeProblem}`, undefined, staff())).ok) loadProblems();
+});
+
+// Guarda la sesión al escribir en cualquier campo persistente.
+document.addEventListener("input", e => { if (FORM_FIELDS.includes(e.target.id)) saveSession(); });
+$("i-user").addEventListener("change", saveSession);
 
 $("btn-create-contest").onclick = async () => {
   const r = await createContest(actor(), $("c-title").value, $("c-password").value, Number($("c-start").value), Number($("c-duration").value));
@@ -343,7 +519,7 @@ $("teams").addEventListener("click", async e => {
   }
   if (d.deleteTeam && confirm("¿Eliminar el equipo? Requiere ADMIN u ORGANIZER.")) {
     if ((await api("DELETE", `/teams/${d.deleteTeam}`)).ok) {
-      if (state.teamId === d.deleteTeam) { state.teamId = null; $("sel-team").textContent = "— ningún equipo seleccionado"; }
+      if (state.teamId === d.deleteTeam) { state.teamId = null; state.teamName = null; showSelection(); saveSession(); }
       loadTeams();
     }
   }
@@ -380,6 +556,8 @@ async function loadConfig() {
     $("jwt-secret").value = cfg.jwtSecret;
     $("jwt-issuer").value = cfg.jwtIssuer;
     state.contestUrl = cfg.contestUrl;
+    state.problemUrl = cfg.problemUrl;
+    $("problem-url").textContent = cfg.problemUrl.replace(/^https?:\/\//, "");
     $("contest-url").textContent = cfg.contestUrl.replace(/^https?:\/\//, "");
     log(cfg.jwtSecretPresent ? "Configuración cargada desde .env." : "Falta JWT_SECRET en el .env: pégalo en el panel 1.", cfg.jwtSecretPresent ? "ok" : "err");
   } catch (err) {
@@ -390,8 +568,13 @@ async function loadConfig() {
 (async function init() {
   loadActors();
   renderActors();
+  loadSession(); // después de renderActors: el selector de invitados ya tiene opciones
+  showSelection();
   await loadConfig();
   checkHealth();
+  await loadCatalog();
   loadContests();
+  loadProblems();
+  loadTeams();
   loadMyInvitations();
 })();

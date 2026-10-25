@@ -91,6 +91,7 @@ code, .mono { font-family: "Geist Mono", Consolas, monospace; font-size: 12px; }
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13px;
 }
+#contests, #problems, #invitations { max-height: 300px; overflow: auto; padding-right: 4px; }
 .item.selected { border-color: var(--accent); }
 .item .grow { flex: 1; min-width: 200px; }
 .muted { color: var(--dim); }
@@ -117,6 +118,10 @@ code, .mono { font-family: "Geist Mono", Consolas, monospace; font-size: 12px; }
 .log .ok { color: var(--ok); }
 .log .err { color: var(--err); }
 .log .info { color: var(--info); }
+
+input[type="color"] { padding: 2px; height: 36px; width: 64px; cursor: pointer; }
+.problem-row input[type="text"], .problem-row input[type="number"] { width: 84px; padding: 5px 8px; font-size: 13px; }
+.problem-row input[type="color"] { height: 30px; width: 48px; }
 
 @media (max-width: 640px) {
   header, .topbar, main { padding-left: 16px; padding-right: 16px; }
