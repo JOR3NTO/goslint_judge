@@ -415,6 +415,7 @@ Los límites (`OutputHandle` usa `outputSizeBytes`, `ErrorsHandle` usa `errorSiz
 | `Team`             | id, contestId, score, penaltyTime, nameTeam |
 | `Member`           | teamId, userId, registeredAt |
 | `ContestProblem`   | contestId, problemId, points, penalty, orderIndex, alias, balloonColor |
+| `Clarification`    | id, problemId, teamId, question, answer, status, createdAt, answeredAt |
 
 **Casos de uso principales:**
 - `CreateContestUseCase` — Solo ORGANIZER/ADMIN
@@ -422,7 +423,7 @@ Los límites (`OutputHandle` usa `outputSizeBytes`, `ErrorsHandle` usa `errorSiz
 - `GetScoreboardUseCase` — Ranking en tiempo real (potencialmente via WebSocket/SSE)
 - `AddProblemToContestUseCase` — Asignación de problemas al concurso
 
-**Tablas BD:** `contests`, `teams`, `members`, `contest_problems`
+**Tablas BD:** `contests`, `teams`, `members`, `contest_problems`, `clarifications`
 
 ---
 
