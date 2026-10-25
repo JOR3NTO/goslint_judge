@@ -414,7 +414,7 @@ Los límites (`OutputHandle` usa `outputSizeBytes`, `ErrorsHandle` usa `errorSiz
 | `Contest`          | id, createdBy, password, title, startTime, endTime, status, description |
 | `Team`             | id, contestId, score, penaltyTime, nameTeam |
 | `Member`           | teamId, userId, registeredAt |
-| `ContestProblem`   | contestId, problemId, points, orderIndex, alias |
+| `ContestProblem`   | contestId, problemId, points, orderIndex, alias, balloonColor |
 
 **Casos de uso principales:**
 - `CreateContestUseCase` — Solo ORGANIZER/ADMIN
