@@ -58,7 +58,7 @@ class ContestProblemUseCasesTest {
     }
 
     private AddProblemToContestCommand addCommand(String alias) {
-        return new AddProblemToContestCommand(contestId, problemId, alias, 0, 1, "#ff0000");
+        return new AddProblemToContestCommand(contestId, problemId, alias, 0, 1, 20, "#ff0000");
     }
 
     @Test
@@ -71,6 +71,7 @@ class ContestProblemUseCasesTest {
         ContestProblem saved = addUseCase.execute(addCommand("a"));
 
         assertThat(saved.getAlias()).isEqualTo("A");
+        assertThat(saved.getPenalty()).isEqualTo(20);
         assertThat(saved.getBalloonColor()).isEqualTo(BalloonColor.of("#FF0000"));
         verify(problems).save(saved);
     }
@@ -111,10 +112,11 @@ class ContestProblemUseCasesTest {
         when(problems.save(existing)).thenReturn(existing);
         var useCase = new UpdateContestProblemUseCaseImpl(problems);
 
-        useCase.execute(new UpdateContestProblemCommand(existing.getId(), "a", 2, 3, "#00ff00"));
+        useCase.execute(new UpdateContestProblemCommand(existing.getId(), "a", 2, 3, 5, "#00ff00"));
 
         assertThat(existing.getOrderIndex()).isEqualTo(2);
         assertThat(existing.getPoints()).isEqualTo(3);
+        assertThat(existing.getPenalty()).isEqualTo(5);
         assertThat(existing.getBalloonColor().value()).isEqualTo("#00FF00");
         verify(problems, never()).existsByContestIdAndAlias(any(), any());
     }
@@ -128,14 +130,14 @@ class ContestProblemUseCasesTest {
         var useCase = new UpdateContestProblemUseCaseImpl(problems);
 
         assertThatThrownBy(() -> useCase.execute(
-                new UpdateContestProblemCommand(existing.getId(), "b", 0, 1, "#FF0000")))
+                new UpdateContestProblemCommand(existing.getId(), "b", 0, 1, null, "#FF0000")))
                 .isInstanceOf(ExistingContestProblemException.class);
         verify(problems, never()).save(any());
 
         UUID unknown = UUID.randomUUID();
         when(problems.findById(unknown)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> useCase.execute(
-                new UpdateContestProblemCommand(unknown, "A", 0, 1, "#FF0000")))
+                new UpdateContestProblemCommand(unknown, "A", 0, 1, null, "#FF0000")))
                 .isInstanceOf(ContestProblemNotFoundException.class);
     }
 

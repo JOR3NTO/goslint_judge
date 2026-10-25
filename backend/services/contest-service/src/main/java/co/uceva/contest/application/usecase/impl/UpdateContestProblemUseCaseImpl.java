@@ -46,7 +46,9 @@ public class UpdateContestProblemUseCaseImpl implements UpdateContestProblemUseC
                 .orElseThrow(() -> new ContestProblemNotFoundException(command.contestProblemId()));
 
         String oldAlias = contestProblem.getAlias();
-        contestProblem.update(command.alias(), command.orderIndex(), command.points(),
+        int penalty = command.penalty() != null
+                ? command.penalty() : contestProblem.getPenalty();
+        contestProblem.update(command.alias(), command.orderIndex(), command.points(), penalty,
                 BalloonColor.of(command.balloonColor()));
 
         if (!oldAlias.equals(contestProblem.getAlias())

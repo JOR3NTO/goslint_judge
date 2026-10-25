@@ -52,7 +52,8 @@ public class ContestProblemController {
      * </p>
      *
      * @param contestId Identificador del concurso.
-     * @param request   Problema a asignar con su alias, posición, puntos (1 si se omiten) y color del globo.
+     * @param request   Problema a asignar con su alias, posición, puntos (1 si se omiten), penalización por
+     *                  intento fallido en minutos (20 si se omite) y color del globo.
      * @return 201 CREATED con la asignación creada; 400 si algún valor es inválido; 404 si el concurso o el
      *         problema no existen; 409 si el problema o el alias ya están en el concurso; 503 si no se pudo
      *         consultar problem-service.
@@ -82,13 +83,14 @@ public class ContestProblemController {
     }
 
     /**
-     * Actualiza el alias, la posición, los puntos y el color del globo de un problema del concurso.
+     * Actualiza el alias, la posición, los puntos, la penalización por intento fallido y el color del
+     * globo de un problema del concurso.
      * <p>
      * Solo {@code ADMIN} u {@code ORGANIZER}. No cambia el problema asignado ni el concurso.
      * </p>
      *
      * @param id      Identificador de la asignación (no el del problema en problem-service).
-     * @param request Nuevos valores; todos son obligatorios.
+     * @param request Nuevos valores; todos son obligatorios salvo la penalización, que si se omite se conserva.
      * @return 200 OK con la asignación actualizada; 400 si algún valor es inválido; 404 si la asignación
      *         no existe; 409 si el nuevo alias ya lo usa otro problema del concurso.
      */

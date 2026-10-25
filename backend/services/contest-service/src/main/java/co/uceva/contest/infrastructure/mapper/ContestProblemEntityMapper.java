@@ -19,6 +19,7 @@ public class ContestProblemEntityMapper {
                 .alias(domain.getAlias())
                 .orderIndex(domain.getOrderIndex())
                 .points(domain.getPoints())
+                .penalty(domain.getPenalty())
                 .balloonColor(domain.getBalloonColor().value())
                 .build();
     }
@@ -33,6 +34,7 @@ public class ContestProblemEntityMapper {
                 .alias(entity.getAlias())
                 .orderIndex(entity.getOrderIndex())
                 .points(entity.getPoints())
+                .penalty(entity.getPenalty())
                 .balloonColor(BalloonColor.of(entity.getBalloonColor()))
                 .build();
     }

@@ -33,6 +33,7 @@ class ContestProblemTest {
         assertThat(problem.getAlias()).isEqualTo("B");
         assertThat(problem.getOrderIndex()).isEqualTo(1);
         assertThat(problem.getPoints()).isEqualTo(ContestProblem.DEFAULT_POINTS);
+        assertThat(problem.getPenalty()).isEqualTo(ContestProblem.DEFAULT_PENALTY);
         assertThat(problem.getBalloonColor()).isEqualTo(RED);
     }
 
@@ -42,11 +43,12 @@ class ContestProblemTest {
         ContestProblem problem = newProblem();
         BalloonColor blue = BalloonColor.of("#0000FF");
 
-        problem.update("c", 2, 5, blue);
+        problem.update("c", 2, 5, 10, blue);
 
         assertThat(problem.getAlias()).isEqualTo("C");
         assertThat(problem.getOrderIndex()).isEqualTo(2);
         assertThat(problem.getPoints()).isEqualTo(5);
+        assertThat(problem.getPenalty()).isEqualTo(10);
         assertThat(problem.getBalloonColor()).isEqualTo(blue);
     }
 
@@ -68,20 +70,34 @@ class ContestProblemTest {
     void shouldRejectInvalidUpdate() {
         ContestProblem problem = newProblem();
 
-        assertThatThrownBy(() -> problem.update("  ", 0, 1, RED))
+        assertThatThrownBy(() -> problem.update("  ", 0, 1, 20, RED))
                 .isInstanceOf(InvalidContestProblemException.class);
-        assertThatThrownBy(() -> problem.update("A".repeat(11), 0, 1, RED))
+        assertThatThrownBy(() -> problem.update("A".repeat(11), 0, 1, 20, RED))
                 .isInstanceOf(InvalidContestProblemException.class);
-        assertThatThrownBy(() -> problem.update("A", -1, 1, RED))
+        assertThatThrownBy(() -> problem.update("A", -1, 1, 20, RED))
                 .isInstanceOf(InvalidContestProblemException.class);
-        assertThatThrownBy(() -> problem.update("A", 0, 0, RED))
+        assertThatThrownBy(() -> problem.update("A", 0, 0, 20, RED))
                 .isInstanceOf(InvalidContestProblemException.class);
-        assertThatThrownBy(() -> problem.update("Z", 9, 9, null))
+        assertThatThrownBy(() -> problem.update("A", 0, 1, -1, RED))
+                .isInstanceOf(InvalidContestProblemException.class)
+                .hasMessageContaining("penalización");
+        assertThatThrownBy(() -> problem.update("Z", 9, 9, 20, null))
                 .isInstanceOf(InvalidContestProblemException.class)
                 .hasMessageContaining("globo");
 
         assertThat(problem.getAlias()).isEqualTo("A");
         assertThat(problem.getOrderIndex()).isZero();
         assertThat(problem.getPoints()).isEqualTo(1);
+        assertThat(problem.getPenalty()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("Debe aceptar penalización cero (sin penalización)")
+    void shouldAcceptZeroPenalty() {
+        ContestProblem problem = newProblem();
+
+        problem.update("A", 0, 1, 0, RED);
+
+        assertThat(problem.getPenalty()).isZero();
     }
 }

@@ -17,13 +17,15 @@ public class ContestProblemWebMapper {
 
     public static AddProblemToContestCommand toCommand(UUID contestId, AddContestProblemRequestDTO request) {
         int points = request.points() != null ? request.points() : ContestProblem.DEFAULT_POINTS;
+        int penalty = request.penalty() != null
+                ? request.penalty() : ContestProblem.DEFAULT_PENALTY;
         return new AddProblemToContestCommand(contestId, request.problemId(), request.alias(),
-                request.orderIndex(), points, request.balloonColor());
+                request.orderIndex(), points, penalty, request.balloonColor());
     }
 
     public static UpdateContestProblemCommand toCommand(UUID contestProblemId, UpdateContestProblemRequestDTO request) {
         return new UpdateContestProblemCommand(contestProblemId, request.alias(), request.orderIndex(),
-                request.points(), request.balloonColor());
+                request.points(), request.penalty(), request.balloonColor());
     }
 
     public static ContestProblemResponseDTO toResponse(ContestProblem domain) {
@@ -34,6 +36,7 @@ public class ContestProblemWebMapper {
                 domain.getAlias(),
                 domain.getOrderIndex(),
                 domain.getPoints(),
+                domain.getPenalty(),
                 domain.getBalloonColor().value()
         );
     }

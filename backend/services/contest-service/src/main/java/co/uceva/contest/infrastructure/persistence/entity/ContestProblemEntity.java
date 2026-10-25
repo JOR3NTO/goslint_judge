@@ -49,6 +49,10 @@ public class ContestProblemEntity {
     @Column(name = "points", nullable = false)
     private int points;
 
+    /** Minutos de penalización por intento fallido. */
+    @Column(name = "penalty", nullable = false)
+    private int penalty;
+
     /** Color del globo en formato {@code #RRGGBB}. */
     @Column(name = "balloon_color", nullable = false)
     private String balloonColor;

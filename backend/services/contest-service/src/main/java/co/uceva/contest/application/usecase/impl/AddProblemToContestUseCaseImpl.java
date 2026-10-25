@@ -67,6 +67,7 @@ public class AddProblemToContestUseCaseImpl implements AddProblemToContestUseCas
                 .alias(command.alias())
                 .orderIndex(command.orderIndex())
                 .points(command.points())
+                .penalty(command.penalty())
                 .balloonColor(BalloonColor.of(command.balloonColor()))
                 .build();
 

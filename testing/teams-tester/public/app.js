@@ -60,7 +60,7 @@ function saveActors() {
 // Sesión: concurso y equipo elegidos y lo escrito en los formularios, para seguir donde se dejó.
 const SESSION_KEY = "teams-tester:session";
 const FORM_FIELDS = ["c-title", "c-password", "c-start", "c-duration", "t-name", "t-password", "t-filter",
-  "p-alias", "p-order", "p-points", "p-color", "i-user", "i-email"];
+  "p-alias", "p-order", "p-points", "p-penalty", "p-color", "i-user", "i-email"];
 
 function saveSession() {
   const fields = Object.fromEntries(FORM_FIELDS.map(id => [id, $(id).value]));
@@ -371,10 +371,11 @@ function renderProblems() {
     <div class="item problem-row" data-id="${p.id}">
       ${balloonSvg(p.balloonColor)}
       <div class="grow"><strong>${esc(p.alias)}</strong> · ${esc(problemTitle(p.problemId))}
-        <div class="muted">${p.points} pt · posición ${p.orderIndex} · ${esc(p.balloonColor)} · <code>${short(p.id)}</code></div></div>
+        <div class="muted">${p.points} pt · ${p.penalty} min/intento fallido · posición ${p.orderIndex} · ${esc(p.balloonColor)} · <code>${short(p.id)}</code></div></div>
       <input type="text" data-f="alias" value="${esc(p.alias)}" maxlength="10" aria-label="Alias" />
       <input type="number" data-f="orderIndex" value="${p.orderIndex}" min="0" aria-label="Posición" />
       <input type="number" data-f="points" value="${p.points}" min="1" aria-label="Puntos" />
+      <input type="number" data-f="penalty" value="${p.penalty}" min="0" aria-label="Penalización por intento fallido (min)" title="Penalización por intento fallido (min)" />
       <input type="color" data-f="balloonColor" value="${esc(p.balloonColor.toLowerCase())}" aria-label="Color del globo" />
       <button type="button" class="btn-small" data-save-problem="${p.id}">Guardar</button>
       <button type="button" class="btn-small btn-danger" data-remove-problem="${p.id}">Retirar</button>
@@ -420,7 +421,7 @@ async function scenarioWithProblems() {
   if (!c.ok) return;
   state.contestId = c.data.id;
   for (const [i, p] of state.catalog.slice(0, 3).entries()) {
-    await addProblem(org, { problemId: p.id, alias: "ABC"[i], orderIndex: i, points: 1, balloonColor: BALLOON_COLORS[i] });
+    await addProblem(org, { problemId: p.id, alias: "ABC"[i], orderIndex: i, points: 1, penalty: 20, balloonColor: BALLOON_COLORS[i] });
   }
   selectContest(c.data.id, c.data.title);
   log(`Escenario listo: concurso con 3 problemas y globos. Puedes crear un equipo en el panel 6.`, "ok");
@@ -468,7 +469,7 @@ $("btn-add-problem").onclick = async () => {
   if (!requireContest()) return;
   const r = await addProblem(staff(), {
     problemId: $("p-problem").value, alias: $("p-alias").value, orderIndex: Number($("p-order").value),
-    points: Number($("p-points").value), balloonColor: $("p-color").value,
+    points: Number($("p-points").value), penalty: Number($("p-penalty").value), balloonColor: $("p-color").value,
   });
   if (r.ok) await loadProblems();
 };
@@ -478,7 +479,8 @@ $("problems").addEventListener("click", async e => {
     const row = e.target.closest(".problem-row");
     const val = f => row.querySelector(`[data-f="${f}"]`).value;
     const r = await api("PUT", `/contest-problems/${d.saveProblem}`, {
-      alias: val("alias"), orderIndex: Number(val("orderIndex")), points: Number(val("points")), balloonColor: val("balloonColor"),
+      alias: val("alias"), orderIndex: Number(val("orderIndex")), points: Number(val("points")),
+      penalty: Number(val("penalty")), balloonColor: val("balloonColor"),
     }, staff());
     if (r.ok) loadProblems();
   }

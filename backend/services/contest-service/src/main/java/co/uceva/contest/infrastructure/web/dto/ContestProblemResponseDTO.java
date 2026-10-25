@@ -11,6 +11,7 @@ import java.util.UUID;
  * @param alias        Alias visible del problema.
  * @param orderIndex   Posición del problema en el concurso.
  * @param points       Puntos del problema.
+ * @param penalty Minutos de penalización por intento fallido.
  * @param balloonColor Color del globo en formato {@code #RRGGBB}.
  */
 public record ContestProblemResponseDTO(
@@ -20,5 +21,6 @@ public record ContestProblemResponseDTO(
     String alias,
     int orderIndex,
     int points,
+    int penalty,
     String balloonColor
 ) {}

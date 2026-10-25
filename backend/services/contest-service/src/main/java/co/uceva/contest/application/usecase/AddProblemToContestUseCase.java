@@ -24,6 +24,7 @@ public interface AddProblemToContestUseCase {
      * @param alias        Alias visible del problema (A, B, C...).
      * @param orderIndex   Posición del problema en el concurso.
      * @param points       Puntos que otorga resolver el problema.
+     * @param penalty Minutos de penalización por cada intento fallido.
      * @param balloonColor Color del globo en formato {@code #RRGGBB}.
      */
     record AddProblemToContestCommand(
@@ -32,6 +33,7 @@ public interface AddProblemToContestUseCase {
         String alias,
         int orderIndex,
         int points,
+        int penalty,
         String balloonColor
     ){}
 }

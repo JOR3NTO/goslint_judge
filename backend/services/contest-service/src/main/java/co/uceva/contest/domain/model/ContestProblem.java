@@ -22,6 +22,8 @@ public class ContestProblem {
 
     /** Puntos predeterminados por problema resuelto (regla estándar ICPC). */
     public static final int DEFAULT_POINTS = 1;
+    /** Penalización predeterminada, en minutos, por cada intento fallido (regla estándar ICPC). */
+    public static final int DEFAULT_PENALTY = 20;
     /** Longitud máxima del alias del problema. */
     public static final int MAX_ALIAS_LENGTH = 10;
 
@@ -37,6 +39,8 @@ public class ContestProblem {
     private int orderIndex;
     /** Puntos que otorga resolver el problema. */
     private int points;
+    /** Minutos de penalización por cada intento fallido antes de resolverlo; 0 si no penaliza. */
+    private int penalty;
     /** Color del globo asociado al problema. */
     private BalloonColor balloonColor;
 
@@ -49,11 +53,12 @@ public class ContestProblem {
      * @param alias        Alias visible del problema.
      * @param orderIndex   Posición del problema (no negativa).
      * @param points       Puntos del problema (mayor que cero).
+     * @param penalty Minutos de penalización por intento fallido (no negativos).
      * @param balloonColor Color del globo.
      */
     @Builder
     private ContestProblem(UUID id, UUID contestId, UUID problemId, String alias, int orderIndex,
-                           int points, BalloonColor balloonColor) {
+                           int points, int penalty, BalloonColor balloonColor) {
         if (contestId == null) {
             throw new InvalidContestProblemException("El identificador del concurso es obligatorio.");
         }
@@ -63,11 +68,11 @@ public class ContestProblem {
         this.id = id != null ? id : UUID.randomUUID();
         this.contestId = contestId;
         this.problemId = problemId;
-        update(alias, orderIndex, points, balloonColor);
+        update(alias, orderIndex, points, penalty, balloonColor);
     }
 
     /**
-     * Factory method para asignar un problema a un concurso con los puntos por defecto.
+     * Factory method para asignar un problema a un concurso con los puntos y la penalización por defecto.
      *
      * @param contestId    Identificador del concurso.
      * @param problemId    Identificador del problema.
@@ -84,6 +89,7 @@ public class ContestProblem {
                 .alias(alias)
                 .orderIndex(orderIndex)
                 .points(DEFAULT_POINTS)
+                .penalty(DEFAULT_PENALTY)
                 .balloonColor(balloonColor)
                 .build();
     }
@@ -94,9 +100,11 @@ public class ContestProblem {
      * @param alias        Alias visible; no vacío y de hasta {@value #MAX_ALIAS_LENGTH} caracteres.
      * @param orderIndex   Posición; no negativa.
      * @param points       Puntos; mayores que cero.
+     * @param penalty Minutos de penalización por intento fallido; no negativos.
      * @param balloonColor Color del globo; no nulo.
      */
-    public void update(String alias, int orderIndex, int points, BalloonColor balloonColor) {
+    public void update(String alias, int orderIndex, int points, int penalty,
+                       BalloonColor balloonColor) {
         if (alias == null || alias.isBlank()) {
             throw new InvalidContestProblemException("El alias del problema no puede estar vacío.");
         }
@@ -111,12 +119,16 @@ public class ContestProblem {
         if (points <= 0) {
             throw new InvalidContestProblemException("Los puntos del problema deben ser mayores que cero.");
         }
+        if (penalty < 0) {
+            throw new InvalidContestProblemException("La penalización por intento fallido no puede ser negativa.");
+        }
         if (balloonColor == null) {
             throw new InvalidContestProblemException("El color del globo es obligatorio.");
         }
         this.alias = normalizedAlias;
         this.orderIndex = orderIndex;
         this.points = points;
+        this.penalty = penalty;
         this.balloonColor = balloonColor;
     }
 }

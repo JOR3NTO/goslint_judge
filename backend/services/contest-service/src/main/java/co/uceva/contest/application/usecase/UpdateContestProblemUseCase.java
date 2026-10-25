@@ -23,6 +23,7 @@ public interface UpdateContestProblemUseCase {
      * @param alias            Nuevo alias visible.
      * @param orderIndex       Nueva posición.
      * @param points           Nuevos puntos.
+     * @param penalty Nueva penalización en minutos por intento fallido; si es nula se conserva la actual.
      * @param balloonColor     Nuevo color del globo en formato {@code #RRGGBB}.
      */
     record UpdateContestProblemCommand(
@@ -30,6 +31,7 @@ public interface UpdateContestProblemUseCase {
         String alias,
         int orderIndex,
         int points,
+        Integer penalty,
         String balloonColor
     ){}
 }
