@@ -40,6 +40,7 @@ async function emailLink(invitationId, action) {
 const state = {
   contestUrl: "http://localhost:8086",
   problemUrl: "http://localhost:8082",
+  submissionUrl: "http://localhost:8083",
   actors: [],
   actorId: null,
   contestId: null,
@@ -50,6 +51,7 @@ const state = {
   catalog: [],
   problems: [],
   clarifications: [],
+  submissions: [],
 };
 
 const STORAGE_KEY = "teams-tester:actors";
@@ -61,7 +63,8 @@ function saveActors() {
 // Sesión: concurso y equipo elegidos y lo escrito en los formularios, para seguir donde se dejó.
 const SESSION_KEY = "teams-tester:session";
 const FORM_FIELDS = ["c-title", "c-password", "c-start", "c-duration", "t-name", "t-password", "t-filter",
-  "k-question", "p-alias", "p-order", "p-points", "p-penalty", "p-color", "i-user", "i-email"];
+  "k-question", "p-alias", "p-order", "p-points", "p-penalty", "p-color", "i-user", "i-email",
+  "s-team-custom", "s-language", "s-code"];
 
 function saveSession() {
   const fields = Object.fromEntries(FORM_FIELDS.map(id => [id, $(id).value]));
@@ -120,9 +123,10 @@ function log(text, kind = "info") {
 
 // ─── API ─────────────────────────────────────────────────────────────────────
 
-async function api(method, path, body, as = actor()) {
+// base: /svc → contest-service, /ssvc → submission-service.
+async function api(method, path, body, as = actor(), base = "/svc") {
   if (!$("jwt-secret").value) { log("Falta JWT_SECRET en el panel 1.", "err"); return { ok: false, status: 0, data: null }; }
-  const res = await fetch(`/svc/api/v1${path}`, {
+  const res = await fetch(`${base}/api/v1${path}`, {
     method,
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${await signJwt(as)}` },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -148,6 +152,11 @@ async function checkHealth() {
     const r = await fetch("/psvc/api/v1/problems/all");
     $("dot-problem").className = `dot ${r.ok ? "dot-up" : "dot-down"}`;
   } catch { $("dot-problem").className = "dot dot-down"; }
+  try {
+    // Sin token responde 401/403: basta con que conteste para saber que está arriba.
+    const r = await fetch("/ssvc/api/v1/submissions");
+    $("dot-submission").className = `dot ${r.status === 502 ? "dot-down" : "dot-up"}`;
+  } catch { $("dot-submission").className = "dot dot-down"; }
 }
 
 // ─── Usuarios de prueba ──────────────────────────────────────────────────────
@@ -225,6 +234,7 @@ function showSelection() {
   $("sel-contest").textContent = c;
   $("sel-contest-problems").textContent = c;
   $("sel-contest-clarifications").textContent = c;
+  $("sel-contest-submissions").textContent = c;
   $("sel-team").textContent = state.teamName ? `— ${state.teamName}` : "— ningún equipo seleccionado";
 }
 
@@ -279,6 +289,7 @@ async function loadTeams() {
   if (state.teamId && !data.some(t => t.id === state.teamId)) { state.teamId = null; state.teamName = null; showSelection(); saveSession(); }
   renderTeams(data);
   renderClarifications();
+  fillSubmissionSelectors();
 }
 
 function selectTeam(id, name) {
@@ -287,6 +298,8 @@ function selectTeam(id, name) {
   showSelection();
   saveSession();
   renderTeams(state.teams);
+  $("s-team").dataset.want = id;
+  fillSubmissionSelectors();
 }
 
 // ─── Invitaciones ────────────────────────────────────────────────────────────
@@ -386,6 +399,7 @@ function renderProblems() {
     </div>`).join("") : '<p class="muted">Este concurso no tiene problemas.</p>';
   fillClarificationProblems();
   renderClarifications();
+  fillSubmissionSelectors();
 }
 
 async function loadProblems() {
@@ -438,6 +452,173 @@ async function loadClarifications() {
   if (!ok) return;
   state.clarifications = data;
   renderClarifications();
+}
+
+// ─── Envíos ──────────────────────────────────────────────────────────────────
+
+// Equipos del concurso seleccionado + "otro UUID"; problemas del concurso primero y luego el resto del
+// catálogo marcado "fuera del concurso", para poder provocar PROBLEM_NOT_IN_CONTEST a propósito.
+function fillSubmissionSelectors() {
+  const keepTeam = $("s-team").value, keepProblem = $("s-problem").value;
+  $("s-team").innerHTML = state.teams.map(t => `<option value="${t.id}">${esc(t.teamName)} · ${short(t.id)}</option>`).join("")
+    + '<option value="custom">Otro UUID (campo de al lado)</option>';
+  // Un equipo recién seleccionado en el panel 6 manda, aunque aún no esté en la lista (loadTeams va detrás).
+  const want = $("s-team").dataset.want;
+  const pick = [want, keepTeam].find(id => id && [...$("s-team").options].some(o => o.value === id));
+  if (pick) $("s-team").value = pick;
+  if (pick && pick === want) delete $("s-team").dataset.want;
+
+  const inContest = new Set(state.problems.map(p => p.problemId));
+  $("s-problem").innerHTML = state.problems.map(p => `<option value="${p.problemId}">${esc(p.alias)} · ${esc(problemTitle(p.problemId))}</option>`).join("")
+    + state.catalog.filter(p => !inContest.has(p.id))
+      .map(p => `<option value="${p.id}">✗ ${esc(p.title)} (fuera del concurso)</option>`).join("");
+  if ([...$("s-problem").options].some(o => o.value === keepProblem)) $("s-problem").value = keepProblem;
+}
+
+function submissionTarget() {
+  const teamId = $("s-team").value === "custom" ? $("s-team-custom").value.trim() : $("s-team").value;
+  return { teamId: teamId || null, problemId: $("s-problem").value || null };
+}
+
+async function submit(as, target, sourceCode, language = "PYTHON") {
+  return api("POST", "/submissions", { ...target, language, sourceCode }, as, "/ssvc");
+}
+
+function renderSubmissions() {
+  $("submissions").innerHTML = state.submissions.length ? state.submissions.map(s => `
+    <div class="item">
+      <div class="grow"><strong>${esc(problemTitle(s.problemId))}</strong> · ${s.language}
+        <span class="pill pill-${s.status}">${s.status}</span> <span class="pill">${s.verdict}</span>
+        <div class="muted">${fmtDate(s.submittedAt)} · equipo <code>${short(s.teamId)}</code></div>
+      </div>
+      <code>${short(s.id)}</code>
+    </div>`).join("") : '<p class="muted">Sin envíos para este equipo.</p>';
+}
+
+async function loadSubmissions(teamId) {
+  if (!teamId) { log("Elige un equipo en el panel 9.", "err"); return; }
+  const { ok, data } = await api("GET", `/submissions/team/${teamId}`, undefined, actor(), "/ssvc");
+  if (!ok) return;
+  state.submissions = [...data].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+  renderSubmissions();
+}
+
+// ─── Pruebas automáticas de la regla de envíos ──────────────────────────────
+
+// Texto que identifica cada motivo en el mensaje del 403 (SubmissionNotAllowedException).
+const REASON_TEXT = {
+  TEAM_NOT_FOUND: "equipo indicado no existe",
+  NOT_A_MEMBER: "no es integrante",
+  CONTEST_NOT_FOUND: "concurso no existe",
+  CONTEST_NOT_ACTIVE: "no está activo",
+  PROBLEM_NOT_IN_CONTEST: "no pertenece al concurso",
+};
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function waitUntil(when, label) {
+  while (Date.now() < when) {
+    $("rule-tests-status").textContent = `${label}: faltan ${Math.ceil((when - Date.now()) / 1000)} s`;
+    await sleep(Math.min(1000, when - Date.now()));
+  }
+}
+
+// Devuelve el n-ésimo actor con ese rol, creándolo si no existe.
+function ensureActor(role, index, name) {
+  const all = state.actors.filter(a => a.role === role);
+  if (all[index]) return all[index];
+  const a = newActor(name, role);
+  state.actors.push(a);
+  saveActors();
+  renderActors();
+  log(`Las pruebas automáticas necesitaban otro ${role}: se creó "${name}".`);
+  return a;
+}
+
+function ruleTestRow(n, label, as, expected) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>…</td><td>${n}. ${esc(label)}</td><td>${esc(as.name)} · ${as.role}</td>
+    <td>${expected.status}${expected.reason ? ` ${expected.reason}` : ""}</td><td class="muted">pendiente</td>`;
+  $("rule-tests-table").querySelector("tbody").append(tr);
+  return tr;
+}
+
+async function runRuleTests() {
+  const org = ensureActor("ORGANIZER", 0, "Organizador");
+  const admin = ensureActor("ADMIN", 0, "Admin");
+  const ana = ensureActor("STUDENT", 0, "Ana (capitana)");
+  const beto = ensureActor("STUDENT", 1, "Beto");
+  if (state.catalog.length < 2) { log("Las pruebas automáticas necesitan al menos 2 problemas en problem-service.", "err"); return; }
+
+  $("btn-rule-tests").disabled = true;
+  $("rule-tests-table").querySelector("tbody").innerHTML = "";
+  const tag = Math.random().toString(36).slice(2, 6);
+  const [pIn, pOut] = state.catalog;
+  let passed = 0, total = 0;
+
+  try {
+    $("rule-tests-status").textContent = "preparando escenario…";
+    const a = await createContest(org, `Prueba ${tag} (activa 1 min)`, "clave123", 1, 1);
+    if (!a.ok) throw new Error("no se pudo crear el concurso");
+    const A = a.data.id;
+    if (!(await api("POST", `/contests/${A}/problems`, { problemId: pIn.id, alias: "A", orderIndex: 0, points: 1, penalty: 20, balloonColor: BALLOON_COLORS[0] }, org)).ok)
+      throw new Error("no se pudo asignar el problema al concurso");
+    const t = await api("POST", `/contests/${A}/teams`, { teamName: `Prueba ${tag}`, contestPassword: "clave123" }, ana);
+    if (!t.ok) throw new Error("no se pudo crear el equipo");
+    const T = t.data.id;
+    // El admin entra al equipo para mostrar que el rol no cuenta: solo ser integrante.
+    if (!(await api("POST", `/teams/${T}/members`, { userId: admin.id }, org)).ok)
+      throw new Error("no se pudo agregar al admin al equipo");
+    const start = new Date(a.data.startTime).getTime(), end = new Date(a.data.endTime).getTime();
+    log(`Pruebas ${tag}: concurso ${short(A)} con "${pIn.title}", equipo ${short(T)} de ${ana.name} y ${admin.name}; "${pOut.title}" queda fuera.`, "ok");
+
+    let n = 0;
+    const code = () => `print(sum(map(int, input().split())))  # prueba ${tag} caso ${n}`;
+    async function check(label, as, target, expected, sourceCode = code()) {
+      n++; total++;
+      const tr = ruleTestRow(n, label, as, expected);
+      const r = await submit(as, target, sourceCode);
+      const msg = r.data?.message || "";
+      const ok = r.status === expected.status && (!expected.reason || msg.includes(REASON_TEXT[expected.reason]));
+      if (ok) passed++;
+      tr.cells[0].textContent = ok ? "✅" : "❌";
+      tr.cells[4].className = ok ? "" : "err-text";
+      tr.cells[4].textContent = `${r.status}${msg ? ` · ${msg}` : r.data?.id ? ` · envío ${short(r.data.id)}` : ""}`;
+      return { sourceCode, r };
+    }
+
+    // Fase 1: el concurso todavía no empieza.
+    $("rule-tests-status").textContent = "fase 1: antes del inicio";
+    await check("Integrante antes del inicio", ana, { teamId: T, problemId: pIn.id }, { status: 403, reason: "CONTEST_NOT_ACTIVE" });
+    await check("Equipo inexistente", ana, { teamId: crypto.randomUUID(), problemId: pIn.id }, { status: 403, reason: "TEAM_NOT_FOUND" });
+    await check("Estudiante que no es del equipo", beto, { teamId: T, problemId: pIn.id }, { status: 403, reason: "NOT_A_MEMBER" });
+    await check("Organizador que creó el concurso (sin exención)", org, { teamId: T, problemId: pIn.id }, { status: 403, reason: "NOT_A_MEMBER" });
+
+    // Fase 2: el concurso está activo.
+    await waitUntil(start + 3000, "esperando el inicio del concurso");
+    $("rule-tests-status").textContent = "fase 2: concurso activo";
+    const okCase = await check("Integrante con concurso activo", ana, { teamId: T, problemId: pIn.id }, { status: 201 });
+    await check("Admin integrante del equipo", admin, { teamId: T, problemId: pIn.id }, { status: 201 });
+    await check("Admin con un equipo inexistente", admin, { teamId: crypto.randomUUID(), problemId: pIn.id }, { status: 403, reason: "TEAM_NOT_FOUND" });
+    await check("Problema fuera del concurso", ana, { teamId: T, problemId: pOut.id }, { status: 403, reason: "PROBLEM_NOT_IN_CONTEST" });
+    await check("Organizador que creó el concurso, durante el concurso", org, { teamId: T, problemId: pIn.id }, { status: 403, reason: "NOT_A_MEMBER" });
+    await check("Mismo código otra vez (duplicado)", ana, { teamId: T, problemId: pIn.id }, { status: 409 }, okCase.sourceCode);
+
+    // Fase 3: el concurso terminó.
+    await waitUntil(end + 3000, "esperando el fin del concurso");
+    $("rule-tests-status").textContent = "fase 3: concurso terminado";
+    await check("Integrante después del fin", ana, { teamId: T, problemId: pIn.id }, { status: 403, reason: "CONTEST_NOT_ACTIVE" });
+
+    selectContest(A, a.data.title);
+    selectTeam(T, t.data.teamName);
+    await loadSubmissions(T);
+  } catch (err) {
+    log(`Pruebas automáticas interrumpidas: ${err.message}.`, "err");
+  } finally {
+    $("btn-rule-tests").disabled = false;
+    $("rule-tests-status").textContent = total ? `${passed}/${total} casos como se esperaba` : "";
+    if (total) log(`Pruebas automáticas: ${passed}/${total} casos como se esperaba.`, passed === total ? "ok" : "err");
+  }
 }
 
 // ─── Escenarios ──────────────────────────────────────────────────────────────
@@ -498,6 +679,7 @@ $("actors-table").addEventListener("click", e => {
 });
 $("btn-add-student").onclick = () => { state.actors.push(newActor(`Estudiante ${state.actors.length + 1}`, "STUDENT")); saveActors(); renderActors(); };
 $("btn-add-organizer").onclick = () => { state.actors.push(newActor(`Organizador ${state.actors.length + 1}`, "ORGANIZER")); saveActors(); renderActors(); };
+$("btn-add-admin").onclick = () => { state.actors.push(newActor(`Admin ${state.actors.length + 1}`, "ADMIN")); saveActors(); renderActors(); };
 $("btn-reset-actors").onclick = () => { state.actors = defaultActors(); state.actorId = null; saveActors(); renderActors(); };
 
 $("btn-scn-basic").onclick = () => scenario(60);
@@ -545,9 +727,20 @@ $("clarifications").addEventListener("click", async e => {
   if ((await api("POST", `/clarifications/${id}/answer`, { answer: text }, staff())).ok) loadClarifications();
 });
 
+$("btn-submit").onclick = async () => {
+  const target = submissionTarget();
+  let code = $("s-code").value;
+  if ($("s-unique").checked) code += `\n# envio ${Date.now()}`;
+  const r = await submit(actor(), target, code, $("s-language").value);
+  if (r.ok && target.teamId) await loadSubmissions(target.teamId);
+};
+$("btn-list-submissions").onclick = () => loadSubmissions(submissionTarget().teamId);
+$("btn-rule-tests").onclick = runRuleTests;
+
 // Guarda la sesión al escribir en cualquier campo persistente.
 document.addEventListener("input", e => { if (FORM_FIELDS.includes(e.target.id)) saveSession(); });
 $("i-user").addEventListener("change", saveSession);
+$("s-language").addEventListener("change", saveSession);
 
 $("btn-create-contest").onclick = async () => {
   const r = await createContest(actor(), $("c-title").value, $("c-password").value, Number($("c-start").value), Number($("c-duration").value));
@@ -617,6 +810,8 @@ async function loadConfig() {
     $("jwt-issuer").value = cfg.jwtIssuer;
     state.contestUrl = cfg.contestUrl;
     state.problemUrl = cfg.problemUrl;
+    state.submissionUrl = cfg.submissionUrl;
+    $("submission-url").textContent = cfg.submissionUrl.replace(/^https?:\/\//, "");
     $("problem-url").textContent = cfg.problemUrl.replace(/^https?:\/\//, "");
     $("contest-url").textContent = cfg.contestUrl.replace(/^https?:\/\//, "");
     log(cfg.jwtSecretPresent ? "Configuración cargada desde .env." : "Falta JWT_SECRET en el .env: pégalo en el panel 1.", cfg.jwtSecretPresent ? "ok" : "err");
@@ -629,6 +824,7 @@ async function loadConfig() {
   loadActors();
   renderActors();
   loadSession(); // después de renderActors: el selector de invitados ya tiene opciones
+  if (state.teamId) $("s-team").dataset.want = state.teamId;
   showSelection();
   await loadConfig();
   checkHealth();

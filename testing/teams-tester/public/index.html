@@ -10,12 +10,13 @@
 
 <header>
   <h1><span class="logo">&lt;/&gt;</span> Probador de equipos e invitaciones</h1>
-  <p class="subtitle">contest-service: concursos → problemas con globo → equipos (capitán) → invitaciones por correo → aceptar/rechazar → límite de 3 y cierre al iniciar.</p>
+  <p class="subtitle">contest-service: concursos → problemas con globo → equipos (capitán) → invitaciones por correo → aceptar/rechazar → límite de 3 y cierre al iniciar → envíos solo de concursantes.</p>
 </header>
 
 <div class="topbar">
   <div class="service-item"><span class="dot dot-unknown" id="dot-contest"></span> contest-service <code id="contest-url">:8086</code></div>
   <div class="service-item"><span class="dot dot-unknown" id="dot-problem"></span> problem-service <code id="problem-url">:8082</code></div>
+  <div class="service-item"><span class="dot dot-unknown" id="dot-submission"></span> submission-service <code id="submission-url">:8083</code></div>
   <button type="button" id="btn-health" class="btn-small">Verificar</button>
   <button type="button" id="btn-forget" class="btn-small btn-ghost" title="Olvida concurso, equipo y formularios guardados (los usuarios de prueba se conservan)">Olvidar sesión</button>
   <label class="actor-pick">Actuar como
@@ -46,6 +47,7 @@
     <div class="row">
       <button type="button" id="btn-add-student">+ Estudiante</button>
       <button type="button" id="btn-add-organizer">+ Organizador</button>
+      <button type="button" id="btn-add-admin">+ Admin</button>
       <button type="button" id="btn-reset-actors" class="btn-ghost">Regenerar todos</button>
     </div>
   </section>
@@ -141,7 +143,52 @@
   </section>
 
   <section class="panel">
-    <h2>9. Registro</h2>
+    <h2>9. Envíos <span class="sel" id="sel-contest-submissions">— ninguno seleccionado</span></h2>
+    <p class="hint">Se envía siempre como el actor, sin sustituirlo: así se ve la regla de submission-service. Vale para todos los
+      roles, sin exenciones: el actor debe ser integrante del equipo, el concurso del equipo debe estar activo (entre el inicio
+      y el fin) y el problema debe estar en ese concurso. El concurso no se envía: se deduce del equipo.</p>
+    <div class="grid">
+      <label>Equipo
+        <select id="s-team"></select>
+      </label>
+      <label>UUID de equipo (si eliges "otro")
+        <input id="s-team-custom" type="text" placeholder="uuid" />
+      </label>
+      <label>Problema
+        <select id="s-problem"></select>
+      </label>
+      <label>Lenguaje
+        <select id="s-language">
+          <option>PYTHON</option><option>CPP</option><option>C</option><option>JAVA</option>
+        </select>
+      </label>
+      <label class="full">Código fuente
+        <textarea id="s-code" rows="4" spellcheck="false">print(sum(map(int, input().split())))</textarea>
+      </label>
+    </div>
+    <div class="row">
+      <button type="button" id="btn-submit">Enviar (como el actor)</button>
+      <label class="inline"><input type="checkbox" id="s-unique" checked /> Añadir marca única al código (evita el 409 por duplicado)</label>
+      <button type="button" id="btn-list-submissions" class="btn-ghost">Envíos del equipo</button>
+    </div>
+    <div id="submissions" class="list"></div>
+
+    <h3>Pruebas automáticas de la regla de envíos</h3>
+    <p class="hint">Crean su propio escenario (un concurso del primer organizador, un equipo de la capitana con el admin como
+      integrante, y un problema dentro y otro fuera) y prueban cada regla con el resultado esperado. El concurso empieza 1 min después de crearlo y dura 1 min, así que
+      las pruebas esperan a que esté activo y luego a que termine: tardan unos 2 min y medio. Necesitan 2 problemas en problem-service.</p>
+    <div class="row">
+      <button type="button" id="btn-rule-tests">Ejecutar pruebas (~2,5 min)</button>
+      <span class="muted" id="rule-tests-status"></span>
+    </div>
+    <table class="table" id="rule-tests-table">
+      <thead><tr><th></th><th>Caso</th><th>Actor</th><th>Esperado</th><th>Obtenido</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="panel">
+    <h2>10. Registro</h2>
     <div class="row"><button type="button" id="btn-clear-log" class="btn-ghost">Limpiar</button></div>
     <div id="log" class="log"></div>
   </section>

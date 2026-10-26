@@ -112,6 +112,10 @@ textarea { resize: vertical; font-family: inherit; }
 .pill-REJECTED { color: var(--dim); }
 .pill-EXPIRED { color: var(--err); border-color: #5a1f22; }
 .pill-captain { color: var(--accent); border-color: #1f5a28; }
+.pill-QUEUED, .pill-JUDGING { color: var(--info); border-color: #1f3d5a; }
+.pill-JUDGED { color: var(--ok); border-color: #1f5a28; }
+.pill-ENQUEUE_ERROR, .pill-JUDGE_ERROR { color: var(--err); border-color: #5a1f22; }
+.err-text { color: var(--err); }
 
 .log {
   font-family: "Geist Mono", Consolas, monospace; font-size: 12px; max-height: 420px; overflow: auto;

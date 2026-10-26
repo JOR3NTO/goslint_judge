@@ -1,4 +1,4 @@
-# Probador de equipos e invitaciones (`contest-service`)
+# Probador de equipos, invitaciones y envíos (`contest-service` + `submission-service`)
 
 Página temporal para probar a mano las HU de maratones, equipos e invitaciones:
 crear concursos, crear equipos (el creador queda como capitán), invitar por correo,
@@ -17,9 +17,10 @@ y el cierre de inscripciones al iniciar el concurso.
 ./testing/teams-tester/start.sh
 ```
 
-Arranca `problem-service` (`:8082`) y `contest-service` (`:8086`) si no están corriendo
+Arranca `problem-service` (`:8082`), `contest-service` (`:8086`) y `submission-service` (`:8083`) si no están corriendo
 (compilándolos si el código cambió) y luego el probador. Al salir con Ctrl+C detiene solo
-lo que arrancó él. Logs en `backend/logs/`.
+lo que arrancó él. Logs en `backend/logs/`. Si RabbitMQ no responde en `:5672`, `submission-service` arranca con
+`APP_MESSAGING_ENABLED=false`: la regla de elegibilidad se prueba igual, pero los envíos aceptados no llegan al juez.
 
 **Sesión guardada:** los usuarios de prueba, el concurso y el equipo elegidos y lo escrito en
 los formularios se guardan en el navegador, así que al recargar la página sigues donde lo dejaste.
@@ -40,5 +41,12 @@ No necesita `npm install`: usa solo módulos nativos de Node 20+.
    concurso, y el organizador responde desde la misma lista.
 3. **Invitaciones**: invita como capitán; luego cambia de actor al invitado para
    verlas en "Mis invitaciones" y responder por la API o con el enlace del correo.
+4. **Envíos**: se envía siempre como el actor, sin sustituirlo, para ver la regla de `submission-service`,
+   que es la misma para todos los roles: el actor debe ser integrante del equipo, el concurso del equipo debe
+   estar activo y el problema debe estar en ese concurso (el concurso no se envía: se deduce del equipo). El
+   selector de problemas incluye los del catálogo que están fuera del concurso, y el de equipo admite un UUID
+   cualquiera, para provocar cada rechazo a mano.
+   **Pruebas automáticas de la regla de envíos** (botón **Ejecutar pruebas**) montan su propio escenario (un concurso que empieza en 1 min y dura 1 min) y comprueban
+   cada regla contra el resultado esperado antes, durante y después del concurso; tardan unos 2,5 min.
 
 El servidor solo escucha en `127.0.0.1`, porque entrega el `JWT_SECRET` al navegador.

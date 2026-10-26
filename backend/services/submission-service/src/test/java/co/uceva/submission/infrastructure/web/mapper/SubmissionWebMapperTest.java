@@ -2,6 +2,7 @@ package co.uceva.submission.infrastructure.web.mapper;
 
 import co.uceva.shared.domain.ProgrammingLanguage;
 import co.uceva.shared.domain.VerdictStatus;
+import co.uceva.shared.infrastructure.security.AuthenticatedUser;
 import co.uceva.submission.application.usecase.GetSubmissionMetricsUseCase.SubmissionMetrics;
 import co.uceva.submission.application.usecase.SubmitCodeUseCase.SubmitCodeCommand;
 import co.uceva.submission.domain.model.Submission;
@@ -20,13 +21,15 @@ class SubmissionWebMapperTest {
     @Test
     void shouldMapRequestToCommand() {
         SubmitCodeRequestDTO dto = SubmissionFixtures.submitCodeRequest();
+        AuthenticatedUser user = new AuthenticatedUser(UUID.randomUUID(), "ORGANIZER");
 
-        SubmitCodeCommand command = SubmissionWebMapper.toCommand(dto);
+        SubmitCodeCommand command = SubmissionWebMapper.toCommand(dto, user);
 
         assertThat(command.teamId()).isEqualTo(dto.teamId());
         assertThat(command.problemId()).isEqualTo(dto.problemId());
         assertThat(command.language()).isEqualTo(dto.language());
         assertThat(command.sourceCode()).isEqualTo(dto.sourceCode());
+        assertThat(command.submitterId()).isEqualTo(user.userId());
     }
 
     @Test
