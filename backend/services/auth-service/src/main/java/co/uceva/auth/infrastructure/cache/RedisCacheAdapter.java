@@ -63,6 +63,11 @@ public class RedisCacheAdapter implements AuthCacheRepository, TokenBlacklist {
     }
 
     @Override
+    public void deleteRefreshToken(String userId) {
+        redisTemplate.delete(REFRESH_TOKEN_PREFIX + userId);
+    }
+
+    @Override
     public void blacklistToken(String rawToken, long ttlMillis) {
         redisTemplate.opsForValue().set(BLACKLIST_PREFIX + rawToken, "REVOKED", Duration.ofMillis(ttlMillis));
     }

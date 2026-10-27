@@ -19,13 +19,27 @@ class LogoutUserUseCaseImplTest {
     private final LogoutUserUseCaseImpl useCase = new LogoutUserUseCaseImpl(cache, tokenProvider);
 
     @Test
-    void blacklistsTokenWithRemainingLifetimeAsTtl() {
+    void blacklistsAccessTokenAndDeletesRefreshToken() {
         long fiveMinutes = 5 * 60 * 1000L;
         when(tokenProvider.getRemainingValidityMillis("token")).thenReturn(fiveMinutes);
+        when(tokenProvider.getUserIdFromToken("token")).thenReturn("user-uuid-123");
 
         useCase.logout("token");
 
         verify(cache).blacklistToken("token", fiveMinutes);
+        verify(cache).deleteRefreshToken("user-uuid-123");
+    }
+
+    @Test
+    void blacklistsAccessTokenEvenWhenUserIdCannotBeExtracted() {
+        long fiveMinutes = 5 * 60 * 1000L;
+        when(tokenProvider.getRemainingValidityMillis("token")).thenReturn(fiveMinutes);
+        when(tokenProvider.getUserIdFromToken("token")).thenReturn(null);
+
+        useCase.logout("token");
+
+        verify(cache).blacklistToken("token", fiveMinutes);
+        verify(cache, never()).deleteRefreshToken(anyString());
     }
 
     @Test
@@ -35,6 +49,7 @@ class LogoutUserUseCaseImplTest {
         useCase.logout("token");
 
         verify(cache, never()).blacklistToken(anyString(), anyLong());
+        verify(cache, never()).deleteRefreshToken(anyString());
     }
 
     @Test

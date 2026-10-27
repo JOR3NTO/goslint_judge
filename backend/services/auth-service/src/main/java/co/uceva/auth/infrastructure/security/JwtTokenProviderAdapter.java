@@ -56,6 +56,20 @@ public class JwtTokenProviderAdapter implements TokenProvider {
         }
     }
 
+    @Override
+    public String getUserIdFromToken(String rawToken) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(key())
+                    .build()
+                    .parseSignedClaims(rawToken)
+                    .getPayload()
+                    .getSubject();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private String generateToken(User user, long expirationMs) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMs);
