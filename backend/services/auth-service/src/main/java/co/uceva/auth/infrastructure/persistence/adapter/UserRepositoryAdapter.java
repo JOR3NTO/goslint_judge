@@ -57,6 +57,11 @@ public class UserRepositoryAdapter implements UserRepository {
         return repository.existsByUsername(username);
     }
 
+    @Override
+    public Optional<User> findById(java.util.UUID id) {
+        return repository.findById(id).map(this::toDomain);
+    }
+
     /** Mapeador manual: Transforma un modelo de Dominio a Entidad JPA */
     private UserJpaEntity toEntity(User user) {
         UserJpaEntity entity = new UserJpaEntity();

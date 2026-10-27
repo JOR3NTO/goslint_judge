@@ -1,13 +1,16 @@
 package co.uceva.auth.infrastructure.web.controller;
 
+import co.uceva.auth.application.usecase.GetCurrentUserUseCase;
 import co.uceva.auth.application.usecase.LoginUserUseCase;
 import co.uceva.auth.application.usecase.LogoutUserUseCase;
 import co.uceva.auth.application.usecase.RegisterUserUseCase;
+import co.uceva.auth.domain.exception.BadCredentialsException;
 import co.uceva.auth.domain.model.AuthToken;
 import co.uceva.auth.domain.model.User;
 import co.uceva.auth.infrastructure.web.dto.LoginRequest;
 import co.uceva.auth.infrastructure.web.dto.LoginResponse;
 import co.uceva.auth.infrastructure.web.dto.RegisterRequest;
+import co.uceva.auth.infrastructure.web.dto.UserProfileResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -29,16 +32,19 @@ public class AuthController {
     private final RegisterUserUseCase registerUserUseCase;
     private final LoginUserUseCase loginUserUseCase;
     private final LogoutUserUseCase logoutUserUseCase;
+    private final GetCurrentUserUseCase getCurrentUserUseCase;
 
     /**
      * Inyección de dependencias para obtener el orquestador del caso de uso.
      */
     public AuthController(RegisterUserUseCase registerUserUseCase,
                           LoginUserUseCase loginUserUseCase,
-                          LogoutUserUseCase logoutUserUseCase) {
+                          LogoutUserUseCase logoutUserUseCase,
+                          GetCurrentUserUseCase getCurrentUserUseCase) {
         this.registerUserUseCase = registerUserUseCase;
         this.loginUserUseCase = loginUserUseCase;
         this.logoutUserUseCase = logoutUserUseCase;
+        this.getCurrentUserUseCase = getCurrentUserUseCase;
     }
 
     /**
@@ -101,5 +107,16 @@ public class AuthController {
         response.put("userId", registeredUser.getId());
         
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserProfileResponse> getCurrentUser(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new BadCredentialsException("Token no proporcionado o formato inválido");
+        }
+        String rawToken = authHeader.substring(7).strip();
+        User user = getCurrentUserUseCase.getCurrentUser(rawToken);
+        return ResponseEntity.ok(UserProfileResponse.fromDomain(user));
     }
 }

@@ -1,5 +1,6 @@
 package co.uceva.auth.infrastructure.web.controller;
 
+import co.uceva.auth.domain.exception.AccountDisabledException;
 import co.uceva.auth.domain.exception.AccountLockedException;
 import co.uceva.auth.domain.exception.BadCredentialsException;
 import co.uceva.auth.domain.exception.InvalidUserDataException;
@@ -84,5 +85,12 @@ public class AuthExceptionHandler {
         Map<String, String> response = new HashMap<>();
         response.put("error", ex.getMessage());
         return ResponseEntity.status(423).body(response);
+    }
+
+    @ExceptionHandler(AccountDisabledException.class)
+    public ResponseEntity<Map<String, String>> handleAccountDisabled(AccountDisabledException ex) {
+        Map<String, String> response = new HashMap<>();
+        response.put("error", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 }
