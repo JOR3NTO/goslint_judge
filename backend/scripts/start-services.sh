@@ -39,27 +39,37 @@ start_service() {
 
 mkdir -p "$BACKEND_DIR/logs"
 
+# Cada servicio arranca en un subshell para que su .env no lo herede el
+# siguiente: el SERVER_PORT de problem-service hacia que submission-service
+# intentara abrir el 8082 y muriera con "Address already in use".
+
 # --- auth-service ---
-load_env "$BACKEND_DIR/services/auth-service/.env"
-start_service "auth-service" \
-    "$BACKEND_DIR/services/auth-service/build/libs/auth-service-1.0.0.jar" \
-    "$BACKEND_DIR/logs/auth-service.log"
+(
+    load_env "$BACKEND_DIR/services/auth-service/.env"
+    start_service "auth-service" \
+        "$BACKEND_DIR/services/auth-service/build/libs/auth-service-1.0.0.jar" \
+        "$BACKEND_DIR/logs/auth-service.log"
+)
 
 sleep 3
 
 # --- problem-service ---
-load_env "$BACKEND_DIR/services/problem-service/.env"
-start_service "problem-service" \
-    "$BACKEND_DIR/services/problem-service/build/libs/problem-service-1.0.0.jar" \
-    "$BACKEND_DIR/logs/problem-service.log"
+(
+    load_env "$BACKEND_DIR/services/problem-service/.env"
+    start_service "problem-service" \
+        "$BACKEND_DIR/services/problem-service/build/libs/problem-service-1.0.0.jar" \
+        "$BACKEND_DIR/logs/problem-service.log"
+)
 
 sleep 3
 
 # --- submission-service ---
-load_env "$BACKEND_DIR/services/submission-service/.env"
-start_service "submission-service" \
-    "$BACKEND_DIR/services/submission-service/build/libs/submission-service-1.0.0.jar" \
-    "$BACKEND_DIR/logs/submission-service.log"
+(
+    load_env "$BACKEND_DIR/services/submission-service/.env"
+    start_service "submission-service" \
+        "$BACKEND_DIR/services/submission-service/build/libs/submission-service-1.0.0.jar" \
+        "$BACKEND_DIR/logs/submission-service.log"
+)
 
 log ""
 log "Servicios iniciados. Espera ~15s para que arranquen completamente."

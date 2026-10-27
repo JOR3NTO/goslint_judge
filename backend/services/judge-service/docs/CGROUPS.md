@@ -44,12 +44,17 @@ El aislamiento de procesos y del sistema de archivos es cosa de bwrap: ver [BWRA
 /sys/fs/cgroup                       raíz de cgroups del host
 └── goslint.slice                    preparada en el host; en el contenedor es /cg (lectura y escritura)
     ├── docker-<id>.scope            el cgroup del propio contenedor
-    ├── prog-<uuid-1>                hoja de la ejecución 1   (la crea SandboxWorkspace con mkdir)
-    ├── prog-<uuid-2>                hoja de la ejecución 2
-    └── ...
+    ├── worker-1                     rama del worker 1        (la crea WorkerEnvironment; sin procesos propios)
+    │   ├── prog-<uuid-1>            hoja de una ejecución    (la crea SandboxWorkspace con mkdir)
+    │   └── ...
+    ├── worker-2                     rama del worker 2
+    │   └── prog-<uuid-2>
+    └── ...                          una rama por worker (app.sandbox.workers.count)
 ```
 
-Detalle importante: las hojas `prog-*` son **hermanas** del scope del contenedor, no hijas. Cuando un proceso se mueve a una hoja, sale del cgroup del contenedor. Tres consecuencias:
+Cada worker de evaluación tiene su propia rama y solo crea hojas dentro de ella (sección 9 y [WORKERS.md](./WORKERS.md)). La rama no contiene procesos: existe para agrupar las hojas del worker, y por eso habilita `memory` y `pids` en su `cgroup.subtree_control`, que es lo que hace que las hojas nazcan con `memory.max` y `pids.max`.
+
+Detalle importante: las ramas `worker-*` y sus hojas `prog-*` son **hermanas** del scope del contenedor, no hijas. Cuando un proceso se mueve a una hoja, sale del cgroup del contenedor. Tres consecuencias:
 
 - Los límites del contenedor (`--memory`, `--pids-limit`) **no cubren** a los programas evaluados. Solo los cubren los de su hoja y, opcionalmente, un tope en la slice (sección 10).
 - `docker stats` no refleja lo que consumen las evaluaciones.
@@ -92,17 +97,18 @@ El detalle de cada paso está en [REQUIREMENTS.md](./REQUIREMENTS.md), secciones
 Lo reparten [SandboxWorkspace](../src/main/java/co/uceva/judge/infrastructure/sandbox/workspace/SandboxWorkspace.java) (pasos 1 a 3 y 8) y [TestCaseRunner](../src/main/java/co/uceva/judge/infrastructure/sandbox/execution/TestCaseRunner.java) (pasos 4 a 7):
 
 ```
- 1  mkdir /cg/prog-<uuid>
+ 1  mkdir /cg/worker-<n>/prog-<uuid>
  2  escribir memory.max, pids.max y memory.swap.max, y releerlos
        si un límite no se aplicó -> no se ejecuta nada
- 3  copiar la solución a /work/<uuid>
+ 3  copiar la solución a /work/worker-<n>/<uuid>
  4  bwrap arranca con --bind .../cgroup.procs /run/cgp
  5  dentro del sandbox: echo $$ > /run/cgp ; exec programa
        a partir de aquí el programa y sus hijos cuentan en la hoja
  6  el watchdog lee cpu.stat cada app.sandbox.monitor.watch-interval-ms
        CPU sobre el límite duro -> cgroup.kill + destroyForcibly()
  7  el programa termina; se leen cpu.stat, memory.peak y memory.events
- 8  cleanup(): borrado de /work/<uuid>, cgroup.kill y rmdir de la hoja con reintentos
+ 8  cleanup(): borrado de /work/worker-<n>/<uuid>, cgroup.kill y rmdir de la hoja
+ 9  al terminar la evaluación, el worker repasa su rama y su directorio y elimina lo que haya quedado
 ```
 
 > Un límite que no se aplica debe abortar la ejecución: nunca se corre código ajeno sin límites efectivos. Por eso el paso 2 los relee antes de seguir, y el paso 8 escribe `cgroup.kill` antes del `rmdir`, porque una hoja con procesos vivos no se puede borrar.
@@ -163,7 +169,8 @@ Desde dentro del sandbox no hay forma de ver ni alterar cgroups:
 
 - **Una hoja solo se borra con `rmdir`.** `rm -rf` no sirve: los archivos de control no se pueden eliminar. Además, una hoja con procesos vivos no se puede borrar (`Device or resource busy`).
 - El diseño de referencia escribe `1` en `cgroup.kill` y reintenta el `rmdir` durante ~1 s antes de avisar. Una hoja que no se borra suele indicar procesos que siguen vivos.
-- El entrypoint del contenedor borra al arrancar las hojas `prog-*` que hayan quedado de una vida anterior.
+- **El worker limpia detrás de cada evaluación.** `rmdir` falla con `Device or resource busy` mientras los procesos recién matados terminan de morir, así que una hoja puede sobrevivir al `cleanup()` de su ejecución. Al devolver el envío, [WorkerEnvironment](../src/main/java/co/uceva/judge/infrastructure/sandbox/workspace/WorkerEnvironment.java) escribe `1` en el `cgroup.kill` de la rama del worker (mata el subárbol entero de una vez), borra las hojas restantes reintentando ~1 s y vacía `/work/worker-<n>`. Si aun así queda algo, el worker se reinicia.
+- El entrypoint del contenedor borra al arrancar las ramas `worker-*` y las hojas `prog-*` que hayan quedado de una vida anterior, y cada worker vuelve a hacerlo con su rama al crearse.
 - Comprobado en el host: tras una fork bomb y un OOM-kill no queda ningún proceso, y todas las hojas se borran con `rmdir`.
 
 ---
@@ -179,7 +186,7 @@ MemoryMax=...
 TasksMax=...
 ```
 
-Dimensionamiento: cada evaluación concurrente puede llegar a su `memory.max`, más el servicio y el `/work` en memoria. El número de evaluaciones simultáneas por `memory.max` debe caber en el `MemoryMax` de la slice. **Recomendado, no validado.**
+Dimensionamiento: cada evaluación concurrente puede llegar a su `memory.max`, más el servicio y el `/work` en memoria. Hay como mucho una ejecución por worker, así que `app.sandbox.workers.count` por el `memory.max` más alto de los problemas debe caber en el `MemoryMax` de la slice. **Recomendado, no validado.**
 
 ---
 
@@ -187,7 +194,8 @@ Dimensionamiento: cada evaluación concurrente puede llegar a su `memory.max`, m
 
 | Archivo | Rol |
 |---------|-----|
-| [infrastructure/sandbox/workspace/SandboxWorkspace.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/workspace/SandboxWorkspace.java) | Crea la hoja, escribe los límites, prepara `/work/<uuid>` y limpia al terminar |
+| [infrastructure/sandbox/workspace/WorkerEnvironment.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/workspace/WorkerEnvironment.java) | Crea, limpia y destruye la rama `worker-<n>` y el directorio `/work/worker-<n>` de un worker |
+| [infrastructure/sandbox/workspace/SandboxWorkspace.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/workspace/SandboxWorkspace.java) | Crea la hoja dentro de la rama del worker, escribe los límites, prepara `/work/worker-<n>/<uuid>` y limpia al terminar |
 | [infrastructure/sandbox/execution/TestCaseRunner.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/execution/TestCaseRunner.java) | Lanza el proceso, lee las métricas del cgroup y decide el veredicto del caso |
 | [infrastructure/sandbox/monitor/TimeWatchdog.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/monitor/TimeWatchdog.java) | Vigila `cpu.stat` y mata la hoja si se pasa de tiempo |
 | [infrastructure/sandbox/monitor/OutputHandle.java](../src/main/java/co/uceva/judge/infrastructure/sandbox/monitor/OutputHandle.java) | Consume stdout con tope y mata la hoja si se excede |
@@ -204,7 +212,7 @@ Lo que cualquier implementación debe cumplir:
 
 | Requisito | Motivo |
 |---|---|
-| Copiar la solución a `/work/<uuid>` antes de lanzar bwrap | El sandbox solo ve esa carpeta |
+| Copiar la solución a `/work/worker-<n>/<uuid>` antes de lanzar bwrap | El sandbox solo ve esa carpeta |
 | Crear la hoja, aplicar límites y **verificarlos leyéndolos** | No ejecutar nada sin límites efectivos |
 | `memory.swap.max=0` en cada hoja | Con swap activo, el exceso se pagaría en disco en vez de provocar el OOM-kill |
 | Enrolar solo con `--bind .../cgroup.procs /run/cgp` | El código no debe ver `memory.max` ni `pids.max` |
@@ -216,7 +224,8 @@ Lo que cualquier implementación debe cumplir:
 | Watchdog con una sola unidad de tiempo y `destroyForcibly()` | SIGTERM puede ser ignorado, y mezclar relojes da un tope arbitrario |
 | Comparar CPU y límite en la misma unidad | `usage_usec` está en µs y el límite del problema llega en ms |
 | `cgroup.kill` y `rmdir` con reintentos al limpiar | Una hoja ocupada no se borra al primer intento |
-| Borrar la hoja y `/work/<uuid>` siempre, también si hay error | Evita fugas |
+| Borrar la hoja y `/work/worker-<n>/<uuid>` siempre, también si hay error | Evita fugas |
+| Crear hojas y archivos solo dentro del `WorkerEnvironment` recibido | Lo que un worker deja no puede afectar a otro, y reiniciarlo lo elimina todo |
 | Estado por ejecución, sin campos compartidos | Varias evaluaciones a la vez con una instancia |
 | Entorno del proceso vacío (`environment().clear()`) | El programa no debe heredar credenciales |
 
@@ -234,6 +243,8 @@ Los límites por problema (`timeLimitMs`, `memoryLimitKb`) llegan desde `problem
 | `app.sandbox.monitor.output-size-bytes` | `10485760` | Tope de stdout |
 | `app.sandbox.monitor.error-size-bytes` | `10485760` | Tope de stderr |
 
+Los workers (cuántos hay y el tiempo máximo de una evaluación) se configuran con `app.sandbox.workers.*`: ver [WORKERS.md](./WORKERS.md).
+
 `PidsLimit` y `VolumeSizeLimit` no son configurables todavía: se declaran con sus valores por defecto en [SandboxConfig](../src/main/java/co/uceva/judge/infrastructure/config/SandboxConfig.java).
 
 ---
@@ -244,6 +255,7 @@ Los límites por problema (`timeLimitMs`, `memoryLimitKb`) llegan desde `problem
 |---|---|
 | `Permission denied` al escribir `cgroup.procs` | Falta el `chown -R` sobre `/cg`, o el contenedor arrancó sin root y el entrypoint no pudo hacerlo |
 | No existe `memory.max` o `pids.max` en la hoja | Los controladores no están habilitados en el `subtree_control` de la slice |
+| `No se pudo preparar el entorno del worker` al arrancar | `/cg` no es una rama de cgroups v2 delegada (falta la slice o el bind mount), o la slice no tiene `memory` y `pids` en su `subtree_control` |
 | `Can't find source path .../cgroup.procs` en bwrap | La hoja no es un cgroup v2 real |
 | `memory.peak` no existe | Kernel anterior a 5.19 |
 | Hojas `prog-*` que se acumulan | Procesos vivos dentro de ellas, o la limpieza no llegó a borrarlas |

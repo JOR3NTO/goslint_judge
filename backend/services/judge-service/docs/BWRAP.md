@@ -66,11 +66,11 @@ sh -c 'exec bwrap "$@" 3<"$SECCOMP_PROFILE"' sh \
   --unshare-user --unshare-ipc --unshare-pid --unshare-net --unshare-uts \
   --ro-bind /usr /usr --symlink usr/bin /bin --symlink usr/lib /lib --symlink usr/lib64 /lib64 \
   --proc /proc --dev /dev \
-  --ro-bind /work/<uuid> /solution \
+  --ro-bind /work/worker-<n>/<uuid> /solution \
   --size 52428800 --tmpfs /work \
   --tmpfs /tmp \
   --chdir /work \
-  --bind /cg/prog-<uuid>/cgroup.procs /run/cgp \
+  --bind /cg/worker-<n>/prog-<uuid>/cgroup.procs /run/cgp \
   --seccomp 3 \
   -- /bin/sh -c 'echo $$ > /run/cgp; exec "$@"' -- python3 /solution/solution.py
 ```

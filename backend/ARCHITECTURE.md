@@ -171,14 +171,24 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 ### Estado de implementación
 
-| Servicio | Puerto | Estado | Descripción real del estado actual |
-|----------|--------|--------|------------------------------------|
-| `auth-service` | 8081 | 🟡 Parcial | `POST /register` y `POST /login` funcionales. Emite JWT (Access 15 min, Refresh 8h). Bloqueo de cuenta por 5 intentos fallidos (Redis, 15 min). `ddl-auto=update` + Flyway desactivado. **Falta:** endpoint `/logout` con invalidación de token, migrar a Flyway + `validate`, añadir filtro JWT para proteger rutas futuras. |
-| `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y test cases con `@PreAuthorize` por roles. Filtro JWT activo (`JwtAuthenticationFilter`). Flyway con `V1__Create_problems_test_cases.sql`. `ddl-auto=validate`. |
-| `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción, encolamiento RabbitMQ con publisher confirms, consumo del veredicto, DLQ con cierre `SYSTEM_ERROR/ENQUEUE_ERROR`, reintento de pendientes (`PendingSubmissionRetryScheduler`), notificación WebSocket. Filtro JWT activo en HTTP y en handshake WS. Flyway `V1`, `V2`, `V3`. `ddl-auto=validate`. |
-| `judge-service` | 8084 | 🟡 Parcial | Motor de evaluación operativo. Sandbox con `bubblewrap`. Soporta: Python completo. C/C++/Java: **compilación pendiente** (actualmente devuelven `JUDGE_ERROR` sin culpar al estudiante). Consume `submission.evaluate`, publica `submission.judging` y `submission.judged`. Filtro JWT activo (`@PreAuthorize` con rol `ADMIN`). `ServiceTokenProvider`: autoservicio de tokens `role=SERVICE` para leer test cases de `problem-service`. Sin BD ni Flyway (no persiste nada). |
-| `feedback-service` | 8085 | 🔴 Esqueleto | Solo la clase de arranque `FeedbackServiceApplication`. Sin dominio, aplicación ni infraestructura. |
-| `contest-service` | 8086 | 🔴 Esqueleto | Solo la clase de arranque `ContestServiceApplication`. Sin dominio, aplicación ni infraestructura. |
+| Servicio | Puerto | Estado | Qué hay hoy |
+|----------|--------|--------|-------------|
+| `auth-service` | 8081 | 🟢 Funcional | Registro de usuarios (`POST /register`) y Login (`POST /login`) implementados. Emite JWT (Access Token 15 min y Refresh Token 8h). Implementa bloqueo de cuenta por intentos fallidos usando Redis. Esquema aún con `ddl-auto=update`, sin Flyway. Falta filtro JWT para rutas protegidas. |
+| `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Falta el filtro JWT y su migración base de Flyway |
+| `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción del envío, encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Esquema versionado con Flyway (`V1`–`V3`). Es el único servicio que **autentica de verdad**, y solo en el handshake del WebSocket |
+| `judge-service` | 8084 | 🟡 Parcial | Dominio, aplicación e infraestructura completos: consume `submission.evaluate`, obtiene casos de prueba y límites de `problem-service` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) y publica el veredicto en `submission.judged`. **Solo evalúa Python**: el `Compiler` (C, C++, Java) va en otra HU, y esos lenguajes terminan como `ENQUEUE_ERROR` tras agotar los reintentos. El JWT `SERVICE` hacia `problem-service` lo firma el propio juez con el secreto compartido. Validado end-to-end en Manjaro x86_64 y en Ubuntu OCI A1-flex aarch64. Se despliega en su propia imagen con `bubblewrap` y seccomp (perfil `sandbox` del compose) |
+| `feedback-service` | 8085 | 🔴 Esqueleto | Solo la clase de arranque |
+| `contest-service` | 8086 | 🔴 Esqueleto | Solo la clase de arranque. Mientras no exista, `submission-service` resuelve cada equipo como individual mediante `NoOpTeamMembershipAdapter` |
+
+**Documentación detallada por subsistema:**
+
+| Documento | Contenido |
+|-----------|-----------|
+| [`services/submission-service/docs/RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md) | Topología, contrato de mensajes con `judge-service`, garantías de entrega, DLQ y reintentos |
+| [`services/submission-service/docs/WEBSOCKET.md`](./services/submission-service/docs/WEBSOCKET.md) | Canal `/ws/submissions`: autenticación en el handshake, contrato del mensaje, alcance por equipo y limitaciones |
+| [`services/judge-service/docs/BWRAP.md`](./services/judge-service/docs/BWRAP.md) | Aislamiento de la ejecución con bubblewrap: comando, qué ve el programa, filtro seccomp y códigos de salida |
+| [`services/judge-service/docs/CGROUPS.md`](./services/judge-service/docs/CGROUPS.md) | Límites y métricas por ejecución con cgroups v2: hoja por evaluación, memoria, PIDs, CPU y de dónde sale cada veredicto |
+| [`services/judge-service/docs/REQUIREMENTS.md`](./services/judge-service/docs/REQUIREMENTS.md) | Lo que hay que preparar en el host: kernel, slice de cgroups y flags del contenedor |
 
 ---
 
@@ -383,60 +393,39 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 ### `judge-service` — Puerto `8084`
 **Responsabilidad:** Motor de evaluación (Judging Engine). Consume la cola de RabbitMQ, ejecuta el código en un sandbox aislado con `bubblewrap` y emite el veredicto.
 
-| Entidad de dominio | Descripción |
-|--------------------|-------------|
-| `JudgeTask` | `submissionId`, `language`, `sourceCode`, `testCases`, `timeLimitMs`, `memoryLimitKb` |
-| `JudgeResult` | `submissionId`, `verdict (VerdictStatus)`, `executionTimeMs`, `memoryUsedKb` |
-| `TestCase` | `id`, `input`, `expectedOutput`, `timeLimit`, `memoryLimit` |
-| `MonitorLimits` | Límites ajustables en caliente para los monitores del sandbox |
+| Elemento de dominio | Descripción |
+|---------------------|-------------|
+| `JudgeTask`         | submissionId, language, sourceCode, testCases, timeLimit, memoryLimit. Se ensambla con `JudgeTask.create(...)` y valida sus invariantes (al menos un caso de prueba, límites en rango) |
+| `JudgeResult`       | submissionId, verdict, executionTimeMs, memoryUsedKb, failedTestCase (`null` si es `ACCEPTED` o si falló antes de ejecutar, p. ej. compilación). Se crea con `JudgeResult.create(...)` |
+| `TestCase`          | VO propio del juez: id, input, expectedOutput, orderIndex. No comparte modelo con `problem-service` |
+| Límites del sandbox | VOs validados: `TimeLimit`, `MemoryLimit`, `PidsLimit`, `VolumeSizeLimit`, `OutputSizeLimit`, `ErrorSizeLimit`, `HardTimePercent`, `WatchIntervalMillis`, `AbsoluteTimeLimit` |
 
-**Value Objects:**
+**Puertos de dominio y excepciones:**
+- `TestCaseRepository` (`domain/repository`) — lectura de los casos de prueba de un problema; los datos pertenecen a `problem-service`.
+- `TestCasesNotFoundException` — el problema no tiene casos de prueba.
+- `SandboxExecutionException` — fallo del propio sistema en el sandbox, distinto de un veredicto que culpa al estudiante.
 
-| Value Object | Descripción |
-|-------------|-------------|
-| `AbsoluteTimeLimit` | Tiempo máximo absoluto de ejecución (ms) |
-| `HardTimePercent` | Porcentaje del time limit a partir del cual se activa el vigilante |
-| `MemoryLimit` | Límite de memoria (MB) |
-| `OutputSizeLimit` | Tamaño máximo del stdout (bytes) |
-| `ErrorSizeLimit` | Tamaño máximo del stderr (bytes) |
-| `PidsLimit` | Máximo de procesos hijo (anti fork-bomb) |
-| `WatchIntervalMillis` | Intervalo de muestreo del vigilante (ms) |
-| `VolumeSizeLimit` | Tamaño máximo del volumen temporal del sandbox |
+**Caso de uso:**
+- `EvaluateSubmissionUseCase` — recibe el `SubmissionReceivedEvent`, obtiene casos de prueba y límites, ensambla el `JudgeTask`, lo ejecuta en el sandbox y publica el `JudgeResult`. Los fallos del sistema se propagan sin publicar, para que la mensajería reintente y, agotados los reintentos, lo cierre la DLQ.
 
-**Casos de uso implementados:**
+**Puertos de salida (`application/port/out`):** `ProblemLimitsPort` (límites de tiempo y memoria del problema), `SandboxExecutor` (ejecuta la tarea y devuelve el `JudgeResult`) y `JudgeResultPublisher` (publica el resultado hacia `submission-service`).
 
-| Caso de uso | Descripción |
-|-------------|-------------|
-| `EvaluateSubmissionUseCase` | Orquesta el pipeline: recupera test cases de `problem-service`, ejecuta en sandbox, determina veredicto |
-| `GetMonitorLimitsUseCase` | Devuelve los límites actuales del sandbox (solo ADMIN) |
-| `UpdateMonitorLimitsUseCase` | Actualiza los límites en caliente (solo ADMIN) |
+> La compilación (`Compiler`) está pendiente y se abordará en otra historia de usuario.
 
-**Puertos de salida:**
+**Infraestructura (`infrastructure/`):**
 
-| Puerto | Implementación |
-|--------|---------------|
-| `SandboxExecutor` | `RunnerSandboxExecutor` → `Runner` + `Compiler` + `BwrapCommandFactory` |
-| `TestCaseRepository` | `ProblemServiceTestCaseRepositoryAdapter` — REST a `problem-service` |
-| `ProblemLimitsPort` | `ProblemServiceLimitsAdapter` — REST a `problem-service` |
-| `JudgeResultPublisher` | `RabbitJudgeResultPublisherAdapter` — publica `submission.judged` |
-| `SubmissionJudgingNotifier` | `RabbitSubmissionJudgingNotifierAdapter` — publica `submission.judging` |
-
-**Endpoints activos:**
-
-| Método | Endpoint | Acceso | Descripción |
-|--------|----------|--------|-------------|
-| GET | `/api/v1/judge/monitor-limits` | ADMIN | Consultar límites del sandbox en caliente |
-| PUT | `/api/v1/judge/monitor-limits` | ADMIN | Actualizar límites del sandbox en caliente |
-| GET | `/actuator/health` | Público | Health check |
-
-**Sandbox:**
-
-| Lenguaje | Estado | Notas |
-|----------|--------|-------|
-| Python | ✅ Completo | Ejecución directa con `python3` en bwrap |
-| C | 🟡 Pendiente compilación | `Compiler.java` no implementado; devuelve `JUDGE_ERROR` |
-| C++ | 🟡 Pendiente compilación | Ídem |
-| Java | 🟡 Pendiente compilación | Ídem |
+| Pieza | Rol |
+|-------|-----|
+| `messaging/SubmissionEvaluationListener` | Consume `submission.evaluate`. Un fallo transitorio se propaga para el reintento (3 intentos, luego DLQ); uno permanente (`TestCasesNotFoundException`, `IllegalArgumentException`) se rechaza sin reintentar |
+| `messaging/RabbitJudgeResultPublisherAdapter` | Publica `SubmissionJudgedEvent` en `submission.exchange` con routing key `submission.judged`, persistente y esperando la confirmación del broker |
+| `security/ServiceTokenProvider` | Emite el JWT `role=SERVICE` del juez (HS256, secreto y emisor compartidos, `sub` = `app.security.jwt.service-id`, vigencia 5 min) y lo reutiliza hasta 30 s antes de expirar. Exige `JWT_SECRET` (mín. 32 bytes, sin valor por defecto) |
+| `client/ProblemServiceTestCaseRepositoryAdapter` | `TestCaseRepository` sobre `GET /api/v1/problems/test-cases/{id}/all` (JWT `SERVICE` en cada petición); un `404` o lista vacía es `TestCasesNotFoundException` |
+| `client/ProblemServiceLimitsAdapter` | `ProblemLimitsPort` sobre `GET /api/v1/problems/{id}` |
+| `sandbox/RunnerSandboxExecutor` | `SandboxExecutor` sobre `Runner`: escribe el fuente a un temporal, ejecuta y traduce el mapa de resultados a `JudgeResult` |
+| `web/MonitorLimitsController` | Consulta y modificación de los límites de los monitores del sandbox (solo `ADMIN`) |
+| `security/JwtAuthenticationFilter` + `config/SecurityConfig` | Autentica el HTTP con el JWT y el mismo `JwtTokenValidator` que el resto; el rol pasa a `ROLE_<rol>` para `@PreAuthorize` |
+| `persistence/InMemoryMonitorLimitsRepository` | Guarda los límites vigentes en memoria (el juez no tiene BD) |
+| `config/` | Convertidor JSON de RabbitMQ, bean del `Runner` y `RestClient` hacia `problem-service` |
 
 **Componentes del sandbox:**
 - `BwrapCommandFactory` — construye el comando `bwrap` con namespaces, bind mounts y límites de cgroups

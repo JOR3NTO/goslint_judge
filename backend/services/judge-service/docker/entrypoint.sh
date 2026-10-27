@@ -21,7 +21,9 @@ if [ "$(id -u)" -eq 0 ]; then
     if [ -d "$CG_DIR" ]; then
         # 1) Hojas de corridas anteriores. Los cgroups se borran con rmdir
         #    (rm -rf falla porque los archivos de control no se pueden unlink).
-        for d in "$CG_DIR"/prog-* "$CG_DIR"/probe-*; do
+        #    El orden importa: primero las hojas de cada worker y despues el
+        #    worker, porque un cgroup con hijos no se puede borrar.
+        for d in "$CG_DIR"/worker-*/prog-* "$CG_DIR"/worker-* "$CG_DIR"/prog-* "$CG_DIR"/probe-*; do
             if [ -d "$d" ]; then
                 rmdir "$d" 2>/dev/null || log "AVISO: no se pudo borrar $d (aun tiene procesos?)"
             fi
@@ -49,7 +51,7 @@ if [ "$(id -u)" -eq 0 ]; then
         log "AVISO: $CG_DIR no existe; falta el bind mount de goslint.slice."
     fi
 
-    # 4) /work: el Runner crea aqui /work/<uuid> por cada ejecucion. Si es un tmpfs
+    # 4) /work: cada worker crea aqui /work/worker-<n>/<uuid> por ejecucion. Si es un tmpfs
     #    o un volumen nuevo llega como root:root; se entrega al usuario final sin
     #    depender de las opciones uid/gid del montaje.
     if [ -d "$WORK_DIR" ]; then

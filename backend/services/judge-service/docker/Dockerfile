@@ -37,18 +37,33 @@ FROM ubuntu:24.04
 ARG WITH_DEBUG_TOOLS=false
 
 # bubblewrap: el sandbox de cada ejecucion.
-# python3: interprete de las soluciones evaluadas, y el unico lenguaje soportado hoy.
+# gcc / g++ / libc6-dev: compilacion y ejecucion de soluciones en C y C++.
+# python3: interprete de soluciones Python.
 # python3-seccomp: lo usa gen_seccomp.py para construir el filtro.
-# openjdk-17-jre-headless: para ejecutar el propio judge-service (no las soluciones).
+# openjdk-17-jdk-headless: javac (compilacion de soluciones Java) + java (ejecucion
+#   del propio judge-service y de las soluciones dentro del sandbox).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         bubblewrap \
+        gcc \
+        g++ \
+        libc6-dev \
         python3 \
         python3-seccomp \
-        openjdk-17-jre-headless \
+        openjdk-17-jdk-headless \
     && if [ "$WITH_DEBUG_TOOLS" = "true" ]; then \
          apt-get install -y --no-install-recommends procps strace; \
        fi \
     && rm -rf /var/lib/apt/lists/*
+
+# El sandbox monta /usr en solo lectura pero NO monta /etc, y en Ubuntu
+# /usr/bin/java es un symlink a /etc/alternatives/java: dentro de bwrap queda
+# roto y la solucion Java muere con "java: not found", que el juez reporta como
+# RUNTIME_ERROR culpando al estudiante de una limitacion de la plataforma. Se
+# reemplaza por un enlace directo al binario real, que si vive bajo /usr.
+# readlink resuelve la ruta en el build para no fijar arquitectura ni version
+# del JDK. javac no necesita esto: compila fuera del sandbox, donde /etc existe.
+RUN ln -sf "$(readlink -f /usr/bin/java)" /usr/bin/java \
+    && [ -x /usr/bin/java ]
 
 # Filtro seccomp (lista negra) para el codigo evaluado. Se genera AQUI, en la
 # imagen, porque el .bpf depende de la arquitectura y de la version de libseccomp.
