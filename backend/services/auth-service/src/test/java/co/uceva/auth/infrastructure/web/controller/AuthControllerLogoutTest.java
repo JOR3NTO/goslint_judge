@@ -1,5 +1,6 @@
 package co.uceva.auth.infrastructure.web.controller;
 
+import co.uceva.auth.application.usecase.GetCurrentUserUseCase;
 import co.uceva.auth.application.usecase.LoginUserUseCase;
 import co.uceva.auth.application.usecase.LogoutUserUseCase;
 import co.uceva.auth.application.usecase.RegisterUserUseCase;
@@ -47,6 +48,9 @@ class AuthControllerLogoutTest {
 
     @MockBean
     private RegisterUserUseCase registerUserUseCase;
+
+    @MockBean
+    private GetCurrentUserUseCase getCurrentUserUseCase;
 
     @Test
     @WithAnonymousUser
