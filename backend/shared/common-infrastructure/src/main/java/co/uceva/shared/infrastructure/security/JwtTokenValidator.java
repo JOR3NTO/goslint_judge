@@ -30,17 +30,39 @@ public class JwtTokenValidator {
     /** Claim que transporta el rol del usuario dentro del token. */
     private static final String ROLE_CLAIM = "role";
 
+    /** Claim con el que {@code auth-service} distingue access tokens de refresh tokens. */
+    private static final String TYPE_CLAIM = "type";
+
+    /** Valor del claim {@link #TYPE_CLAIM} en los refresh tokens. */
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
+
     /** Longitud mínima de la clave para HMAC-SHA256, exigida por la especificación. */
     private static final int MIN_SECRET_LENGTH_BYTES = 32;
 
     private final JwtParser parser;
 
+    private final TokenBlacklist tokenBlacklist;
+
     /**
+     * Crea un validador sin consulta de revocaciones.
+     *
      * @param secret Clave compartida con la que {@code auth-service} firma los tokens.
      * @param issuer Emisor esperado; un token emitido por cualquier otro se rechaza.
      * @throws IllegalArgumentException Si la clave es demasiado corta para HMAC-SHA256.
      */
     public JwtTokenValidator(String secret, String issuer) {
+        this(secret, issuer, null);
+    }
+
+    /**
+     * @param secret         Clave compartida con la que {@code auth-service} firma los tokens.
+     * @param issuer         Emisor esperado; un token emitido por cualquier otro se rechaza.
+     * @param tokenBlacklist Consulta de tokens revocados; puede ser {@code null} si el
+     *                       servicio no verifica revocaciones.
+     * @throws IllegalArgumentException Si la clave es demasiado corta para HMAC-SHA256.
+     */
+    public JwtTokenValidator(String secret, String issuer, TokenBlacklist tokenBlacklist) {
+        this.tokenBlacklist = tokenBlacklist;
         if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_LENGTH_BYTES) {
             throw new IllegalArgumentException(
                     "La clave de firma JWT debe tener al menos %d bytes.".formatted(MIN_SECRET_LENGTH_BYTES));
@@ -70,11 +92,19 @@ public class JwtTokenValidator {
             throw new InvalidTokenException("no se recibió ningún token");
         }
 
+        if (tokenBlacklist != null && tokenBlacklist.isBlacklisted(token)) {
+            throw new InvalidTokenException("el token ha sido revocado (sesión cerrada)");
+        }
+
         Claims claims;
         try {
             claims = parser.parseSignedClaims(token).getPayload();
         } catch (Exception e) {
             throw new InvalidTokenException("la firma, el emisor o la vigencia no son válidos", e);
+        }
+
+        if (REFRESH_TOKEN_TYPE.equals(claims.get(TYPE_CLAIM, String.class))) {
+            throw new InvalidTokenException("un refresh token no sirve como credencial de acceso");
         }
 
         UUID userId = readUserId(claims);

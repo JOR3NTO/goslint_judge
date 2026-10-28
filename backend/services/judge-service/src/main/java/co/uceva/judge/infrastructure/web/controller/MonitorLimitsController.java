@@ -21,7 +21,7 @@ import jakarta.validation.Valid;
  */
 @RestController
 @RequestMapping("/api/v1/judge/monitor-limits")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
 public class MonitorLimitsController {
 
     private final GetMonitorLimitsUseCase getMonitorLimitsUseCase;

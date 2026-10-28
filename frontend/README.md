@@ -49,11 +49,25 @@ src/
 La aplicación principal que usan los estudiantes:
 - **Landing page** con presentación de la plataforma
 - **Login / Registro** de cuentas
+- **Perfil** (`/profile`, ruta protegida) — datos de la cuenta y avatar generado con [DiceBear](https://www.dicebear.com) (estilo `gaze`, CC0) a partir del `username`. Ver [estado del perfil](#estado-del-perfil-student-app)
 - **Maratones** (`/contests`) — listado, inscripción y participación
 - **Envío de código** — editor + selección de lenguaje
 - **Historial de envíos** — veredictos y métricas
 - **Retroalimentación IA** (`/ai-feedback`) — sugerencias del LLM
 - **Scoreboard** — ranking en tiempo real vía WebSockets
+
+#### Estado del perfil (`student-app`)
+
+| Pieza | Estado | Notas |
+|---|---|---|
+| Página `/profile` | 🟢 Lista | Cabecera (avatar, nombre, `@username`, rol), detalle de cuenta, skeleton y error con reintento |
+| Avatar DiceBear | 🟢 Lista | Semilla = `username` (o `id` si el perfil es parcial). Determinístico, no se guarda en BD. Se renderiza como `<img>` con data URI, sin `dangerouslySetInnerHTML` |
+| Navbar con sesión | 🟢 Lista | Con token muestra "Mi perfil"; sin token, Login/Registro |
+| Datos completos de la cuenta | 🟡 Depende del backend | Requiere `GET /api/v1/auth/me` en `auth-service` (**no existe aún**). Contrato en `features/profile/types/profile.types.ts` |
+| Fallback sin `/me` | 🟢 Lista | Si responde 404/405 o no hay conexión, se muestra un perfil parcial con los claims del JWT (id, correo, rol) y un aviso |
+| Cierre de sesión en el front | 🔴 Pendiente | Fuera de esta HU; el backend ya expone `POST /api/v1/auth/logout` |
+
+Cómo probarlo sin backend: `NEXT_PUBLIC_USE_MOCK=true pnpm dev:student`, guardar un `auth_token` de prueba en `localStorage` y abrir `/profile`.
 
 ### `admin-app` — Puerto 3001
 Panel de administración y gestión:
