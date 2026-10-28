@@ -50,7 +50,7 @@ goslint_judge/
 │       └── admin-app/    (puerto 3001) ← Panel administrativo
 │
 ├── infrastructure/           ← Docker Compose, Traefik
-│   ├── docker/               ← docker-compose.yml (PostgreSQL + RabbitMQ)
+│   ├── docker/               ← docker-compose.yml (PostgreSQL, Redis, RabbitMQ y los servicios) + README paso a paso
 │   └── traefik/              ← Configuración del API Gateway
 │
 └── testing/                  ← Utilidades de prueba manual
@@ -117,8 +117,10 @@ goslint_judge/
 ### Backend
 
 ```bash
-# 1. Levantar la infraestructura (PostgreSQL + RabbitMQ)
-docker compose -f infrastructure/docker/docker-compose.yml up -d
+# 1. Levantar la infraestructura (PostgreSQL + Redis + RabbitMQ).
+#    Requiere infrastructure/docker/.env (copiar de .env.example). Para levantar también
+#    los servicios en contenedores: `docker compose up -d --build` — ver infrastructure/docker/README.md
+docker compose -f infrastructure/docker/docker-compose.yml up -d postgres redis rabbitmq
 
 cd backend
 
@@ -174,7 +176,7 @@ pnpm dev:admin
 | `contest-service`   | 🔴 Esqueleto          | Sin implementar; los equipos se tratan como individuales mientras tanto |
 | `student-app`       | 🟢 UI base lista      | Landing, Login, Register, Contests migrados. Perfil (`/profile`) con avatar DiceBear listo; datos completos pendientes de `GET /api/v1/auth/me` en `auth-service` |
 | `admin-app`         | 🔴 Pendiente          | Placeholder - en construcción                      |
-| `docker-compose`    | 🟢 Listo              | Levanta PostgreSQL y RabbitMQ; perfil `sandbox` levanta `judge-service` |
+| `docker-compose`    | 🟢 Listo              | Levanta PostgreSQL, Redis, RabbitMQ y auth, problem y submission; perfil `sandbox` (solo Linux) agrega `judge-service` |
 | `traefik`           | 🔴 Pendiente          | `traefik.yml` aún vacío                            |
 | `Gradle Wrapper`    | 🟢 Listo              | `./gradlew` disponible en `backend/`               |
 

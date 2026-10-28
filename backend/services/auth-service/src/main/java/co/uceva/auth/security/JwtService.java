@@ -42,7 +42,7 @@ public class JwtService {
     private final long refreshExpirationMs;
 
     public JwtService(@Value("${jwt.secret}") String secret,
-                      @Value("${jwt.issuer:goslint-auth-service}") String issuer,
+                      @Value("${jwt.issuer:goslint-judge}") String issuer,
                       @Value("${jwt.expiration.access}") long accessExpirationMs,
                       @Value("${jwt.expiration.refresh}") long refreshExpirationMs) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
