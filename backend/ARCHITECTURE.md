@@ -116,11 +116,11 @@ Cada microservicio internamente sigue la **Clean Architecture** de Robert C. Mar
 - Clases Java puras: entidades de negocio, value objects, enums de dominio.
 - **Cero** imports de `org.springframework.*`, `jakarta.persistence.*`, `com.fasterxml.*`.
 - Aquí viven las reglas de negocio que nunca cambian aunque cambie la BD o el framework.
-- Ejemplo: `Submission.java`, `User.java`, `Problem.java`, `JudgeTask.java`.
+- Ejemplo: `Submission.java`, `Problem.java`, `JudgeTask.java`.
 
 #### `application/` — Casos de uso
-- Interfaces (puertos): `SubmissionRepository`, `JudgeResultPublisher`, `AuthCacheRepository`.
-- Implementaciones de los casos de uso: `SubmitCodeUseCaseImpl`, `LoginUserUseCaseImpl`.
+- Interfaces (puertos): `SubmissionRepository`, `JudgeResultPublisher`.
+- Implementaciones de los casos de uso: `SubmitCodeUseCaseImpl`.
 - Aquí se orquesta la lógica de negocio. Puede importar clases de `domain/`.
 - **No** importa nada de `infrastructure/` ni de Spring directamente.
 
@@ -173,7 +173,7 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 | Servicio | Puerto | Estado | Qué hay hoy |
 |----------|--------|--------|-------------|
-| `auth-service` | 8081 | 🟢 Funcional | Registro de usuarios (`POST /register`) y Login (`POST /login`) implementados. Emite JWT (Access Token 15 min y Refresh Token 8h). Implementa bloqueo de cuenta por intentos fallidos usando Redis. Esquema aún con `ddl-auto=update`, sin Flyway. Falta filtro JWT para rutas protegidas. |
+| `auth-service` | 8081 | 🟢 Funcional | Registro, login, logout, refresh con rotación, perfil (`/me`, cambio de username y de contraseña). Emite JWT (Access 15 min y Refresh 8 h, distinguidos por el claim `type`). Bloqueo de cuenta por intentos fallidos y lista negra de tokens en Redis. Esquema aún con `ddl-auto=update`, sin Flyway. |
 | `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Falta el filtro JWT y su migración base de Flyway |
 | `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción del envío, encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Esquema versionado con Flyway (`V1`–`V3`). Es el único servicio que **autentica de verdad**, y solo en el handshake del WebSocket |
 | `judge-service` | 8084 | 🟡 Parcial | Dominio, aplicación e infraestructura completos: consume `submission.evaluate`, obtiene casos de prueba y límites de `problem-service` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) y publica el veredicto en `submission.judged`. **Solo evalúa Python**: el `Compiler` (C, C++, Java) va en otra HU, y esos lenguajes terminan como `ENQUEUE_ERROR` tras agotar los reintentos. El JWT `SERVICE` hacia `problem-service` lo firma el propio juez con el secreto compartido. Validado end-to-end en Manjaro x86_64 y en Ubuntu OCI A1-flex aarch64. Se despliega en su propia imagen con `bubblewrap` y seccomp (perfil `sandbox` del compose) |
@@ -195,10 +195,9 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 ### `auth-service` — Puerto `8081`
 **Responsabilidad:** Gestión de identidad y autenticación.
 
-| Entidad de dominio | Descripción |
-|--------------------|-------------|
-| `User` | `id (UUID)`, `firstName`, `lastName`, `username`, `email`, `passwordHash`, `role (ADMIN/STUDENT/ORGANIZER)`, `institution`, `isActive`, `createdAt` |
-| `AuthToken` | `accessToken`, `refreshToken`, `expiresIn` |
+| Clase | Descripción |
+|-------|-------------|
+| `User` | Entidad JPA `users`: `id (UUID)`, `firstName`, `lastName`, `username`, `email`, `passwordHash`, `role (ADMIN/STUDENT/ORGANIZER)`, `institution`, `isActive`, `createdAt` |
 
 **Roles del sistema (enum `Role`):**
 
@@ -209,21 +208,14 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 | `STUDENT` | Estudiante. Solo lectura pública y sus propios envíos. |
 | *`SERVICE`* | Rol técnico. **No está en el enum** `Role` de `auth-service` porque no es un usuario humano. `judge-service` lo firma directamente en sus tokens vía `ServiceTokenProvider`. |
 
-**Casos de uso implementados:**
+**Estructura:** capas planas (`controller`, `service`, `repository`, `model`, `dto`, `exception`, `security`, `cache`, `config`), sin interfaces de casos de uso ni adaptadores. Detalle en [`services/auth-service/docs/AUTH_API.md`](./services/auth-service/docs/AUTH_API.md).
 
-| Caso de uso | Implementación | Descripción |
-|-------------|----------------|-------------|
-| `RegisterUserUseCase` | `RegisterUserUseCaseImpl` | Valida unicidad de email y username, hashea contraseña (BCrypt), persiste con rol `STUDENT` |
-| `LoginUserUseCase` | `LoginUserUseCaseImpl` | Verifica intentos fallidos (Redis), valida credenciales, genera Access + Refresh Token, guarda refresh en Redis |
-
-**Puertos de dominio:**
-
-| Puerto | Implementación |
-|--------|---------------|
-| `UserRepository` | `UserRepositoryAdapter` → `SpringDataUserRepository` (JPA) |
-| `AuthCacheRepository` | `RedisCacheAdapter` — gestiona: `auth:failed_attempts:*`, `auth:lock:*`, `auth:refresh_token:*` |
-| `TokenProvider` | `JwtTokenProviderAdapter` — usa JJWT 0.12.5, configura con `jwt.secret` y `jwt.issuer` |
-| `PasswordEncoder` | Clase anónima en `SecurityConfig` → BCryptPasswordEncoder |
+| Clase | Responsabilidad |
+|-------|-----------------|
+| `AuthService` | Registro (email en minúsculas, unicidad sin distinguir mayúsculas), login con bloqueo por intentos fallidos, logout (lista negra + borrado del refresh token) y refresh con rotación |
+| `ProfileService` | Consulta de perfil, cambio de username y de contraseña (esta última cierra todas las sesiones) |
+| `JwtService` | Emite y lee JWT (JJWT 0.12.5, `jwt.secret` / `jwt.issuer`). Cada token lleva `type` = `access` o `refresh` |
+| `AuthCache` | Redis: `auth:failed_attempts:*`, `auth:lock:*`, `auth:refresh_token:*`, `auth:blacklist:<sha256>`. Implementa `TokenBlacklist` |
 
 **Endpoints activos:**
 
@@ -231,21 +223,26 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 |--------|----------|--------|-------------|----------|
 | POST | `/api/v1/auth/register` | Público | `{firstName, lastName, username, email, password, institution?}` | 201 `{message, userId}` |
 | POST | `/api/v1/auth/login` | Público | `{email, password}` | 200 `{accessToken, refreshToken, expiresIn, type: "Bearer"}` |
+| POST | `/api/v1/auth/refresh` | Público | `{refreshToken}` | 200 igual que login |
+| POST | `/api/v1/auth/logout` | Bearer | — | 200 siempre |
+| GET | `/api/v1/auth/me` | Bearer | — | 200 perfil |
+| PATCH | `/api/v1/auth/me/username` | Bearer | `{username}` | 200 perfil · 409 en uso |
+| PATCH | `/api/v1/auth/me/password` | Bearer | `{currentPassword, newPassword}` | 204 · 422 contraseña actual incorrecta |
 
-**Validaciones del `RegisterRequest`:**
+**Validaciones:**
 - `firstName`, `lastName`: obligatorios, 2–50 caracteres.
-- `username`: obligatorio, 3–50 caracteres.
+- `username`: 3–30 caracteres (letras, dígitos, `_`, `.`).
 - `email`: obligatorio, formato válido.
-- `password`: obligatorio, mínimo 8 caracteres, al menos 1 mayúscula, 1 número y 1 carácter especial.
+- `password` / `newPassword`: mínimo 8 caracteres, al menos 1 mayúscula, 1 número y 1 carácter especial.
 - `institution`: opcional.
 
-**Errores conocidos (comportamiento actual):**
-- Login fallido (credenciales incorrectas): incrementa `auth:failed_attempts:<email>` con TTL de 1 hora.
-- Tras **5 intentos fallidos**: bloqueo de cuenta con `auth:lock:<email>` durante **15 minutos**.
-- Cuenta bloqueada: el login devuelve mensaje de bloqueo con el tiempo restante en segundos.
+**Comportamiento del login:**
+- Login fallido: incrementa `auth:failed_attempts:<email>` (TTL de 1 hora desde el primer fallo).
+- Tras **5 intentos fallidos**: bloqueo con `auth:lock:<email>` durante **15 minutos**.
+- Cuenta bloqueada: el login responde `423` con los minutos restantes.
 
 **BD:** Tabla `users` (PostgreSQL, `ddl-auto=update` — Flyway desactivado).  
-**Redis:** `auth:failed_attempts:<email>` (TTL 1h) · `auth:lock:<email>` (TTL 15min) · `auth:refresh_token:<userId>` (TTL 8h)
+**Redis:** `auth:failed_attempts:<email>` (TTL 1h) · `auth:lock:<email>` (TTL 15min) · `auth:refresh_token:<userId>` (TTL 8h) · `auth:blacklist:<sha256 del token>` (TTL = vigencia restante)
 
 > ⚠️ **Deuda técnica:** `auth-service` no usa Flyway ni `ddl-auto=validate`. El esquema `users` depende de que Hibernate lo cree o migre automáticamente.
 
@@ -541,7 +538,7 @@ public ResponseEntity<List<TestCaseResponseDTO>> getAll(...) { ... }
 
 ### 6.3 Estado de seguridad de `auth-service`
 
-`auth-service` **no** implementa el filtro JWT en sus endpoints. Sus rutas `/api/v1/auth/**` son públicas intencionalmente, porque es el emisor de tokens, no el validador. La configuración actual en `SecurityConfig` usa `anyRequest().permitAll()` globalmente.
+`auth-service` **no** implementa el filtro JWT en sus endpoints. Sus rutas `/api/v1/auth/**` son públicas intencionalmente, porque es el emisor de tokens, no el validador. Los endpoints de perfil (`/me/**`) validan por su cuenta el access token que reciben (firma, emisor, tipo `access`, lista negra y cuenta activa). Los refresh tokens llevan `type=refresh` y `JwtTokenValidator` los rechaza como credencial de acceso en todos los servicios.
 
 ### 6.4 Autenticación servicio a servicio (S2S)
 
@@ -648,8 +645,10 @@ const ws = new WebSocket(
 
 El prefijo base de todos los paquetes es `co.uceva.<servicio>`.
 
+> **`auth-service`** no sigue la estructura de abajo: usa capas planas (`controller/`, `service/`, `repository/`, `model/`, `dto/`, `exception/`, `security/`, `cache/`, `config/`). El esquema de puertos y adaptadores descrito a continuación aplica a los demás servicios que lo usan.
+
 ```
-co.uceva.auth/
+co.uceva.<servicio>/   (ejemplo con los nombres que usaba auth-service antes de pasar a capas planas)
 ├── domain/
 │   ├── model/          ← Clases de entidad (User.java, AuthToken.java)
 │   ├── exception/      ← Excepciones de dominio (UserAlreadyExistsException.java)
@@ -734,11 +733,11 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 
 | # | Problema | Criticidad | Acción requerida |
 |---|----------|-----------|------------------|
-| 1 | **`auth-service` no tiene endpoint `/logout`** — El token emitido no puede ser invalidado antes de su expiración | 🔴 Alta (HU-03) | Implementar `POST /api/v1/auth/logout`: blacklist del token en Redis. Ver plan detallado en `plan_hu03_logout.md` |
+| 1 | ~~`auth-service` sin `/logout`~~ | ✅ Resuelto | `POST /logout` revoca el access token (lista negra en Redis) y borra el refresh token |
 | 2 | **`auth-service` usa `ddl-auto=update` sin Flyway** — El esquema de `users` no está versionado | 🟡 Media | Añadir `V1__Create_users_table.sql` a Flyway (ya existe en `db/migration/` pero Flyway está desactivado), cambiar a `ddl-auto=validate` y activar Flyway |
 | 3 | **`jwt.issuer` en `auth-service` usa propiedad `jwt.issuer` mientras los otros servicios usan `app.security.jwt.issuer`** — Inconsistencia en los nombres de propiedades | 🟡 Media | Unificar la propiedad a `app.security.jwt.issuer` en `auth-service` también |
 | 4 | **El sandbox de `judge-service` no soporta compilación de C, C++ y Java** — Python es el único lenguaje evaluado correctamente | 🔴 Alta | Implementar `Compiler.java` para los tres lenguajes compilados. Conectar a `RunnerSandboxExecutor`. |
-| 5 | **`JwtTokenValidator` en `common-infrastructure` no soporta lista negra** — Aunque Redis está disponible como dependencia, no hay integración | 🟡 Media | Añadir constructor opcional con `TokenBlacklist`. Necesario para HU-03 |
+| 5 | ~~`JwtTokenValidator` sin lista negra~~ | ✅ Resuelto | Constructor opcional con `TokenBlacklist`; `auth-service` la implementa con `AuthCache` |
 | 6 | **`contest-service` y `feedback-service` son esqueletos** — Toda su lógica está pendiente | 🔴 Alta | Implementar según roadmap del proyecto |
 | 7 | **`users-service/` convive con `auth-service`** — Módulo obsoleto | 🟢 Baja | Decidir cuál queda y retirar el otro de `settings.gradle` |
 | 8 | **Registro de sesiones WebSocket es local a la instancia** — No escala horizontalmente | 🟡 Media | Compartir el registro vía Redis cuando se requiera más de una réplica |
