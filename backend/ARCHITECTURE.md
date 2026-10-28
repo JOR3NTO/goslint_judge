@@ -197,13 +197,14 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 | Clase | Descripción |
 |-------|-------------|
-| `User` | Entidad JPA `users`: `id (UUID)`, `firstName`, `lastName`, `username`, `email`, `passwordHash`, `role (ADMIN/STUDENT/ORGANIZER)`, `institution`, `isActive`, `createdAt` |
+| `User` | Entidad JPA `users`: `id (UUID)`, `firstName`, `lastName`, `username`, `email`, `passwordHash`, `role (SUPER_ADMIN/ADMIN/ORGANIZER/STUDENT)`, `institution`, `isActive`, `createdAt` |
 
 **Roles del sistema (enum `Role`):**
 
 | Rol | Descripción |
 |-----|-------------|
-| `ADMIN` | Administrador. Acceso total. |
+| `SUPER_ADMIN` | Dueño de la plataforma. Único que asigna y retira administradores. Se crea al arrancar `auth-service` con `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD`; no se obtiene por registro ni por la API. Los demás servicios lo tratan como `ADMIN`. |
+| `ADMIN` | Administrador. Gestiona estudiantes y organizadores (no a otros administradores). |
 | `ORGANIZER` | Organizador. Gestiona problemas y concursos. |
 | `STUDENT` | Estudiante. Solo lectura pública y sus propios envíos. |
 | *`SERVICE`* | Rol técnico. **No está en el enum** `Role` de `auth-service` porque no es un usuario humano. `judge-service` lo firma directamente en sus tokens vía `ServiceTokenProvider`. |
@@ -213,7 +214,8 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 | Clase | Responsabilidad |
 |-------|-----------------|
 | `AuthService` | Registro (email en minúsculas, unicidad sin distinguir mayúsculas), login con bloqueo por intentos fallidos, logout (lista negra + borrado del refresh token) y refresh con rotación |
-| `ProfileService` | Consulta de perfil, cambio de username y de contraseña (esta última cierra todas las sesiones) |
+| `ProfileService` | Consulta de perfil, cambio de username y de contraseña (esta última cierra todas las sesiones) y disponibilidad de username |
+| `AdminUserService` | Listado paginado con búsqueda, cambio de rol y de estado, con reglas de jerarquía (el rol del actor se lee de la base de datos) |
 | `JwtService` | Emite y lee JWT (JJWT 0.12.5, `jwt.secret` / `jwt.issuer`). Cada token lleva `type` = `access` o `refresh` |
 | `AuthCache` | Redis: `auth:failed_attempts:*`, `auth:lock:*`, `auth:refresh_token:*`, `auth:blacklist:<sha256>`. Implementa `TokenBlacklist` |
 
@@ -228,6 +230,10 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 | GET | `/api/v1/auth/me` | Bearer | — | 200 perfil |
 | PATCH | `/api/v1/auth/me/username` | Bearer | `{username}` | 200 perfil · 409 en uso |
 | PATCH | `/api/v1/auth/me/password` | Bearer | `{currentPassword, newPassword}` | 204 · 422 contraseña actual incorrecta |
+| GET | `/api/v1/auth/check-username?username=` | Público | — | 200 `{available}` |
+| GET | `/api/v1/admin/users?page&size&search` | ADMIN / SUPER_ADMIN | — | 200 página de usuarios |
+| PATCH | `/api/v1/admin/users/{id}/role` | ADMIN / SUPER_ADMIN | `{role}` | 200 usuario · 403 jerarquía · 404 |
+| PATCH | `/api/v1/admin/users/{id}/status` | ADMIN / SUPER_ADMIN | `{isActive}` | 200 usuario · 403 (incl. autodesactivación) · 404 |
 
 **Validaciones:**
 - `firstName`, `lastName`: obligatorios, 2–50 caracteres.
