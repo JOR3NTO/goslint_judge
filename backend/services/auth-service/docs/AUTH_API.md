@@ -29,7 +29,7 @@
 ### 1. Variables de entorno
 
 ```bash
-DB_URL=jdbc:postgresql://localhost:5432/goslint_judge
+DB_URL=jdbc:postgresql://localhost:5432/goslint_judge_db
 DB_USERNAME=postgres
 DB_PASSWORD=<tu_password>
 ```
@@ -51,7 +51,7 @@ SUPER_ADMIN_USERNAME=superadmin # default: superadmin
 
 ### 2. Servicios externos
 
-- **PostgreSQL** en `localhost:5432` con la base `goslint_judge`.
+- **PostgreSQL** en `localhost:5432` con la base `goslint_judge_db`.
 - **Redis** en `localhost:6379`.
 
 ### 3. Arrancar
@@ -223,7 +223,7 @@ Access y refresh token comparten claims y se distinguen por `type`:
 {
   "jti": "uuid-único",
   "sub": "a3f1bc2d-4e5f-6789-abcd-ef0123456789",
-  "iss": "goslint-auth-service",
+  "iss": "goslint-judge",
   "email": "jorge@uceva.edu.co",
   "role": "STUDENT",
   "type": "access",
