@@ -15,7 +15,9 @@ import co.uceva.submission.infrastructure.web.dto.SubmitCodeRequestDTO;
 import co.uceva.submission.infrastructure.web.dto.SubmissionMetricsResponseDTO;
 import co.uceva.submission.infrastructure.web.dto.SubmissionResponseDTO;
 import co.uceva.submission.infrastructure.web.mapper.SubmissionWebMapper;
+import co.uceva.shared.infrastructure.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -71,12 +73,14 @@ public class SubmissionController {
      * </p>
      *
      * @param request DTO con los datos del envío.
+     * @param user    Usuario autenticado (principal del contexto de seguridad).
      * @return 201 CREATED con el envío creado.
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER')")
-    public ResponseEntity<SubmissionResponseDTO> create(@RequestBody SubmitCodeRequestDTO request) {
-        var command = SubmissionWebMapper.toCommand(request);
+    public ResponseEntity<SubmissionResponseDTO> create(@RequestBody SubmitCodeRequestDTO request,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        var command = SubmissionWebMapper.toCommand(request, user);
         Submission created = submitCodeUseCase.execute(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(SubmissionWebMapper.toResponse(created));
     }

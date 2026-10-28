@@ -488,10 +488,11 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 | Entidad de dominio | Descripción |
 |--------------------|-------------|
-| `Contest` | `id`, `createdBy`, `password`, `title`, `startTime`, `endTime`, `status`, `description` |
-| `Team` | `id`, `contestId`, `score`, `penaltyTime`, `nameTeam` |
-| `Member` | `teamId`, `userId`, `registeredAt` |
-| `ContestProblem` | `contestId`, `problemId`, `points`, `orderIndex`, `alias` |
+| `Contest`          | `id`, `createdBy`, `password`, `title`, `startTime`, `endTime`, `status`, `description` |
+| `Team`             | `id`, `contestId`, `score`, `penaltyTime`, `nameTeam` |
+| `Member`           | `teamId`, `userId`, `registeredAt` |
+| `ContestProblem`   | `contestId`, `problemId`, `points`, `penalty`, `orderIndex`, `alias`, `balloonColor` |
+| `Clarification`    | `id`, `problemId`, `teamId`, `question`, `answer`, `status`, `createdAt`, `answeredAt` |
 
 **Casos de uso planeados:**
 - `CreateContestUseCase` — Solo ORGANIZER/ADMIN
@@ -502,7 +503,7 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 **Integración con otros servicios:**
 - Al implementarse, `submission-service` debe cambiar `app.team-membership.provider` y añadir un adaptador HTTP que consulte a `contest-service` para resolver los integrantes de un equipo (destinatarios de las notificaciones WebSocket).
 
-**Tablas BD planeadas:** `contests`, `teams`, `members`, `contest_problems`
+**Tablas BD:** `contests`, `teams`, `members`, `contest_problems`, `clarifications`
 
 ---
 

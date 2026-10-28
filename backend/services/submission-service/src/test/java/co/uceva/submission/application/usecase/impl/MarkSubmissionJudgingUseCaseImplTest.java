@@ -88,12 +88,12 @@ class MarkSubmissionJudgingUseCaseImplTest {
     @Test
     void shouldNotOverwriteASubmissionThatAlreadyHasASystemError() {
         Submission submission = SubmissionFixtures.aSubmission(
-                SubmissionFixtures.SUBMISSION_ID, SubmissionStatus.SYSTEM_ERROR);
+                SubmissionFixtures.SUBMISSION_ID, SubmissionStatus.ENQUEUE_ERROR);
         when(submissionRepository.findById(submission.getId())).thenReturn(Optional.of(submission));
 
         Submission result = useCase.execute(submission.getId());
 
-        assertThat(result.getStatus()).isEqualTo(SubmissionStatus.SYSTEM_ERROR);
+        assertThat(result.getStatus()).isEqualTo(SubmissionStatus.ENQUEUE_ERROR);
         verify(submissionRepository, never()).save(any());
         verify(applicationEventPublisher, never()).publishEvent(any(SubmissionStatusChangedEvent.class));
     }

@@ -3,6 +3,7 @@ package co.uceva.submission;
 import co.uceva.shared.domain.ProgrammingLanguage;
 import co.uceva.shared.domain.SubmissionStatus;
 import co.uceva.shared.domain.VerdictStatus;
+import co.uceva.submission.application.port.out.ContestDataPort;
 import co.uceva.submission.application.port.out.SubmissionStatusNotifier;
 import co.uceva.submission.application.port.out.TeamDTO;
 import co.uceva.submission.application.port.out.TeamMembershipPort;
@@ -10,7 +11,9 @@ import co.uceva.submission.application.usecase.MarkSubmissionEnqueueErrorUseCase
 import co.uceva.submission.application.usecase.SubmitCodeUseCase;
 import co.uceva.submission.application.usecase.UpdateSubmissionVerdictUseCase;
 import co.uceva.submission.application.usecase.UpdateSubmissionVerdictUseCase.UpdateSubmissionVerdictCommand;
+import co.uceva.submission.domain.model.ContestSnapshot;
 import co.uceva.submission.domain.model.Submission;
+import co.uceva.submission.domain.model.TeamSnapshot;
 import co.uceva.submission.domain.repository.SubmissionRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -18,7 +21,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,6 +65,10 @@ class SubmissionVerdictNotificationIntegrationTest extends AbstractIntegrationTe
 
     @MockBean
     private TeamMembershipPort teamMembershipPort;
+
+    /** Se simula contest-service: cada equipo de estas pruebas es elegible para su envío. */
+    @MockBean
+    private ContestDataPort contestDataPort;
 
     @Test
     void shouldPersistAndNotifyTheQueuedStatusAfterSuccessfulEnqueue() {
@@ -150,7 +159,15 @@ class SubmissionVerdictNotificationIntegrationTest extends AbstractIntegrationTe
     }
 
     private Submission givenASubmission(UUID teamId) {
+        UUID submitterId = UUID.randomUUID();
+        UUID contestId = UUID.randomUUID();
+        UUID problemId = UUID.randomUUID();
+        when(contestDataPort.findTeam(teamId)).thenReturn(Optional.of(
+                new TeamSnapshot(teamId, contestId, List.of(submitterId))));
+        when(contestDataPort.findContest(contestId)).thenReturn(Optional.of(new ContestSnapshot(
+                contestId, Instant.now().minusSeconds(3600), Instant.now().plusSeconds(3600))));
+        when(contestDataPort.findContestProblemIds(contestId)).thenReturn(List.of(problemId));
         return submitCodeUseCase.execute(new SubmitCodeUseCase.SubmitCodeCommand(
-                teamId, UUID.randomUUID(), ProgrammingLanguage.PYTHON, "print(" + UUID.randomUUID() + ")"));
+                teamId, problemId, submitterId, ProgrammingLanguage.PYTHON, "print(" + UUID.randomUUID() + ")"));
     }
 }
