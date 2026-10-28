@@ -66,6 +66,24 @@ public class ProfileService {
     }
 
     /**
+     * Indica si un username puede usarse. Si {@code rawToken} es un access token válido, el
+     * username que ya tiene su dueño también cuenta como disponible. Un token inválido se ignora.
+     */
+    public boolean isUsernameAvailable(String username, String rawToken) {
+        String candidate = username.trim();
+        if (rawToken != null) {
+            try {
+                if (getCurrentUser(rawToken).getUsername().equalsIgnoreCase(candidate)) {
+                    return true;
+                }
+            } catch (BadCredentialsException | AccountDisabledException ignored) {
+                // Endpoint público: sin sesión válida se responde como a cualquier visitante.
+            }
+        }
+        return !userRepository.existsByUsernameIgnoreCase(candidate);
+    }
+
+    /**
      * Cambia el nombre de usuario. Es único sin distinguir mayúsculas, pero el dueño sí
      * puede cambiar solo la capitalización del suyo.
      *

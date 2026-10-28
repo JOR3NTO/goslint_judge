@@ -91,6 +91,20 @@ class AuthControllerTest {
     }
 
     @Test
+    void registerIgnoresARoleSentByTheClient() throws Exception {
+        Map<String, String> body = new java.util.HashMap<>(registerBody());
+        body.put("role", "SUPER_ADMIN");
+        when(authService.register(any())).thenReturn(user);
+
+        mockMvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content(json(body)))
+                .andExpect(status().isCreated());
+        // RegisterRequest no tiene campo de rol: AuthService solo puede crear estudiantes (User.newStudent).
+        org.junit.jupiter.api.Assertions.assertEquals(0,
+                java.util.Arrays.stream(co.uceva.auth.dto.RegisterRequest.class.getRecordComponents())
+                        .filter(c -> c.getName().equals("role")).count());
+    }
+
+    @Test
     void registerReturnsConflictWhenAlreadyRegistered() throws Exception {
         when(authService.register(any())).thenThrow(new UserAlreadyExistsException("El correo electrónico ya está registrado."));
 

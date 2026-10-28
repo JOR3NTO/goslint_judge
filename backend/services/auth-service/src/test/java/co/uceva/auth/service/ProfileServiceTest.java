@@ -189,6 +189,37 @@ class ProfileServiceTest {
         verify(userRepository, never()).save(any());
     }
 
+    // -------------------------------------------------------- isUsernameAvailable
+
+    @Test
+    void usernameIsAvailableWhenNobodyHasIt() {
+        when(userRepository.existsByUsernameIgnoreCase("libre")).thenReturn(false);
+
+        org.junit.jupiter.api.Assertions.assertTrue(profileService.isUsernameAvailable(" libre ", null));
+    }
+
+    @Test
+    void usernameIsNotAvailableWhenTaken() {
+        when(userRepository.existsByUsernameIgnoreCase("ocupado")).thenReturn(true);
+
+        org.junit.jupiter.api.Assertions.assertFalse(profileService.isUsernameAvailable("ocupado", null));
+    }
+
+    @Test
+    void ownUsernameCountsAsAvailableForTheLoggedInUser() {
+        tokenBelongsToExistingUser();
+
+        org.junit.jupiter.api.Assertions.assertTrue(profileService.isUsernameAvailable("CAMILA", token));
+        verify(userRepository, never()).existsByUsernameIgnoreCase(anyString());
+    }
+
+    @Test
+    void invalidTokenIsIgnoredAndAnsweredLikeAVisitor() {
+        when(userRepository.existsByUsernameIgnoreCase("camila")).thenReturn(true);
+
+        org.junit.jupiter.api.Assertions.assertFalse(profileService.isUsernameAvailable("camila", "basura"));
+    }
+
     @Test
     void changePasswordRejectsInvalidToken() {
         assertThrows(BadCredentialsException.class,

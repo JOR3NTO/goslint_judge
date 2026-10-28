@@ -3,7 +3,9 @@ package co.uceva.auth.controller;
 import co.uceva.auth.exception.AccountDisabledException;
 import co.uceva.auth.exception.AccountLockedException;
 import co.uceva.auth.exception.BadCredentialsException;
+import co.uceva.auth.exception.ForbiddenOperationException;
 import co.uceva.auth.exception.InvalidCurrentPasswordException;
+import co.uceva.auth.exception.UserNotFoundException;
 import co.uceva.auth.exception.InvalidUserDataException;
 import co.uceva.auth.exception.UserAlreadyExistsException;
 import co.uceva.auth.exception.UsernameTakenException;
@@ -14,6 +16,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -55,10 +58,10 @@ public class AuthExceptionHandler {
         return ResponseEntity.badRequest().body(errors);
     }
 
-    /** Cuerpo ausente o JSON malformado. */
+    /** Cuerpo ausente, JSON malformado o valor fuera de los permitidos (p. ej. un rol inexistente). */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, String>> handleUnreadableBody(HttpMessageNotReadableException ex) {
-        return error(HttpStatus.BAD_REQUEST, "El cuerpo de la petición no es un JSON válido.");
+        return error(HttpStatus.BAD_REQUEST, "El cuerpo de la petición no es un JSON válido o tiene un valor no permitido.");
     }
 
     @ExceptionHandler(InvalidUserDataException.class)
@@ -74,6 +77,22 @@ public class AuthExceptionHandler {
     @ExceptionHandler(AccountLockedException.class)
     public ResponseEntity<Map<String, String>> handleAccountLocked(AccountLockedException ex) {
         return error(HttpStatus.LOCKED, ex.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenOperationException.class)
+    public ResponseEntity<Map<String, String>> handleForbiddenOperation(ForbiddenOperationException ex) {
+        return error(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleUserNotFound(UserNotFoundException ex) {
+        return error(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    /** UUID de ruta mal formado, p. ej. {@code /admin/users/abc/role}. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, String>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return error(HttpStatus.BAD_REQUEST, "El parámetro '" + ex.getName() + "' no es válido.");
     }
 
     @ExceptionHandler(AccountDisabledException.class)
