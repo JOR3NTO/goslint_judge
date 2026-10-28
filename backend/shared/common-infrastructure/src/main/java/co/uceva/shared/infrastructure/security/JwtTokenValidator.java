@@ -30,6 +30,12 @@ public class JwtTokenValidator {
     /** Claim que transporta el rol del usuario dentro del token. */
     private static final String ROLE_CLAIM = "role";
 
+    /** Claim con el que {@code auth-service} distingue access tokens de refresh tokens. */
+    private static final String TYPE_CLAIM = "type";
+
+    /** Valor del claim {@link #TYPE_CLAIM} en los refresh tokens. */
+    private static final String REFRESH_TOKEN_TYPE = "refresh";
+
     /** Longitud mínima de la clave para HMAC-SHA256, exigida por la especificación. */
     private static final int MIN_SECRET_LENGTH_BYTES = 32;
 
@@ -95,6 +101,10 @@ public class JwtTokenValidator {
             claims = parser.parseSignedClaims(token).getPayload();
         } catch (Exception e) {
             throw new InvalidTokenException("la firma, el emisor o la vigencia no son válidos", e);
+        }
+
+        if (REFRESH_TOKEN_TYPE.equals(claims.get(TYPE_CLAIM, String.class))) {
+            throw new InvalidTokenException("un refresh token no sirve como credencial de acceso");
         }
 
         UUID userId = readUserId(claims);
