@@ -74,7 +74,7 @@ public class SubmissionController {
      * @return 201 CREATED con el envío creado.
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<SubmissionResponseDTO> create(@RequestBody SubmitCodeRequestDTO request) {
         var command = SubmissionWebMapper.toCommand(request);
         Submission created = submitCodeUseCase.execute(command);
@@ -91,7 +91,7 @@ public class SubmissionController {
      * @return 200 OK con el envío encontrado.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<SubmissionResponseDTO> getById(@PathVariable("id") UUID id) {
         Submission submission = getSubmissionByIdUseCase.execute(id);
         return ResponseEntity.ok(SubmissionWebMapper.toResponse(submission));
@@ -106,7 +106,7 @@ public class SubmissionController {
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<List<SubmissionResponseDTO>> getAll() {
         List<Submission> submissions = getAllSubmissionsUseCase.execute();
         List<SubmissionResponseDTO> response = submissions.stream()
@@ -125,7 +125,7 @@ public class SubmissionController {
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping("/problem/{problemId}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<List<SubmissionResponseDTO>> getByProblem(@PathVariable("problemId") UUID problemId) {
         List<Submission> submissions = getSubmissionsByProblemUseCase.execute(problemId);
         List<SubmissionResponseDTO> response = submissions.stream()
@@ -144,7 +144,7 @@ public class SubmissionController {
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping("/team/{teamId}")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<List<SubmissionResponseDTO>> getByTeam(@PathVariable("teamId") UUID teamId) {
         List<Submission> submissions = getSubmissionsByTeamUseCase.execute(teamId);
         List<SubmissionResponseDTO> response = submissions.stream()
@@ -164,7 +164,7 @@ public class SubmissionController {
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping("/history")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<List<SubmissionResponseDTO>> getHistory(
             @RequestParam("problemId") UUID problemId,
             @RequestParam("teamId") UUID teamId) {
@@ -186,7 +186,7 @@ public class SubmissionController {
      * @return 200 OK con las métricas del envío.
      */
     @GetMapping("/{id}/metrics")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<SubmissionMetricsResponseDTO> getMetrics(@PathVariable("id") UUID id) {
         SubmissionMetrics metrics = getSubmissionMetricsUseCase.execute(id);
         return ResponseEntity.ok(SubmissionWebMapper.toResponse(metrics));
@@ -202,7 +202,7 @@ public class SubmissionController {
      * @return 204 NO CONTENT.
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<Void> delete(@PathVariable("id") UUID id) {
         deleteSubmissionUseCase.execute(id);
         return ResponseEntity.noContent().build();

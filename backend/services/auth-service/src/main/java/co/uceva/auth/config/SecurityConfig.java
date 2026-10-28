@@ -25,8 +25,9 @@ public class SecurityConfig {
     private String allowedOrigins;
 
     /**
-     * Las rutas de {@code /api/v1/auth/**} son públicas a nivel HTTP: este servicio emite
-     * los tokens y valida el que recibe cada endpoint de perfil por su cuenta.
+     * Las rutas de {@code /api/v1/auth/**} y {@code /api/v1/admin/**} quedan abiertas a nivel
+     * HTTP: este servicio emite los tokens y cada endpoint valida por su cuenta el que recibe
+     * (en los de administración, además, que su dueño sea administrador según la base de datos).
      */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -35,7 +36,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**").permitAll()
+                .requestMatchers("/api/v1/auth/**", "/api/v1/admin/**").permitAll()
                 .anyRequest().authenticated()
             );
         return http.build();

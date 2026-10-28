@@ -7,7 +7,8 @@ import co.uceva.auth.dto.RefreshRequest;
 import co.uceva.auth.dto.RegisterRequest;
 import co.uceva.auth.dto.UpdateUsernameRequest;
 import co.uceva.auth.dto.UserProfileResponse;
-import co.uceva.auth.exception.BadCredentialsException;
+import co.uceva.auth.dto.ValidationRules;
+import co.uceva.auth.exception.InvalidUserDataException;
 import co.uceva.auth.model.User;
 import co.uceva.auth.service.AuthService;
 import co.uceva.auth.service.ProfileService;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -32,8 +34,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
-
-    private static final String BEARER_PREFIX = "Bearer ";
 
     private final AuthService authService;
     private final ProfileService profileService;
@@ -64,8 +64,9 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
-        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
-            authService.logout(authHeader.substring(BEARER_PREFIX.length()).strip());
+        String token = BearerTokens.optional(authHeader);
+        if (token != null) {
+            authService.logout(token);
         }
         return ResponseEntity.ok().build();
     }
@@ -105,10 +106,23 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    private String bearerToken(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-            throw new BadCredentialsException("Token no proporcionado o formato inválido");
+    /**
+     * Público. Indica si el username está libre, para validar el formulario mientras se
+     * escribe. Si llega un access token válido, el username propio también cuenta como libre.
+     * 400 si el formato es inválido.
+     */
+    @GetMapping("/check-username")
+    public ResponseEntity<Map<String, Boolean>> checkUsername(
+            @RequestParam String username,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authHeader) {
+        if (!username.trim().matches(ValidationRules.USERNAME_PATTERN)) {
+            throw new InvalidUserDataException(ValidationRules.USERNAME_MESSAGE);
         }
-        return authHeader.substring(BEARER_PREFIX.length()).strip();
+        boolean available = profileService.isUsernameAvailable(username, BearerTokens.optional(authHeader));
+        return ResponseEntity.ok(Map.of("available", available));
+    }
+
+    private String bearerToken(String authHeader) {
+        return BearerTokens.require(authHeader);
     }
 }

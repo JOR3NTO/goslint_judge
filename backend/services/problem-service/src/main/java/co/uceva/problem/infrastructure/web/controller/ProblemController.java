@@ -64,7 +64,7 @@ public class ProblemController {
      * @return 201 CREATED con el problema creado.
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<ProblemResponseDTO> create(@RequestBody CreateProblemRequestDTO request) {
         // Convertir el DTO a comando de aplicación
         var command = ProblemWebMapper.toCommand(request);
@@ -135,7 +135,7 @@ public class ProblemController {
      * @return 200 OK con el problema actualizado.
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<ProblemResponseDTO> update(
             @PathVariable("id") UUID id,
             @RequestBody UpdateProblemRequestDTO request) {
@@ -157,7 +157,7 @@ public class ProblemController {
      * @return 204 NO CONTENT.
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<Void> delete(@PathVariable("id") UUID id) {
         deleteProblemUseCase.execute(id);
         return ResponseEntity.noContent().build();
