@@ -14,31 +14,33 @@
 4. [Módulos compartidos (shared)](#4-módulos-compartidos-shared)
 5. [Microservicios — Responsabilidades y dominio](#5-microservicios--responsabilidades-y-dominio)
    - [Estado de implementación](#estado-de-implementación)
-6. [Flujo de datos principal (envío de código)](#6-flujo-de-datos-principal-envío-de-código)
-7. [Convenciones de paquetes Java](#7-convenciones-de-paquetes-java)
-8. [Configuración de Gradle](#8-configuración-de-gradle)
-9. [Problemas conocidos y deuda técnica](#9-problemas-conocidos-y-deuda-técnica)
-10. [Cómo agregar un nuevo microservicio](#10-cómo-agregar-un-nuevo-microservicio)
-11. [Checklist antes de hacer un PR](#11-checklist-antes-de-hacer-un-pr)
+6. [Seguridad y autorización](#6-seguridad-y-autorización)
+7. [Canal WebSocket (notificaciones en tiempo real)](#7-canal-websocket-notificaciones-en-tiempo-real)
+8. [Flujo de datos principal (envío de código)](#8-flujo-de-datos-principal-envío-de-código)
+9. [Convenciones de paquetes Java](#9-convenciones-de-paquetes-java)
+10. [Configuración de Gradle](#10-configuración-de-gradle)
+11. [Problemas conocidos y deuda técnica](#11-problemas-conocidos-y-deuda-técnica)
+12. [Cómo agregar un nuevo microservicio](#12-cómo-agregar-un-nuevo-microservicio)
+13. [Checklist antes de hacer un PR](#13-checklist-antes-de-hacer-un-pr)
 
 ---
 
 ## 1. Visión general del sistema
 
-El **Goslint Judge** es un juez en línea (Online Judge System) institucional diseñado para que la UCEVA gestione de forma autónoma su repositorio de problemas algorítmicos y sus maratones de programación. Los estudiantes envían soluciones en C, C++, Java o Python; el sistema las evalúa en contenedores Docker aislados (sandbox) y emite veredictos oficiales (`Accepted`, `Wrong Answer`, `Time Limit Exceeded`, etc.), además de una retroalimentación descriptiva generada por un LLM externo.
+El **Goslint Judge** es un juez en línea (Online Judge System) institucional diseñado para que la UCEVA gestione de forma autónoma su repositorio de problemas algorítmicos y sus maratones de programación. Los estudiantes envían soluciones en C, C++, Java o Python; el sistema las evalúa en un sandbox aislado con `bubblewrap` + cgroups y emite veredictos oficiales (`ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, etc.).
 
 ### Componentes tecnológicos principales
 
 | Tecnología     | Rol                                                             |
 |----------------|-----------------------------------------------------------------|
 | Spring Boot    | Framework de cada microservicio                                  |
-| PostgreSQL     | Persistencia relacional (una BD por servicio)                   |
+| PostgreSQL     | Persistencia relacional (BD compartida con schemas por servicio) |
 | RabbitMQ       | Cola de mensajes asíncrona para el pipeline de evaluación       |
-| Redis          | Caché (scoreboard en tiempo real, rate-limiting)                |
-| Docker SDK     | Creación y destrucción de contenedores para el sandboxing       |
-| API LLM        | Retroalimentación inteligente (OpenAI / Gemini)                 |
-| Traefik        | API Gateway / reverse proxy / balanceo de carga                 |
-| JWT            | Autenticación stateless entre clientes y servicios              |
+| Redis          | Caché: intentos fallidos, bloqueos de cuentas, refresh tokens, blacklist JWT |
+| bubblewrap     | Sandbox de ejecución de código (sin Docker)                     |
+| API LLM        | Retroalimentación inteligente (pendiente)                       |
+| Traefik        | API Gateway / reverse proxy (configuración pendiente)            |
+| JWT (JJWT 0.12.5) | Autenticación stateless entre clientes y servicios           |
 | Flyway         | Migraciones de esquema de base de datos                         |
 
 ---
@@ -47,26 +49,28 @@ El **Goslint Judge** es un juez en línea (Online Judge System) institucional di
 
 ```
 backend/
-├── build.gradle                  ← Configuración raíz (Spring Boot BOM, Lombok, tests)
-├── settings.gradle               ← Declara todos los sub-proyectos Gradle
-├── gradle.properties             ← Variables globales (versiones, flags)
+├── build.gradle                  ← BOM Spring Boot 3.2.4, Lombok, JaCoCo, tests comunes
+├── settings.gradle               ← Declara los 8 sub-proyectos Gradle
+├── gradle.properties             ← Variables globales
+├── .env                          ← Variables de entorno locales (no commitear)
 │
 ├── shared/                       ← Librerías internas reutilizables
-│   ├── common-domain/            ← Entidades/eventos que cruzan más de un servicio
-│   │   └── build.gradle          ← Sin dependencias de Spring (dominio puro)
-│   └── common-infrastructure/    ← Config transversal (excepciones HTTP, seguridad base)
-│       └── build.gradle          ← Depende de common-domain + Spring Web/Validation
+│   ├── common-domain/            ← Enums y eventos que cruzan más de un servicio
+│   │   └── build.gradle          ← Sin dependencias externas; solo Lombok
+│   └── common-infrastructure/    ← Seguridad base (JWT) reutilizable por todos los servicios
+│       └── build.gradle          ← api: spring-web, spring-security, spring-data-redis, jjwt
 │
 └── services/                     ← Cada directorio = un microservicio desplegable
-    ├── auth-service/
-    ├── problem-service/
-    ├── submission-service/
-    ├── judge-service/
-    ├── feedback-service/
-    └── contest-service/
+    ├── auth-service/             ← Puerto 8081
+    ├── problem-service/          ← Puerto 8082
+    ├── submission-service/       ← Puerto 8083
+    ├── judge-service/            ← Puerto 8084
+    ├── feedback-service/         ← Puerto 8085 (esqueleto)
+    ├── contest-service/          ← Puerto 8086 (esqueleto)
+    └── users-service/            ← OBSOLETO — duplicado de auth-service (pendiente eliminar)
 ```
 
-Cada microservicio tiene la siguiente forma interna:
+Cada microservicio activo tiene la siguiente forma interna:
 
 ```
 services/<nombre>-service/
@@ -78,7 +82,8 @@ services/<nombre>-service/
     │   │   ├── application/      ← Capa 2: Casos de uso y puertos
     │   │   └── infrastructure/   ← Capa 3: Spring, BD, HTTP, mensajería
     │   └── resources/
-    │       └── application.properties
+    │       ├── application.properties
+    │       └── db/migration/     ← Migraciones Flyway (si aplica)
     └── test/
         └── java/co/uceva/<nombre>/
 ```
@@ -111,11 +116,11 @@ Cada microservicio internamente sigue la **Clean Architecture** de Robert C. Mar
 - Clases Java puras: entidades de negocio, value objects, enums de dominio.
 - **Cero** imports de `org.springframework.*`, `jakarta.persistence.*`, `com.fasterxml.*`.
 - Aquí viven las reglas de negocio que nunca cambian aunque cambie la BD o el framework.
-- Ejemplo: `Submission.java`, `Verdict.java`, `Problem.java`, `User.java`.
+- Ejemplo: `Submission.java`, `Problem.java`, `JudgeTask.java`.
 
 #### `application/` — Casos de uso
-- Interfaces (puertos): `SubmissionRepository`, `JudgePort`, `FeedbackPort`.
-- Servicios de aplicación (implementan los casos de uso): `SubmitCodeUseCase`, `EvaluateSubmissionUseCase`.
+- Interfaces (puertos): `SubmissionRepository`, `JudgeResultPublisher`.
+- Implementaciones de los casos de uso: `SubmitCodeUseCaseImpl`.
 - Aquí se orquesta la lógica de negocio. Puede importar clases de `domain/`.
 - **No** importa nada de `infrastructure/` ni de Spring directamente.
 
@@ -131,25 +136,34 @@ Cada microservicio internamente sigue la **Clean Architecture** de Robert C. Mar
 ## 4. Módulos compartidos (shared)
 
 ### `shared/common-domain`
-Contiene elementos del dominio que son transversales a más de un microservicio (eventos de dominio, tipos de datos compartidos).
+Contiene elementos del dominio que son transversales a más de un microservicio.
 
 **Restricción:** No puede tener dependencias de Spring Boot ni de ningún framework externo. Solo Lombok.
 
-Candidatos a residir aquí:
-- Eventos de dominio compartidos (ej. `SubmissionEvaluatedEvent`)
-- Tipos base genéricos (ej. `AggregateRoot<ID>`, `DomainEvent`)
-- Enums comunes (ej. `ProgrammingLanguage`, `VerdictStatus`)
+| Clase | Tipo | Descripción |
+|-------|------|-------------|
+| `ProgrammingLanguage` | Enum | `C`, `CPP`, `JAVA`, `PYTHON` |
+| `SubmissionStatus` | Enum | Ciclo de vida: `PENDING` → `QUEUED` → `JUDGING` → `JUDGED`. Terminal de error: `ENQUEUE_ERROR` |
+| `VerdictStatus` | Enum | `PENDING`, `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `RUNTIME_ERROR`, `COMPILATION_ERROR`, `JUDGE_ERROR` |
+| `SubmissionReceivedEvent` | Record | Publicado por `submission-service` al encolar un envío. Contiene: `submissionId`, `teamId`, `problemId`, `language`, `sourceCode`, `submittedAt` |
+| `SubmissionJudgingStartedEvent` | Record | Publicado por `judge-service` al tomar el envío. Contiene: `submissionId`, `startedAt` |
+| `SubmissionJudgedEvent` | Record | Publicado por `judge-service` al terminar. Contiene: `submissionId`, `verdict`, `executionTimeMs`, `memoryUsedKb`, `judgedAt` |
+| `SourceCode` | Value Object | `record SourceCode(String content, ProgrammingLanguage language)`. Valida: contenido no vacío, lenguaje no nulo, tamaño ≤ 128 KB (131 072 bytes). Expone `sizeInBytes()`. |
+
+> **Relación `status` ↔ `verdict`:** Son ortogonales. Mientras el juez trabaja, un envío puede estar `status=QUEUED, verdict=PENDING`. `status` describe *dónde está* el envío en el flujo; `verdict` describe *qué resultado obtuvo*.
 
 ### `shared/common-infrastructure`
-Contiene configuración transversal de Spring que todos los servicios reutilizan.
+Contiene la pieza de seguridad JWT compartida por todos los servicios que validan tokens.
 
-**Depende de:** `common-domain` + `spring-boot-starter-web` + `spring-boot-starter-validation`
+**Depende de (vía `api`):** `common-domain` + `spring-boot-starter-web` + `spring-boot-starter-security` + `spring-boot-starter-data-redis` + `jjwt 0.12.5`
 
-Candidatos a residir aquí:
-- `GlobalExceptionHandler` (`@ControllerAdvice`)
-- DTOs de respuesta estandarizados (`ApiResponse<T>`, `ErrorResponse`)
-- Configuración base de seguridad JWT (filtros comunes)
-- Utilidades de paginación y serialización
+| Clase | Descripción |
+|-------|-------------|
+| `JwtTokenValidator` | Verifica firma HMAC-SHA256, emisor y expiración de un JWT. Constructor `(secret, issuer)`. No emite tokens. Sin anotaciones Spring. |
+| `AuthenticatedUser` | Record: identidad extraída de un token ya validado. Campos: `UUID userId`, `String role`. |
+| `InvalidTokenException` | `RuntimeException` lanzada cuando el token no supera la validación (firma, expiración, claims faltantes). |
+
+> **Nota:** La dependencia `spring-boot-starter-data-redis` en `common-infrastructure` tiene como objetivo futuro soportar la lista negra de tokens. Actualmente no hay ninguna clase en este módulo que la use.
 
 ---
 
@@ -159,10 +173,10 @@ Candidatos a residir aquí:
 
 | Servicio | Puerto | Estado | Qué hay hoy |
 |----------|--------|--------|-------------|
-| `auth-service` | 8081 | 🟢 Funcional | Registro de usuarios (`POST /register`) y Login (`POST /login`) implementados. Emite JWT (Access Token 15 min y Refresh Token 8h). Implementa bloqueo de cuenta por intentos fallidos usando Redis. Esquema aún con `ddl-auto=update`, sin Flyway. Falta filtro JWT para rutas protegidas. |
+| `auth-service` | 8081 | 🟢 Funcional | Registro, login, logout, refresh con rotación, perfil (`/me`, cambio de username y de contraseña). Emite JWT (Access 15 min y Refresh 8 h, distinguidos por el claim `type`). Bloqueo de cuenta por intentos fallidos y lista negra de tokens en Redis. Esquema aún con `ddl-auto=update`, sin Flyway. |
 | `problem-service` | 8082 | 🟢 Funcional | CRUD completo de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Falta el filtro JWT y su migración base de Flyway |
 | `submission-service` | 8083 | 🟢 Funcional | Ciclo completo: recepción del envío, encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Esquema versionado con Flyway (`V1`–`V3`). Es el único servicio que **autentica de verdad**, y solo en el handshake del WebSocket |
-| `judge-service` | 8084 | 🔴 Esqueleto | Solo la clase de arranque. Su papel lo simula hoy [`testing/ws-judge-simulator/`](../testing/ws-judge-simulator/README.md) |
+| `judge-service` | 8084 | 🟡 Parcial | Dominio, aplicación e infraestructura completos: consume `submission.evaluate`, obtiene casos de prueba y límites de `problem-service` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) y publica el veredicto en `submission.judged`. **Solo evalúa Python**: el `Compiler` (C, C++, Java) va en otra HU, y esos lenguajes terminan como `ENQUEUE_ERROR` tras agotar los reintentos. El JWT `SERVICE` hacia `problem-service` lo firma el propio juez con el secreto compartido. Validado end-to-end en Manjaro x86_64 y en Ubuntu OCI A1-flex aarch64. Se despliega en su propia imagen con `bubblewrap` y seccomp (perfil `sandbox` del compose) |
 | `feedback-service` | 8085 | 🔴 Esqueleto | Solo la clase de arranque |
 | `contest-service` | 8086 | 🔴 Esqueleto | Solo la clase de arranque. Mientras no exista, `submission-service` resuelve cada equipo como individual mediante `NoOpTeamMembershipAdapter` |
 
@@ -172,31 +186,71 @@ Candidatos a residir aquí:
 |-----------|-----------|
 | [`services/submission-service/docs/RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md) | Topología, contrato de mensajes con `judge-service`, garantías de entrega, DLQ y reintentos |
 | [`services/submission-service/docs/WEBSOCKET.md`](./services/submission-service/docs/WEBSOCKET.md) | Canal `/ws/submissions`: autenticación en el handshake, contrato del mensaje, alcance por equipo y limitaciones |
+| [`services/judge-service/docs/BWRAP.md`](./services/judge-service/docs/BWRAP.md) | Aislamiento de la ejecución con bubblewrap: comando, qué ve el programa, filtro seccomp y códigos de salida |
+| [`services/judge-service/docs/CGROUPS.md`](./services/judge-service/docs/CGROUPS.md) | Límites y métricas por ejecución con cgroups v2: hoja por evaluación, memoria, PIDs, CPU y de dónde sale cada veredicto |
+| [`services/judge-service/docs/REQUIREMENTS.md`](./services/judge-service/docs/REQUIREMENTS.md) | Lo que hay que preparar en el host: kernel, slice de cgroups y flags del contenedor |
 
 ---
 
 ### `auth-service` — Puerto `8081`
 **Responsabilidad:** Gestión de identidad y autenticación.
 
-| Entidad de dominio | Descripción |
-|--------------------|-------------|
-| `User`             | id, username, email, passwordHash, role (ADMIN/STUDENT/ORGANIZER), institution, isActive, createdAt |
-| `AuthToken`        | accessToken, refreshToken, expiresIn |
+| Clase | Descripción |
+|-------|-------------|
+| `User` | Entidad JPA `users`: `id (UUID)`, `firstName`, `lastName`, `username`, `email`, `passwordHash`, `role (SUPER_ADMIN/ADMIN/ORGANIZER/STUDENT)`, `institution`, `isActive`, `createdAt` |
 
-**Roles del sistema:**
+**Roles del sistema (enum `Role`):**
 
-| Rol         | Descripción                                                                 |
-|-------------|------------------------------------------------------------------------------|
-| `ADMIN`     | Administrador del sistema. Acceso total a problemas, concursos y usuarios.  |
-| `ORGANIZER` | Organizador de maratones. Puede gestionar problemas y concursos.            |
-| `STUDENT`   | Estudiante o competidor. Solo lectura pública de problemas y envíos propios.|
-| `SERVICE`   | Rol técnico para comunicación **microservicio-a-microservicio**. No es un usuario humano; se utiliza en JWTs emitidos por otros servicios (por ejemplo, `judge-service`) para consumir endpoints internos. |
+| Rol | Descripción |
+|-----|-------------|
+| `SUPER_ADMIN` | Dueño de la plataforma. Único que asigna y retira administradores. Se crea al arrancar `auth-service` con `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD`; no se obtiene por registro ni por la API. Los demás servicios lo tratan como `ADMIN`. |
+| `ADMIN` | Administrador. Gestiona estudiantes y organizadores (no a otros administradores). |
+| `ORGANIZER` | Organizador. Gestiona problemas y concursos. |
+| `STUDENT` | Estudiante. Solo lectura pública y sus propios envíos. |
+| *`SERVICE`* | Rol técnico. **No está en el enum** `Role` de `auth-service` porque no es un usuario humano. `judge-service` lo firma directamente en sus tokens vía `ServiceTokenProvider`. |
 
-**Casos de uso principales:**
-- `RegisterUserUseCase` — Registro de nuevos usuarios
-- `LoginUserUseCase` — Login → valida intentos contra Redis (máx. 5, bloqueo de 15 min) y devuelve JWT (access + refresh)
+**Estructura:** capas planas (`controller`, `service`, `repository`, `model`, `dto`, `exception`, `security`, `cache`, `config`), sin interfaces de casos de uso ni adaptadores. Detalle en [`services/auth-service/docs/AUTH_API.md`](./services/auth-service/docs/AUTH_API.md).
 
-**Tablas BD:** `users` (PostgreSQL), `auth:failed_attempts:*` y `auth:lock:*` (Redis)
+| Clase | Responsabilidad |
+|-------|-----------------|
+| `AuthService` | Registro (email en minúsculas, unicidad sin distinguir mayúsculas), login con bloqueo por intentos fallidos, logout (lista negra + borrado del refresh token) y refresh con rotación |
+| `ProfileService` | Consulta de perfil, cambio de username y de contraseña (esta última cierra todas las sesiones) y disponibilidad de username |
+| `AdminUserService` | Listado paginado con búsqueda, cambio de rol y de estado, con reglas de jerarquía (el rol del actor se lee de la base de datos) |
+| `JwtService` | Emite y lee JWT (JJWT 0.12.5, `jwt.secret` / `jwt.issuer`). Cada token lleva `type` = `access` o `refresh` |
+| `AuthCache` | Redis: `auth:failed_attempts:*`, `auth:lock:*`, `auth:refresh_token:*`, `auth:blacklist:<sha256>`. Implementa `TokenBlacklist` |
+
+**Endpoints activos:**
+
+| Método | Endpoint | Acceso | Request Body | Respuesta |
+|--------|----------|--------|-------------|----------|
+| POST | `/api/v1/auth/register` | Público | `{firstName, lastName, username, email, password, institution?}` | 201 `{message, userId}` |
+| POST | `/api/v1/auth/login` | Público | `{email, password}` | 200 `{accessToken, refreshToken, expiresIn, type: "Bearer"}` |
+| POST | `/api/v1/auth/refresh` | Público | `{refreshToken}` | 200 igual que login |
+| POST | `/api/v1/auth/logout` | Bearer | — | 200 siempre |
+| GET | `/api/v1/auth/me` | Bearer | — | 200 perfil |
+| PATCH | `/api/v1/auth/me/username` | Bearer | `{username}` | 200 perfil · 409 en uso |
+| PATCH | `/api/v1/auth/me/password` | Bearer | `{currentPassword, newPassword}` | 204 · 422 contraseña actual incorrecta |
+| GET | `/api/v1/auth/check-username?username=` | Público | — | 200 `{available}` |
+| GET | `/api/v1/admin/users?page&size&search` | ADMIN / SUPER_ADMIN | — | 200 página de usuarios |
+| PATCH | `/api/v1/admin/users/{id}/role` | ADMIN / SUPER_ADMIN | `{role}` | 200 usuario · 403 jerarquía · 404 |
+| PATCH | `/api/v1/admin/users/{id}/status` | ADMIN / SUPER_ADMIN | `{isActive}` | 200 usuario · 403 (incl. autodesactivación) · 404 |
+
+**Validaciones:**
+- `firstName`, `lastName`: obligatorios, 2–50 caracteres.
+- `username`: 3–30 caracteres (letras, dígitos, `_`, `.`).
+- `email`: obligatorio, formato válido.
+- `password` / `newPassword`: mínimo 8 caracteres, al menos 1 mayúscula, 1 número y 1 carácter especial.
+- `institution`: opcional.
+
+**Comportamiento del login:**
+- Login fallido: incrementa `auth:failed_attempts:<email>` (TTL de 1 hora desde el primer fallo).
+- Tras **5 intentos fallidos**: bloqueo con `auth:lock:<email>` durante **15 minutos**.
+- Cuenta bloqueada: el login responde `423` con los minutos restantes.
+
+**BD:** Tabla `users` (PostgreSQL, `ddl-auto=update` — Flyway desactivado).  
+**Redis:** `auth:failed_attempts:<email>` (TTL 1h) · `auth:lock:<email>` (TTL 15min) · `auth:refresh_token:<userId>` (TTL 8h) · `auth:blacklist:<sha256 del token>` (TTL = vigencia restante)
+
+> ⚠️ **Deuda técnica:** `auth-service` no usa Flyway ni `ddl-auto=validate`. El esquema `users` depende de que Hibernate lo cree o migre automáticamente.
 
 ---
 
@@ -205,371 +259,454 @@ Candidatos a residir aquí:
 
 | Entidad de dominio | Descripción |
 |--------------------|-------------|
-| `Problem`          | id, createdBy, title, statement, timeLimitMs, memoryLimitKb, difficulty, inputFormat, outputFormat |
-| `TestCase`         | id, problemId, expectedOutput, input, output, orderIndex, isSample |
+| `Problem` | `id`, `createdBy`, `title`, `statement`, `timeLimitMs`, `memoryLimitKb`, `difficulty (value object)`, `inputFormat`, `outputFormat` |
+| `TestCase` | `id`, `problemId`, `expectedOutput`, `orderIndex`, `isSample`, `input`, `output` |
 
-**Casos de uso principales:**
-- `CreateProblemUseCase` / `UpdateProblemUseCase` / `DeleteProblemUseCase` — Solo ADMIN/ORGANIZER
-- `GetProblemByIdUseCase` / `GetAllProblemsUseCase` / `GetAllProblemsByTitleUseCase` — Lectura pública
-- `CreateTestCaseUseCase` / `UpdateTestCaseUseCase` / `DeleteTestCaseUseCase` / `ReorderTestCasesUseCase` — Solo ADMIN/ORGANIZER
-- `GetAllTestCaseByProblemIdUseCase` — ADMIN/ORGANIZER/SERVICE (incluye casos privados; necesario para `judge-service`)
-- `GetTestCaseByIdUseCase` — ADMIN/ORGANIZER/SERVICE (necesario para `judge-service`)
-- `GetAllSampleTestCasesByProblemIdUseCase` — Público; retorna únicamente los casos de prueba donde `isSample = true`
+**Value objects:**
 
-**Endpoints destacados:**
+| Value Object | Validación |
+|-------------|-----------|
+| `Difficulty` | Entero entre 1 y 10 |
+| `TimeLimit` | Entero positivo (ms) |
+| `MemoryLimit` | Entero positivo (KB) |
 
-| Método | Endpoint | Acceso | Notas |
-|--------|----------|--------|-------|
-| GET    | `/api/v1/problems/{id}` | Público | Lectura del enunciado |
-| GET    | `/api/v1/problems/all` | Público | Lista de problemas |
-| GET    | `/api/v1/problems/title/{title}` | Público | Búsqueda por título |
-| POST   | `/api/v1/problems` | ADMIN/ORGANIZER | Crear problema |
-| PUT    | `/api/v1/problems/{id}` | ADMIN/ORGANIZER | Actualizar problema |
-| DELETE | `/api/v1/problems/{id}` | ADMIN/ORGANIZER | Eliminar problema |
-| GET    | `/api/v1/problems/test-cases/{problemId}/all` | ADMIN/ORGANIZER/SERVICE | Lista **todos** los test cases (privados y ejemplos) |
-| GET    | `/api/v1/problems/test-cases/{id}` | ADMIN/ORGANIZER/SERVICE | Obtener un test case por ID |
-| GET    | `/api/v1/problems/test-cases/{problemId}/samples` | Público | Lista solo los test cases donde `isSample = true` |
-| POST   | `/api/v1/problems/test-cases/{problemId}` | ADMIN/ORGANIZER | Crear test case |
-| POST   | `/api/v1/problems/test-cases/{problemId}/batch` | ADMIN/ORGANIZER | Crear test cases en lote |
-| PUT    | `/api/v1/problems/test-cases/{problemId}/{testCaseId}` | ADMIN/ORGANIZER | Actualizar test case |
-| PUT    | `/api/v1/problems/test-cases/{problemId}/reorder` | ADMIN/ORGANIZER | Reordenar test cases |
-| DELETE | `/api/v1/problems/test-cases/{problemId}/{testCaseId}` | ADMIN/ORGANIZER | Eliminar test case |
-| POST   | `/api/v1/problems/test-cases/batch-delete` | ADMIN/ORGANIZER | Eliminar test cases en lote |
+**Casos de uso implementados:**
 
-**Tablas BD:** `problems`, `test_cases`
+| Caso de uso | Descripción |
+|-------------|-------------|
+| `CreateProblemUseCase` | Crea un problema; `createdBy` viene del JWT |
+| `UpdateProblemUseCase` | Actualiza campos de un problema existente |
+| `DeleteProblemUseCase` | Elimina problema y sus test cases (CASCADE en BD) |
+| `GetProblemByIdUseCase` | Busca por UUID |
+| `GetAllProblemsUseCase` | Lista todos los problemas |
+| `GetAllProblemsByTitleUseCase` | Búsqueda por coincidencia de título |
+| `CreateTestCaseUseCase` | Crea un test case individual |
+| `CreateTestCaseBatchUseCase` | Crea varios test cases en una sola transacción |
+| `UpdateTestCaseUseCase` | Actualiza un test case existente |
+| `DeleteTestCaseUseCase` | Elimina un test case por UUID |
+| `DeleteTestCaseBatchUseCase` | Elimina una lista de test cases por sus UUIDs |
+| `ReorderTestCasesUseCase` | Reordena los `orderIndex` de los test cases de un problema |
+| `GetTestCaseByIdUseCase` | Busca test case por UUID (privado: requiere rol) |
+| `GetAllTestCaseByProblemIdUseCase` | Lista todos los test cases de un problema (privado) |
+| `GetAllSampleTestCasesByProblemIdUseCase` | Lista solo los test cases con `isSample=true` (público) |
+
+**Endpoints activos:**
+
+| Método | Endpoint | Acceso | Descripción |
+|--------|----------|--------|-------------|
+| POST | `/api/v1/problems` | ADMIN, ORGANIZER | Crear problema |
+| GET | `/api/v1/problems/{id}` | Público | Obtener problema por ID |
+| GET | `/api/v1/problems/all` | Público | Listar todos los problemas |
+| GET | `/api/v1/problems/title/{title}` | Público | Buscar por título |
+| PUT | `/api/v1/problems/{id}` | ADMIN, ORGANIZER | Actualizar problema |
+| DELETE | `/api/v1/problems/{id}` | ADMIN, ORGANIZER | Eliminar problema |
+| POST | `/api/v1/test-cases/{problemId}` | ADMIN, ORGANIZER | Crear test case |
+| POST | `/api/v1/test-cases/{problemId}/batch` | ADMIN, ORGANIZER | Crear test cases en lote |
+| POST | `/api/v1/test-cases/batch-delete` | ADMIN, ORGANIZER | Eliminar test cases en lote |
+| GET | `/api/v1/test-cases/{problemId}/all` | ADMIN, ORGANIZER, SERVICE | Listar todos los test cases (incluye privados) |
+| GET | `/api/v1/test-cases/{problemId}/samples` | Público | Listar solo los test cases de ejemplo |
+| GET | `/api/v1/test-cases/{id}` | ADMIN, ORGANIZER, SERVICE | Obtener test case por ID |
+| PUT | `/api/v1/test-cases/{problemId}/{testCaseId}` | ADMIN, ORGANIZER | Actualizar test case |
+| PUT | `/api/v1/test-cases/{problemId}/reorder` | ADMIN, ORGANIZER | Reordenar test cases |
+| DELETE | `/api/v1/test-cases/{problemId}/{testCaseId}` | ADMIN, ORGANIZER | Eliminar test case |
+
+> El rol `SERVICE` en los endpoints de test cases permite a `judge-service` leer los casos de prueba privados durante la evaluación.
+
+**Seguridad:** `JwtAuthenticationFilter` activo + `@EnableMethodSecurity`. `JwtConfig` declara `JwtTokenValidator` con `app.security.jwt.secret` y `app.security.jwt.issuer` (sin default — la ausencia de la variable de entorno aborta el arranque).
+
+**BD:** Tablas `problems` y `test_cases`. Flyway `V1__Create_problems_test_cases.sql`. `ddl-auto=validate`. Historial en `flyway_schema_history_problem`.
 
 ---
 
 ### `submission-service` — Puerto `8083`
-**Responsabilidad:** Recibir envíos de código de los estudiantes, persistirlos y entregarlos al motor de evaluación a través de RabbitMQ.
+**Responsabilidad:** Recibir envíos de código, persistirlos y orquestar el ciclo de evaluación vía mensajería.
 
 | Entidad de dominio | Descripción |
 |--------------------|-------------|
-| `Submission`       | id, teamId, problemId, language, sourceCode, verdict, **status**, executionTimeMs, memoryUsedKb, codeSizeBytes, submittedAt |
+| `Submission` | `id`, `teamId`, `problemId`, `language (ProgrammingLanguage)`, `sourceCode (SourceCode)`, `verdict (VerdictStatus)`, `status (SubmissionStatus)`, `executionTimeMs`, `memoryUsedKb`, `codeSizeBytes`, `submittedAt` |
 
-**Casos de uso principales:**
-- `SubmitCodeUseCase` — Valida, detecta duplicados y persiste el envío
-- `EnqueueSubmissionUseCase` — Publica `SubmissionReceivedEvent` en RabbitMQ y marca el envío como encolado
-- `GetSubmissionHistoryUseCase` — Historial por equipo/problema
-- `GetSubmissionMetricsUseCase` — Tiempo y memoria de ejecución
+**Casos de uso implementados (12 total):**
+- `SubmitCodeUseCase` — Valida, detecta duplicados y persiste
+- `EnqueueSubmissionUseCase` — Publica `SubmissionReceivedEvent` → RabbitMQ, publisher confirms
+- `UpdateSubmissionVerdictUseCase` — Actualiza veredicto y métricas al recibir `SubmissionJudgedEvent`
+- `MarkSubmissionJudgingUseCase` — Transiciona a `JUDGING` al recibir `SubmissionJudgingStartedEvent`
+- `MarkSubmissionEnqueueErrorUseCase` — Transiciona a `ENQUEUE_ERROR` en DLQ
+- `NotifySubmissionStatusUseCase` — Empuja cambios de estado por WebSocket
+- `GetSubmissionByIdUseCase`, `GetAllSubmissionsUseCase`, `GetSubmissionsByProblemUseCase`, `GetSubmissionsByTeamUseCase`, `GetSubmissionHistoryUseCase`, `GetSubmissionMetricsUseCase`, `DeleteSubmissionUseCase`
 
-#### Estado del envío (`SubmissionStatus`)
+**Puertos de salida:**
 
-`status` es **ortogonal** a `verdict`: el veredicto dice *cómo resultó evaluado* el envío, el estado dice *dónde está* dentro del flujo. Mientras el juez trabaja, lo normal es `status = QUEUED` con `verdict = PENDING`.
+| Puerto | Implementación activa |
+|--------|----------------------|
+| `SubmissionEventPublisher` | `RabbitSubmissionEventPublisherAdapter` si `app.messaging.enabled=true`; `NoOpSubmissionEventPublisherAdapter` en otro caso |
+| `SubmissionStatusNotifier` | `WebSocketSubmissionStatusNotifierAdapter` |
+| `TeamMembershipPort` | `NoOpTeamMembershipAdapter` — resuelve cada envío como individual. Se reemplazará por un adaptador HTTP a `contest-service` cuando exista |
 
-| Estado    | Significado                                                          |
-|-----------|----------------------------------------------------------------------|
-| `PENDING` | Persistido, pero aún no entregado al motor de evaluación             |
-| `QUEUED`  | Entrega confirmada por el broker (publisher confirms)                |
-| `JUDGING` | El motor de evaluación tomó el envío y lo está procesando            |
-| `JUDGED`  | El motor finalizó y emitió un veredicto                              |
+**Topología completa de RabbitMQ (declarada por `submission-service`):**
 
-El estado vive en la propia tabla, no en memoria: por eso una fila en `PENDING` representa trabajo de entrega sin completar y `PendingSubmissionRetryScheduler` puede recogerla y reintentar el encolamiento, incluso después de un reinicio del servicio o una caída del broker.
+| Recurso | Nombre | Tipo | Notas |
+|---------|--------|------|-------|
+| Exchange principal | `submission.exchange` | Topic, durable | Exchange único para todo el pipeline |
+| Exchange de DLX | `submission.dlx` | Direct, durable | Recibe mensajes rechazados de todas las colas |
+| Cola de evaluación | `submission.evaluate` | Durable | Consumida por `judge-service` (prefetch=1) |
+| DLQ de evaluación | `submission.evaluate.dlq` | Durable | `ExhaustedSubmissionDeadLetterListener` la consume |
+| Cola de judging | `submission.judging` | Durable | Consumida por `submission-service` (notificación JUDGING) |
+| DLQ de judging | `submission.judging.dlq` | Durable | Mensajes no procesables de judging |
+| Cola de juzgado | `submission.judged` | Durable | Consumida por `submission-service` (actualiza veredicto) |
+| DLQ de juzgado | `submission.judged.dlq` | Durable | Mensajes no procesables de judged |
 
-#### Topología de mensajería
+**Routing keys:**
 
-Los nombres se declaran una sola vez en `application.properties` (`app.messaging.submission.*`); `RabbitConfig` declara la topología a partir de ellas y el publicador envía a esos mismos valores. Son también el **contrato con `judge-service`**.
+| Clave | Origen → Destino |
+|-------|------------------|
+| `submission.evaluate` | `submission-service` → `judge-service` |
+| `submission.judging` | `judge-service` → `submission-service` |
+| `submission.judged` | `judge-service` → `submission-service` |
 
-| Propiedad | Valor por defecto | Rol |
-|-----------|-------------------|-----|
-| `app.messaging.submission.exchange` | `submission.exchange` | Topic exchange duradero |
-| `app.messaging.submission.routing-key` | `submission.evaluate` | Routing key de los envíos por evaluar |
-| `app.messaging.submission.queue` | `submission.evaluate` | Cola que consume `judge-service` |
-| `app.messaging.submission.dead-letter-exchange` | `submission.dlx` | Destino de los mensajes rechazados |
-| `app.messaging.submission.dead-letter-queue` | `submission.evaluate.dlq` | Retención de los envíos que no se pudieron procesar |
+**Política de reintentos del consumidor (listener retry):**
+- Max intentos: 3 · Intervalo inicial: 1s · Multiplicador: 2 · Máximo: 10s
+- `default-requeue-rejected=false` — los mensajes agotados van a la DLQ, no se reencolan.
 
-`app.messaging.enabled=false` permite levantar el servicio sin broker (pruebas, desarrollo local): se usa un publicador *no-op* y no se declara la topología.
+**Reintento de envíos PENDING (`PendingSubmissionRetryScheduler`):**
+- Intervalo: cada 30 s (`app.submission.retry.interval-ms=30000`)
+- Grace period: 15 s — envíos más recientes que esto no se reencolan aún
+- Batch: máximo 50 envíos por ciclo (`app.submission.retry.batch-size=50`)
 
-**Tablas BD:** `submissions`
+**Endpoints activos:**
 
-#### Esquema y migraciones
+| Método | Endpoint | Acceso | Descripción |
+|--------|----------|--------|-------------|
+| POST | `/api/v1/submissions` | STUDENT, ADMIN, ORGANIZER | Enviar solución |
+| GET | `/api/v1/submissions/{id}` | STUDENT, ADMIN, ORGANIZER, SERVICE | Obtener envío por ID |
+| GET | `/api/v1/submissions` | ADMIN, ORGANIZER | Listar todos los envíos |
+| GET | `/api/v1/submissions/problem/{problemId}` | ADMIN, ORGANIZER, SERVICE | Envíos de un problema |
+| GET | `/api/v1/submissions/team/{teamId}` | STUDENT, ADMIN, ORGANIZER | Envíos de un equipo |
+| GET | `/api/v1/submissions/history` | STUDENT, ADMIN, ORGANIZER | Historial equipo+problema (`?problemId=&teamId=`) |
+| GET | `/api/v1/submissions/{id}/metrics` | STUDENT, ADMIN, ORGANIZER, SERVICE | Métricas de un envío |
+| DELETE | `/api/v1/submissions/{id}` | ADMIN, ORGANIZER | Eliminar envío |
 
-El servicio arranca con `spring.jpa.hibernate.ddl-auto=validate`: **Hibernate no crea ni modifica nada**, solo comprueba que la tabla coincide con `SubmissionEntity` y aborta el arranque si no es así. El esquema lo define Flyway en `src/main/resources/db/migration/`:
-
-| Migración | Qué hace |
-|-----------|----------|
-| `V1__crear_tabla_submissions.sql` | Línea base de la tabla `submissions` (tal y como existía antes del encolamiento) más los índices de las consultas por equipo y por problema |
-| `V2__agregar_status_a_submissions.sql` | Agrega `status` en tres pasos (columna nullable → relleno del histórico → `NOT NULL`), su `CHECK` contra `SubmissionStatus` y el índice parcial que alimenta el reintento de encolamiento |
-
-Detalles que conviene conocer antes de desplegar sobre una base de datos ya existente:
-
-- **Relleno del histórico:** los envíos anteriores a `V2` nunca pasaron por el encolamiento, así que su estado se deduce del veredicto — `verdict = 'PENDING'` → `status = 'PENDING'`, cualquier otro veredicto → `status = 'JUDGED'`. Las filas que queden en `PENDING` serán reencoladas por el barrido de reintentos en el primer arranque, que es justo lo que se quiere: son envíos que nunca llegaron al juez.
-- **Base de datos compartida:** todos los microservicios comparten la misma BD, por eso el servicio lleva su propio historial (`spring.flyway.table=flyway_schema_history_submission`) y toma como línea base la versión `0` (`spring.flyway.baseline-on-migrate=true`, `spring.flyway.baseline-version=0`). Sin `baseline-version=0`, Flyway daría `V1` por aplicada solo porque el esquema no está vacío por culpa de otro servicio.
-- **Idempotencia:** `V1` y `V2` usan `IF NOT EXISTS` para tolerar entornos donde la tabla ya la creó `ddl-auto` en su día.
-
-> 📖 El detalle completo de la mensajería —garantías de entrega, colas de mensajes
-> muertos, reintentos y contrato con `judge-service`— está en
-> [`services/submission-service/docs/RABBITMQ.md`](./services/submission-service/docs/RABBITMQ.md).
-
-> ⚠️ **Importante:** `submission-service` **no juzga** el código. Solo orquesta la entrada. El juicio es responsabilidad de `judge-service`.
+**BD:** Tabla `submissions`. Flyway con 3 migraciones:  
+- `V1` — Tabla base con check constraints de `language` y `verdict`  
+- `V2` — Columna `status` con ciclo de vida `PENDING/QUEUED/JUDGING/JUDGED/ENQUEUE_ERROR`  
+- `V3` — Amplió el check constraint de `status` para incluir `ENQUEUE_ERROR`  
+`ddl-auto=validate`. Historial en `flyway_schema_history_submission`.
 
 ---
 
 ### `judge-service` — Puerto `8084`
-**Responsabilidad:** Motor de evaluación (Judging Engine). Consume la cola de RabbitMQ, crea contenedores Docker aislados, ejecuta el código contra los casos de prueba y emite el veredicto.
+**Responsabilidad:** Motor de evaluación (Judging Engine). Consume la cola de RabbitMQ, ejecuta el código en un sandbox aislado con `bubblewrap` y emite el veredicto.
 
-| Entidad de dominio | Descripción |
-|--------------------|-------------|
-| `JudgeTask`        | submissionId, language, sourceCode, testCases, timeLimitMs, memoryLimitKb |
-| `JudgeResult`      | submissionId, verdict, executionTimeMs, memoryUsedKb, failedTestCase |
+| Elemento de dominio | Descripción |
+|---------------------|-------------|
+| `JudgeTask`         | submissionId, language, sourceCode, testCases, timeLimit, memoryLimit. Se ensambla con `JudgeTask.create(...)` y valida sus invariantes (al menos un caso de prueba, límites en rango) |
+| `JudgeResult`       | submissionId, verdict, executionTimeMs, memoryUsedKb, failedTestCase (`null` si es `ACCEPTED` o si falló antes de ejecutar, p. ej. compilación). Se crea con `JudgeResult.create(...)` |
+| `TestCase`          | VO propio del juez: id, input, expectedOutput, orderIndex. No comparte modelo con `problem-service` |
+| Límites del sandbox | VOs validados: `TimeLimit`, `MemoryLimit`, `PidsLimit`, `VolumeSizeLimit`, `OutputSizeLimit`, `ErrorSizeLimit`, `HardTimePercent`, `WatchIntervalMillis`, `AbsoluteTimeLimit` |
 
-**Casos de uso principales:**
-- `EvaluateSubmissionUseCase` — Orquesta el pipeline de compilación y ejecución
-- `RunInSandboxUseCase` — Lanza contenedor Docker, aplica límites de CPU/RAM, captura stdout/stderr
-- `CompareOutputUseCase` — I/O Matching contra el expected output del test case
+**Puertos de dominio y excepciones:**
+- `TestCaseRepository` (`domain/repository`) — lectura de los casos de prueba de un problema; los datos pertenecen a `problem-service`.
+- `TestCasesNotFoundException` — el problema no tiene casos de prueba.
+- `SandboxExecutionException` — fallo del propio sistema en el sandbox, distinto de un veredicto que culpa al estudiante.
 
-**Veredictos emitidos:** `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `RUNTIME_ERROR`, `COMPILATION_ERROR`
+**Caso de uso:**
+- `EvaluateSubmissionUseCase` — recibe el `SubmissionReceivedEvent`, obtiene casos de prueba y límites, ensambla el `JudgeTask`, lo ejecuta en el sandbox y publica el `JudgeResult`. Los fallos del sistema se propagan sin publicar, para que la mensajería reintente y, agotados los reintentos, lo cierre la DLQ.
 
-> 🔒 **Seguridad del Sandbox:** El contenedor Docker corre con:
-> - Red deshabilitada (`--network none`)
-> - Sistema de archivos de solo lectura excepto `/tmp`
-> - Límite de PIDs para evitar fork bombs
-> - `--memory` y `--cpus` configurados por problema
+**Puertos de salida (`application/port/out`):** `ProblemLimitsPort` (límites de tiempo y memoria del problema), `SandboxExecutor` (ejecuta la tarea y devuelve el `JudgeResult`) y `JudgeResultPublisher` (publica el resultado hacia `submission-service`).
 
-**Lenguajes soportados:** C, C++, Java, Python
+> La compilación (`Compiler`) está pendiente y se abordará en otra historia de usuario.
+
+**Infraestructura (`infrastructure/`):**
+
+| Pieza | Rol |
+|-------|-----|
+| `messaging/SubmissionEvaluationListener` | Consume `submission.evaluate`. Un fallo transitorio se propaga para el reintento (3 intentos, luego DLQ); uno permanente (`TestCasesNotFoundException`, `IllegalArgumentException`) se rechaza sin reintentar |
+| `messaging/RabbitJudgeResultPublisherAdapter` | Publica `SubmissionJudgedEvent` en `submission.exchange` con routing key `submission.judged`, persistente y esperando la confirmación del broker |
+| `security/ServiceTokenProvider` | Emite el JWT `role=SERVICE` del juez (HS256, secreto y emisor compartidos, `sub` = `app.security.jwt.service-id`, vigencia 5 min) y lo reutiliza hasta 30 s antes de expirar. Exige `JWT_SECRET` (mín. 32 bytes, sin valor por defecto) |
+| `client/ProblemServiceTestCaseRepositoryAdapter` | `TestCaseRepository` sobre `GET /api/v1/problems/test-cases/{id}/all` (JWT `SERVICE` en cada petición); un `404` o lista vacía es `TestCasesNotFoundException` |
+| `client/ProblemServiceLimitsAdapter` | `ProblemLimitsPort` sobre `GET /api/v1/problems/{id}` |
+| `sandbox/RunnerSandboxExecutor` | `SandboxExecutor` sobre `Runner`: escribe el fuente a un temporal, ejecuta y traduce el mapa de resultados a `JudgeResult` |
+| `web/MonitorLimitsController` | Consulta y modificación de los límites de los monitores del sandbox (solo `ADMIN`) |
+| `security/JwtAuthenticationFilter` + `config/SecurityConfig` | Autentica el HTTP con el JWT y el mismo `JwtTokenValidator` que el resto; el rol pasa a `ROLE_<rol>` para `@PreAuthorize` |
+| `persistence/InMemoryMonitorLimitsRepository` | Guarda los límites vigentes en memoria (el juez no tiene BD) |
+| `config/` | Convertidor JSON de RabbitMQ, bean del `Runner` y `RestClient` hacia `problem-service` |
+
+**Componentes del sandbox:**
+- `BwrapCommandFactory` — construye el comando `bwrap` con namespaces, bind mounts y límites de cgroups
+- `Runner` — lanza el proceso en el sandbox, captura stdout/stderr con monitores
+- `Compiler` — compila el código antes de ejecutar (pendiente para C/C++/Java)
+- `RunnerSandboxExecutor` — adaptador que orquesta `Compiler` + `Runner` por cada test case
+- `TimeWatchdog` — termina el proceso si supera `timeLimitMs`
+- `OutputHandle` / `ErrorsHandle` — capturan y limitan stdout/stderr
+- `CgroupKiller` — mata el proceso y sus hijos vía cgroups v2
+- `SandboxWorkspace` — crea/limpia el directorio temporal por envío
+
+**MonitorLimits (ajustables en caliente, en memoria — no persisten):**
+
+| Límite | Propiedad | Default |
+|--------|-----------|--------|
+| `outputSizeBytes` | `app.sandbox.monitor.output-size-bytes` | 10 MB |
+| `errorSizeBytes` | `app.sandbox.monitor.error-size-bytes` | 10 MB |
+| `hardTimePercent` | `app.sandbox.monitor.hard-time-percent` | 0.3 (30 %) |
+| `watchIntervalMs` | `app.sandbox.monitor.watch-interval-ms` | 500 ms |
+| `absoluteTimeMs` | `app.sandbox.monitor.absolute-time-ms` | 10 000 ms |
+
+**Seguridad:** `JwtAuthenticationFilter` activo. `judge-service` tiene su propia `SecurityConfig` que exige autenticación en todas las rutas excepto `/actuator/health`.
+
+**Autenticación S2S:** `ServiceTokenProvider` auto-genera tokens `role=SERVICE` firmados con la misma clave compartida. El token se renueva automáticamente 30 s antes de expirar. `TTL` configurable con `app.security.jwt.service-token-ttl-seconds` (default 300 s).
+
+**Sin BD:** Excluye `DataSourceAutoConfiguration` y `HibernateJpaAutoConfiguration`. Los límites del monitor se guardan en `InMemoryMonitorLimitsRepository` y se pierden al reiniciar.
 
 ---
 
 ### `feedback-service` — Puerto `8085`
 **Responsabilidad:** Generar retroalimentación educativa inteligente usando un LLM externo (OpenAI / Gemini) tras un veredicto de evaluación.
 
+> 🔴 **Estado actual:** Solo clase de arranque `FeedbackServiceApplication`. Sin dominio, aplicación ni infraestructura implementados.
+
 | Entidad de dominio | Descripción |
 |--------------------|-------------|
-| `Feedback`         | id, submissionId, aiSuggestion, generatedAt |
+| `Feedback` | `id`, `submissionId`, `aiSuggestion`, `generatedAt` |
 
-**Casos de uso principales:**
+**Casos de uso planeados:**
 - `GenerateFeedbackUseCase` — Construye prompt con (código + veredicto + métricas) y llama a la API LLM
-- `GetFeedbackUseCase` — Recupera retroalimentación generada
+- `GetFeedbackUseCase` — Recupera retroalimentación ya generada para un envío
 
-**Restricciones:**
-- El LLM **no debe revelar** la solución del problema.
+**Restricciones de negocio:**
+- El LLM **no debe revelar** la solución del problema, solo orientar al estudiante.
 - Solo se genera feedback cuando el veredicto **no** es `ACCEPTED`.
-- Depende del EIF externo (API LLM) — su disponibilidad está sujeta al proveedor.
+- El servicio consumirá `SubmissionJudgedEvent` desde RabbitMQ (mismo exchange `submission.exchange`).
+- Depende de un EIF externo (API LLM) — su disponibilidad está sujeta al proveedor.
 
-**Tablas BD:** `feedback`
+**Tablas BD planeadas:** `feedback`
 
 ---
 
 ### `contest-service` — Puerto `8086`
 **Responsabilidad:** Creación y gestión de maratones de programación (concursos), equipos y scoreboard.
 
+> 🔴 **Estado actual:** Solo clase de arranque `ContestServiceApplication`. Sin dominio, aplicación ni infraestructura implementados. Mientras no exista, `submission-service` resuelve cada equipo como individual mediante `NoOpTeamMembershipAdapter`.
+
 | Entidad de dominio | Descripción |
 |--------------------|-------------|
-| `Contest`          | id, createdBy, password, title, startTime, endTime, status, description |
-| `Team`             | id, contestId, score, penaltyTime, nameTeam |
-| `Member`           | teamId, userId, registeredAt |
-| `ContestProblem`   | contestId, problemId, points, orderIndex, alias |
+| `Contest`          | `id`, `createdBy`, `password`, `title`, `startTime`, `endTime`, `status`, `description` |
+| `Team`             | `id`, `contestId`, `score`, `penaltyTime`, `nameTeam` |
+| `Member`           | `teamId`, `userId`, `registeredAt` |
+| `ContestProblem`   | `contestId`, `problemId`, `points`, `penalty`, `orderIndex`, `alias`, `balloonColor` |
+| `Clarification`    | `id`, `problemId`, `teamId`, `question`, `answer`, `status`, `createdAt`, `answeredAt` |
 
-**Casos de uso principales:**
+**Casos de uso planeados:**
 - `CreateContestUseCase` — Solo ORGANIZER/ADMIN
 - `RegisterTeamUseCase` — Inscripción de equipos con contraseña
-- `GetScoreboardUseCase` — Ranking en tiempo real (potencialmente via WebSocket/SSE)
+- `GetScoreboardUseCase` — Ranking en tiempo real (via WebSocket/SSE)
 - `AddProblemToContestUseCase` — Asignación de problemas al concurso
 
-**Tablas BD:** `contests`, `teams`, `members`, `contest_problems`
+**Integración con otros servicios:**
+- Al implementarse, `submission-service` debe cambiar `app.team-membership.provider` y añadir un adaptador HTTP que consulte a `contest-service` para resolver los integrantes de un equipo (destinatarios de las notificaciones WebSocket).
+
+**Tablas BD:** `contests`, `teams`, `members`, `contest_problems`, `clarifications`
 
 ---
 
 ## 6. Seguridad y autorización
 
-La seguridad se implementa con **Spring Security** y **JWT** de forma stateless. Cada microservicio hereda la dependencia `spring-boot-starter-security` desde `shared/common-infrastructure` y define su propia configuración de seguridad.
-
 ### 6.1 Modelo de roles
 
-Los roles actuales del sistema son:
-
-| Rol         | Tipo de actor | Permisos principales |
-|-------------|---------------|----------------------|
-| `ADMIN`     | Usuario humano | Acceso total a problemas, concursos y usuarios. |
+| Rol | Tipo de actor | Permisos principales |
+|-----|---------------|----------------------|
+| `ADMIN` | Usuario humano | Acceso total. |
 | `ORGANIZER` | Usuario humano | Gestión de problemas y concursos. |
-| `STUDENT`   | Usuario humano | Lectura pública de problemas, envío de soluciones y consulta de propios envíos. |
-| `SERVICE`   | Microservicio  | Rol técnico para comunicación **servicio-a-servicio**. No representa un usuario humano. |
+| `STUDENT` | Usuario humano | Lectura pública, envío de soluciones, consulta de sus propios envíos. |
+| `SERVICE` | Microservicio | Rol técnico S2S. `judge-service` lo usa para leer test cases privados de `problem-service`. No existe en el enum `Role` de `auth-service`. |
 
-### 6.2 Restricción de endpoints con `@PreAuthorize`
+### 6.2 Patrón de seguridad implementado (`problem-service`, `submission-service`, `judge-service`)
 
-Los controladores REST usan la anotación `@PreAuthorize` de Spring Security para declarar los roles permitidos en cada método:
+Cada uno de estos servicios implementa exactamente el mismo patrón en tres clases:
 
+1. **`JwtConfig`** (`@Configuration`): Declara el bean `JwtTokenValidator(secret, issuer)` leyendo `app.security.jwt.secret` y `app.security.jwt.issuer`. La clave **no tiene valor por defecto**: un secreto heredado en producción aceptaría tokens falsificados. Si falta la variable de entorno, el servicio no arranca.
+
+2. **`JwtAuthenticationFilter`** (extiende `OncePerRequestFilter`): Extrae el header `Authorization: Bearer <token>`, llama a `JwtTokenValidator.validate()`, convierte el claim `role` en la authority `ROLE_<rol>` y lo publica en `SecurityContextHolder`. Si el token es inválido o está ausente, la petición **continúa como anónima** — el filtro no la rechaza.
+
+3. **`SecurityConfig`** (`@Configuration @EnableWebSecurity @EnableMethodSecurity`): Registra el filtro antes de `UsernamePasswordAuthenticationFilter`. Configura la cadena como stateless (`SessionCreationPolicy.STATELESS`) y sin CSRF. Establece `anyRequest().permitAll()` — la autorización real la imponen los `@PreAuthorize` en cada método del controlador.
+
+**Ejemplo de uso de `@PreAuthorize`:**
 ```java
+// Solo ADMIN puede ver todos los envios
+@GetMapping
+@PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+public ResponseEntity<List<SubmissionResponseDTO>> getAll() { ... }
+
+// ADMIN, ORGANIZER y el propio motor de juicio pueden leer test cases
+@GetMapping("/{problemId}/all")
 @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
-@PostMapping("/{problemId}")
-public ResponseEntity<TestCaseResponseDTO> create(...) { ... }
+public ResponseEntity<List<TestCaseResponseDTO>> getAll(...) { ... }
 ```
 
-Spring Security evalúa esta expresión comparando las **authorities** del `Authentication` actual. `hasAnyRole('ADMIN','ORGANIZER','SERVICE')` busca las authorities `ROLE_ADMIN`, `ROLE_ORGANIZER` o `ROLE_SERVICE` en el contexto de seguridad.
+> `JwtTokenValidator` vive en `common-infrastructure` sin anotaciones Spring. Cada servicio lo instancia como `@Bean` en su propia configuración.
 
-### 6.3 El rol `SERVICE` y los endpoints GET de test cases
+### 6.3 Estado de seguridad de `auth-service`
 
-El rol `SERVICE` existe para permitir que otros microservicios consuman datos protegidos sin necesidad de un usuario humano autenticado. **No se usa en operaciones de escritura**: crear, actualizar o eliminar problemas y test cases solo pueden hacerlo usuarios humanos con rol `ADMIN` u `ORGANIZER`.
+`auth-service` **no** implementa el filtro JWT en sus endpoints. Sus rutas `/api/v1/auth/**` son públicas intencionalmente, porque es el emisor de tokens, no el validador. Los endpoints de perfil (`/me/**`) validan por su cuenta el access token que reciben (firma, emisor, tipo `access`, lista negra y cuenta activa). Los refresh tokens llevan `type=refresh` y `JwtTokenValidator` los rechaza como credencial de acceso en todos los servicios.
 
-#### Caso de uso: `judge-service` necesita leer los test cases
+### 6.4 Autenticación servicio a servicio (S2S)
 
-Cuando `judge-service` evalúa una solución enviada por un estudiante, debe ejecutar el código contra **todos** los casos de prueba del problema, incluyendo los casos privados que los estudiantes no deben ver. Para ello, `judge-service` se autenticará con un JWT propio que contenga el claim:
+`judge-service` usa `ServiceTokenProvider` para auto-emitir tokens `role=SERVICE`. Este componente:
+- Firma tokens JJWT con la misma clave compartida y el mismo emisor (`JWT_ISSUER`).
+- Renueva el token automáticamente 30 segundos antes de que expire (`REFRESH_MARGIN`).
+- El identificador del servicio viene de `app.security.jwt.service-id` (UUID configurable).
+- TTL por defecto: 5 minutos (`app.security.jwt.service-token-ttl-seconds=300`).
 
-```json
-{
-  "role": "SERVICE"
-}
-```
+---
 
-Este JWT será validado por el futuro filtro de seguridad de `problem-service`, que convertirá el claim `role=SERVICE` en la authority `ROLE_SERVICE`. Por eso, los únicos endpoints de `problem-service` que aceptan el rol `SERVICE` son los de **lectura** de test cases:
+## 7. Canal WebSocket (notificaciones en tiempo real)
 
-```
-GET /api/v1/problems/test-cases/{problemId}/all
-GET /api/v1/problems/test-cases/{id}
-```
-
-Ambos están restringidos a `@PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")`, permitiendo que `judge-service` (y solo él, con el JWT correcto) recupere los test cases necesarios para la evaluación.
-
-#### Test cases de ejemplo (samples): endpoint público
-
-Los estudiantes necesitan ver al menos algunos casos de prueba para entender el problema. El campo `isSample` de `TestCase` marca cuáles son públicos. El endpoint:
-
-```
-GET /api/v1/problems/test-cases/{problemId}/samples
-```
-
-**no lleva `@PreAuthorize`** y es accesible sin autenticación. Retorna únicamente los casos donde `isSample = true`, filtrados desde la base de datos mediante el caso de uso `GetAllSampleTestCasesByProblemIdUseCase`.
-
-### 6.4 Estado actual de la seguridad
-
-- **La emisión de tokens ya está implementada**: `auth-service` expone `/login` y devuelve tokens JWT con claims estándar (`sub`, `email`, `role`).
-- **Filtro JWT en endpoints pendiente**: Las restricciones por rol ya están escritas en los controllers, pero actualmente todos los endpoints permiten acceso anónimo a nivel de filtro HTTP (`anyRequest().permitAll()` o equivalente). Se activarán completamente cuando se agregue el filtro JWT global que extraiga el rol del token y lo convierta a `ROLE_*`.
-- El rol `SERVICE` **no está en el enum `Role` del `auth-service`** porque no es un rol de usuario humano. Cuando se implemente la validación, el claim `role=SERVICE` se mapeará directamente a la authority `ROLE_SERVICE`.
-- **El canal WebSocket ya autentica de verdad.** `JwtTokenValidator` (en `shared/common-infrastructure`) verifica firma, emisor y vigencia, y `JwtHandshakeInterceptor` lo aplica durante el handshake: una conexión sin token válido se rechaza con `401` y nunca llega a abrirse. El mismo bean servirá al futuro filtro JWT de los endpoints HTTP, de modo que ambos lados validen igual.
-
-### 6.5 Canal de notificación en tiempo real
-
-`submission-service` expone un WebSocket en `/ws/submissions` para empujar los cambios de estado de los envíos.
+`submission-service` expone un WebSocket en `/ws/submissions` para empujar cambios de estado de los envíos.
 
 | Aspecto | Decisión |
 |---------|----------|
-| Sentido | **Unidireccional.** El servidor empuja; lo que el cliente envíe se descarta sin interpretarlo. No hay comandos, ni suscripciones, ni STOMP. |
-| Autenticación | JWT validado en el handshake, en este orden: subprotocolo `bearer.<token>`, cabecera `Authorization: Bearer`, o query param `token`. |
-| Alcance | El servidor asocia la conexión al `sub` del token y solo entrega envíos cuyo equipo dueño incluye a ese usuario. |
-| Destinatarios | Se resuelven vía `TeamMembershipPort`. Mientras `contest-service` no exista, `NoOpTeamMembershipAdapter` trata cada equipo como individual. |
+| Sentido | **Unidireccional.** El servidor empuja; lo que el cliente envíe se descarta. |
+| Autenticación | JWT validado en el handshake por `JwtHandshakeInterceptor`. Token rechazado → handshake devuelve `401 Unauthorized`. |
+| Alcance | La conexión se asocia al `sub` del token. Solo se entregan cambios del mismo usuario. |
+| Subprotocolo confirmado | `goslint-judge` (`app.websocket.submission.sub-protocol`) |
+| Destinatarios | Resueltos vía `TeamMembershipPort`. `NoOpTeamMembershipAdapter` activo mientras no exista `contest-service`. |
 
-Los navegadores no permiten fijar cabeceras al abrir un WebSocket, de ahí el subprotocolo. El cliente anuncia dos y el servidor confirma solo el fijo:
+### 7.1 Extracción del token en el handshake
 
-```js
-new WebSocket("wss://.../ws/submissions", ["goslint-judge", `bearer.${token}`]);
+Los navegadores no permiten enviar headers HTTP personalizados al abrir un WebSocket. Por eso `JwtHandshakeInterceptor` soporta **tres vías**, en orden de prioridad:
+
+1. **Subprotocolo `bearer.<token>`** — El cliente anuncia `["goslint-judge", "bearer.<token>"]` en `Sec-WebSocket-Protocol`. El servidor confirma solo `goslint-judge` y extrae el token del segundo subprotocolo. Esta es la vía recomendada desde el navegador.
+2. **Header `Authorization: Bearer <token>`** — Válida en entornos no-browser (clientes Java, scripts, tests).
+3. **Query param `?token=<token>`** — Último recurso. No recomendado en producción porque el token queda en los logs del servidor.
+
+```javascript
+// Ejemplo desde el frontend (vía subprotocolo)
+const ws = new WebSocket(
+  'ws://localhost:8083/ws/submissions',
+  ['goslint-judge', `bearer.${accessToken}`]
+);
 ```
 
-Mensaje emitido (`SubmissionStatusEventDTO`):
+### 7.2 Registro de sesiones
+
+`WebSocketSessionRegistry` mantiene un `Map<UUID, WebSocketSession>` en memoria, donde la clave es el `userId` del token. Una vez establecida la sesión, `WebSocketSubmissionStatusNotifierAdapter` la busca para empujar mensajes.
+
+> ⚠️ El registro es **local a la instancia**. Con más de una réplica del servicio, un usuario conectado a la instancia A no recibirá los mensajes generados en la instancia B. Para escalar horizontalmente se requiere un registro compartido en Redis.
+
+### 7.3 Mensaje emitido (`SubmissionStatusEventDTO`)
 
 ```json
 {
   "type": "SUBMISSION_STATUS_UPDATED",
-  "submissionId": "…", "problemId": "…", "teamId": "…",
-  "status": "JUDGED", "verdict": "ACCEPTED",
-  "executionTimeMs": 120, "memoryUsedKb": 2048,
+  "submissionId": "3fa85f64-...",
+  "problemId": "3fa85f64-...",
+  "teamId": "3fa85f64-...",
+  "status": "JUDGED",
+  "verdict": "ACCEPTED",
+  "executionTimeMs": 120,
+  "memoryUsedKb": 2048,
   "occurredAt": "2026-08-25T18:30:00Z"
 }
-```
-
-No incluye el código fuente: ya está en poder de quien lo envió y no tiene por qué recorrer la red otra vez.
-
-> 📖 El detalle del canal —las tres vías de las que se extrae el token, el registro
-> de sesiones, cómo se resuelven los destinatarios y las limitaciones conocidas al
-> escalar— está en
-> [`services/submission-service/docs/WEBSOCKET.md`](./services/submission-service/docs/WEBSOCKET.md).
-
-## 7. Flujo de datos principal (envío de código)
-
-```
-[Estudiante]
-    │  POST /submissions  (HTTP)
-    ▼
-[submission-service]
-    │  1. Valida JWT con auth-service
-    │  2. Persiste Submission (status: PENDING, verdict: PENDING)
-    │  3. Publica → RabbitMQ: exchange "submission.exchange",
-    │     routing key "submission.evaluate" → cola "submission.evaluate"
-    │  4. Con la confirmación del broker, marca la Submission como QUEUED
-    │     (si no llega, la fila sigue en PENDING y el barrido la reintenta)
-    │
-    ▼
-[judge-service]  ← Consumidor de "submission.evaluate"
-    │  5. Recupera test cases desde problem-service
-    │  6. Compila el código en contenedor Docker
-    │  7. Ejecuta vs. cada test case (sandbox)
-    │  8. Determina veredicto
-    │  9. Publica → RabbitMQ: exchange "submission.exchange",
-    │     routing key "submission.judged" → cola "submission.judged"
-    │
-    ├─▶ [submission-service] ← Consumidor de "submission.judged"
-    │     10. Actualiza Submission: veredicto + executionTimeMs + memoryUsedKb
-    │         (status: JUDGED)
-    │     11. Tras el commit, empuja el nuevo estado por WebSocket al dueño
-    │         del envío → la pantalla se actualiza sin recargar ni hacer polling
-    │
-    └─▶ [feedback-service] ← Si no es ACCEPTED:
-           12. Llama API LLM con prompt
-           13. Persiste Feedback
-```
-
-> Si el envío no puede completar su recorrido —el juez agota los reintentos, o el
-> veredicto no consigue registrarse— el mensaje acaba en la cola de mensajes
-> muertos correspondiente (`submission.evaluate.dlq` / `submission.judged.dlq`).
-> `ExhaustedSubmissionDeadLetterListener` lo recoge y cierra el envío con estado
-> `SYSTEM_ERROR`, que se notifica por el mismo WebSocket. Sin ese cierre el envío
-> se quedaría para siempre aparentando estar en cola y el estudiante esperando un
-> veredicto que nadie va a emitir.
-
-> El envío **nunca se pierde por un fallo de mensajería**: si el paso 3 no obtiene
-> confirmación del broker, la fila se queda en `PENDING` y
-> `PendingSubmissionRetryScheduler` la vuelve a encolar periódicamente. Por eso el
-> estado se persiste en la tabla `submissions` y no solo en memoria.
 
 ---
 
-## 7. Convenciones de paquetes Java
+## 8. Flujo de datos principal (envío de código)
+
+```
+[Cliente/Estudiante]
+    │  POST /api/v1/submissions  (HTTP, JWT requerido)
+    ▼
+[submission-service :8083]
+    │  1. JwtAuthenticationFilter valida el JWT
+    │  2. @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER')")
+    │  3. SubmitCodeUseCase: valida, detecta duplicados, persiste (status: PENDING, verdict: PENDING)
+    │  4. EnqueueSubmissionUseCase: publica SubmissionReceivedEvent → RabbitMQ
+    │     (exchange: submission.exchange, routing-key: submission.evaluate)
+    │  5. Con publisher confirm → marca Submission como QUEUED
+    │     (sin confirm → queda PENDING, PendingSubmissionRetryScheduler lo reintenta)
+    │
+    ▼
+[judge-service :8084]  ← Consumidor de "submission.evaluate"
+    │  6. SubmissionEvaluationListener recibe el evento
+    │  7. Publica SubmissionJudgingStartedEvent → submission-service (routing: submission.judging)
+    │  8. ServiceTokenProvider provee token role=SERVICE
+    │  9. Recupera test cases desde problem-service (autenticado como SERVICE)
+    │  10. RunnerSandboxExecutor: ejecuta código en bwrap sandbox
+    │  11. Determina veredicto (Python: completo; C/C++/Java: compilación pendiente)
+    │  12. Publica SubmissionJudgedEvent → RabbitMQ (routing: submission.judged)
+    │
+    ├─▶ [submission-service] ← Consumidor de "submission.judged"
+    │     13. UpdateSubmissionVerdictUseCase: actualiza veredicto + métricas (status: JUDGED)
+    │     14. NotifySubmissionStatusUseCase: empuja estado por WebSocket al usuario
+    │
+    └─▶ [feedback-service] ← PENDIENTE DE IMPLEMENTAR
+           15. Llamada API LLM (si veredicto ≠ ACCEPTED)
+           16. Persistir Feedback
+```
+
+**Mecanismos de resiliencia:**
+- **DLQ:** Mensajes rechazados en `submission.evaluate.dlq` → `ExhaustedSubmissionDeadLetterListener` cierra el envío con `ENQUEUE_ERROR` y notifica por WebSocket.
+- **Reintento:** `PendingSubmissionRetryScheduler` barre filas en `PENDING` periódicamente y las reencola.
+
+---
+
+## 9. Convenciones de paquetes Java
 
 El prefijo base de todos los paquetes es `co.uceva.<servicio>`.
 
+> **`auth-service`** no sigue la estructura de abajo: usa capas planas (`controller/`, `service/`, `repository/`, `model/`, `dto/`, `exception/`, `security/`, `cache/`, `config/`). El esquema de puertos y adaptadores descrito a continuación aplica a los demás servicios que lo usan.
+
 ```
-co.uceva.auth/
+co.uceva.<servicio>/   (ejemplo con los nombres que usaba auth-service antes de pasar a capas planas)
 ├── domain/
-│   ├── model/          ← Clases de entidad (User.java)
-│   ├── valueobject/    ← Value Objects (Email.java, Role.java)
-│   └── exception/      ← Excepciones de dominio (UserAlreadyExistsException.java)
+│   ├── model/          ← Clases de entidad (User.java, AuthToken.java)
+│   ├── exception/      ← Excepciones de dominio (UserAlreadyExistsException.java)
+│   └── repository/     ← Puertos de salida de repositorio (UserRepository.java)
+│   └── service/        ← Puertos de servicios técnicos (TokenProvider.java, PasswordEncoder.java)
 ├── application/
-│   ├── port/
-│   │   ├── in/         ← Interfaces de casos de uso (RegisterUserUseCase.java)
-│   │   └── out/        ← Interfaces de repositorios/puertos externos (UserRepository.java)
-│   └── service/        ← Implementaciones de casos de uso (AuthApplicationService.java)
+│   └── usecase/        ← Interfaces (LoginUserUseCase.java)
+│   └── usecase/impl/   ← Implementaciones (LoginUserUseCaseImpl.java)
 └── infrastructure/
-    ├── web/            ← @RestController
-    │   ├── dto/        ← Request/Response DTOs (RegisterRequest.java)
-    │   └── mapper/     ← Conversión dominio ↔ DTO
-    ├── persistence/    ← @Repository, JPA entities (@Entity), Spring Data Repos
-    └── config/         ← @Configuration (SecurityConfig, RabbitConfig, etc.)
+    ├── web/
+    │   ├── controller/ ← @RestController (AuthController.java)
+    │   └── dto/        ← Request/Response DTOs
+    ├── persistence/
+    │   ├── adapter/    ← Adaptadores (UserRepositoryAdapter.java)
+    │   ├── entity/     ← @Entity JPA (UserJpaEntity.java)
+    │   └── repository/ ← Spring Data Interfaces (SpringDataUserRepository.java)
+    ├── cache/          ← Adaptadores Redis (RedisCacheAdapter.java)
+    ├── security/       ← Adaptadores de seguridad (JwtTokenProviderAdapter.java)
+    └── config/         ← @Configuration (SecurityConfig.java)
 ```
 
 ### Reglas de nomenclatura
 
-| Tipo de clase          | Sufijo recomendado       | Ejemplo                          |
-|------------------------|--------------------------|----------------------------------|
-| Caso de uso (interfaz) | `UseCase`                | `SubmitCodeUseCase`              |
-| Servicio de aplicación | `ApplicationService`     | `SubmissionApplicationService`   |
-| Puerto de salida       | `Repository` / `Port`    | `SubmissionRepository`           |
-| Controlador REST       | `Controller`             | `SubmissionController`           |
-| JPA Entity             | `JpaEntity`              | `SubmissionJpaEntity`            |
-| Adaptador de repo      | `RepositoryAdapter`      | `SubmissionRepositoryAdapter`    |
-| DTO de request         | `Request`                | `SubmitCodeRequest`              |
-| DTO de response        | `Response`               | `SubmissionResponse`             |
-| Mapper                 | `Mapper`                 | `SubmissionMapper`               |
+| Tipo de clase | Sufijo recomendado | Ejemplo |
+|--------------|-------------------|---------|
+| Caso de uso (interfaz) | `UseCase` | `LoginUserUseCase` |
+| Implementación de caso de uso | `UseCaseImpl` | `LoginUserUseCaseImpl` |
+| Puerto de salida (repositorio) | `Repository` | `UserRepository` |
+| Puerto de salida (servicio técnico) | `Port` | `TeamMembershipPort` |
+| Controlador REST | `Controller` | `AuthController` |
+| JPA Entity | `JpaEntity` | `UserJpaEntity` |
+| Adaptador de repositorio | `RepositoryAdapter` / `RepositoryImpl` | `UserRepositoryAdapter` |
+| Adaptador de caché | `CacheAdapter` | `RedisCacheAdapter` |
+| DTO de request | `Request` / `RequestDTO` | `LoginRequest`, `SubmitCodeRequestDTO` |
+| DTO de response | `Response` / `ResponseDTO` | `LoginResponse`, `SubmissionResponseDTO` |
+| Mapper web | `WebMapper` | `SubmissionWebMapper` |
+| Mapper de entidad | `EntityMapper` | `SubmissionEntityMapper` |
 
 ---
 
-## 8. Configuración de Gradle
+## 10. Configuración de Gradle
 
 ### `build.gradle` raíz
-Gestiona el BOM de Spring Boot 3.2.4 y dependencias comunes a todos los sub-proyectos:
-- `org.projectlombok:lombok:1.18.30` (compileOnly + annotationProcessor)
-- `spring-boot-starter-test`
+Gestiona el BOM de Spring Boot 3.2.4 y configuración común a todos los sub-proyectos:
+- `io.freefair.lombok:8.6` — Lombok aplicado a todos
+- `jacoco:0.8.12` — Cobertura de código
+- `spring-boot-starter-test` + `spring-security-test` — Base de tests
+- Lee el archivo `.env` del proyecto raíz para inyectarlo como variables de entorno al ejecutar `bootRun`
 
 ### `settings.gradle`
-Declara los 8 sub-proyectos:
+Declara los 8 sub-proyectos (nota: `users-service` está registrado pero es obsoleto):
 ```gradle
 include 'shared:common-domain'
 include 'shared:common-infrastructure'
@@ -581,54 +718,46 @@ include 'services:feedback-service'
 include 'services:contest-service'
 ```
 
-### `build.gradle` de cada microservicio
-Cada servicio debe:
-1. Aplicar el plugin `org.springframework.boot` para generar el JAR ejecutable.
-2. Declarar `implementation project(':shared:common-infrastructure')`.
-3. Agregar sus dependencias específicas (JPA, RabbitMQ, Docker client, etc.).
+### `build.gradle` por servicio
 
-**Ejemplo para `submission-service`:**
-```gradle
-plugins {
-    id 'org.springframework.boot'
-}
+| Servicio | Dependencias específicas |
+|---------|--------------------------|
+| `auth-service` | `common-infrastructure`, `spring-boot-starter-data-jpa`, `flyway-core`, `postgresql`, Lombok explícito |
+| `problem-service` | `common-infrastructure`, `flyway-core`, `postgresql`, H2 (tests) |
+| `submission-service` | `common-domain`, `common-infrastructure`, `spring-boot-starter-data-jpa`, `spring-boot-starter-security`, `spring-boot-starter-amqp`, `spring-boot-starter-websocket`, `flyway-core`, `postgresql`, H2 (tests), `spring-rabbit-test` |
+| `judge-service` | `common-domain`, `common-infrastructure`, `spring-boot-starter-amqp`, `spring-boot-starter-actuator`, `spring-rabbit-test` |
+| `feedback-service` | Solo `spring-boot-starter` base |
+| `contest-service` | Solo `spring-boot-starter` base |
 
-dependencies {
-    implementation project(':shared:common-infrastructure')
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-amqp'   // RabbitMQ
-    runtimeOnly 'org.postgresql:postgresql'
-    implementation 'org.flywaydb:flyway-core'
-}
-```
-
-> Todos los servicios aplican ya el plugin. Los que siguen siendo esqueleto (`judge`, `feedback`, `contest`) aún no declaran sus dependencias reales (Docker client, cliente HTTP del LLM, etc.): se añaden al implementarlos.
+> `common-infrastructure/build.gradle` usa `api` (no `implementation`) para exponer Spring Security, Redis, JJWT y Spring Web a todos los servicios que lo dependan.
 
 ### Gradle Wrapper
 Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` desde `backend/`; no hace falta Gradle instalado globalmente.
 
 ---
 
-## 9. Problemas conocidos y deuda técnica
+## 11. Problemas conocidos y deuda técnica
 
 | # | Problema | Criticidad | Acción requerida |
 |---|----------|-----------|------------------|
-| 1 | **Ningún endpoint HTTP valida el JWT**: los `@PreAuthorize` están escritos pero la autenticación llega anónima | 🔴 Alta | Escribir el filtro JWT reutilizando `JwtTokenValidator` (ya usado por el handshake del WebSocket) y retirar configuraciones temporales de seguridad en los servicios |
-| 2 | **`problem-service` arranca con `ddl-auto=validate` pero su carpeta `db/migration/` está vacía** | 🔴 Alta | Nadie crea sus tablas: el arranque contra una BD limpia falla. Escribir su migración base como se hizo en `submission-service` |
-| 3 | **`auth-service` sigue con `ddl-auto=update` y Flyway desactivado** | 🟡 Media | El esquema de `users` no está versionado; migrar a Flyway + `validate` para que deje de depender de lo que Hibernate decida en cada arranque |
-| 4 | **`judge-service` no existe**: los envíos se encolan y nadie los consume | 🔴 Alta | Implementar el consumidor de `submission.evaluate`. El contrato ya está fijado en `docs/RABBITMQ.md`; `testing/ws-judge-simulator/` lo simula mientras tanto |
-| 5 | **`contest-service` no existe**: la composición real de los equipos se desconoce | 🟡 Media | `NoOpTeamMembershipAdapter` trata cada equipo como individual. Al llegar el servicio, añadir un adaptador y cambiar `app.team-membership.provider` |
-| 6 | **El registro de sesiones WebSocket es local a la instancia** | 🟡 Media | Con varias réplicas, la instancia que recibe el veredicto puede no tener la conexión del estudiante. Escalar horizontalmente exige compartir el registro (p. ej. Redis) |
-| 7 | **`traefik.yml` está vacío** | 🟡 Media | Sin API Gateway cada servicio se expone por su puerto. Al configurarlo, cuidar el reenvío de `Upgrade`/`Sec-WebSocket-Protocol` o el handshake del WebSocket no se completa |
-| 8 | **`app.websocket.allowed-origins=*`** | 🟡 Media | Cómodo en desarrollo; restringir a los orígenes del frontend antes de exponer el servicio |
-| 9 | **Test package incorrecto** en `auth-service` y `problem-service` | 🟢 Baja | La clase de test usa `co.uceva.judge.auth_service` en lugar de `co.uceva.auth` |
-| 10 | **`services/users-service/` conviven con `auth-service`** | 🟢 Baja | Hay dos módulos para la misma responsabilidad; decidir cuál queda y retirar el otro de `settings.gradle` |
+| 1 | ~~`auth-service` sin `/logout`~~ | ✅ Resuelto | `POST /logout` revoca el access token (lista negra en Redis) y borra el refresh token |
+| 2 | **`auth-service` usa `ddl-auto=update` sin Flyway** — El esquema de `users` no está versionado | 🟡 Media | Añadir `V1__Create_users_table.sql` a Flyway (ya existe en `db/migration/` pero Flyway está desactivado), cambiar a `ddl-auto=validate` y activar Flyway |
+| 3 | **`jwt.issuer` en `auth-service` usa propiedad `jwt.issuer` mientras los otros servicios usan `app.security.jwt.issuer`** — Inconsistencia en los nombres de propiedades | 🟡 Media | Unificar la propiedad a `app.security.jwt.issuer` en `auth-service` también |
+| 4 | **El sandbox de `judge-service` no soporta compilación de C, C++ y Java** — Python es el único lenguaje evaluado correctamente | 🔴 Alta | Implementar `Compiler.java` para los tres lenguajes compilados. Conectar a `RunnerSandboxExecutor`. |
+| 5 | ~~`JwtTokenValidator` sin lista negra~~ | ✅ Resuelto | Constructor opcional con `TokenBlacklist`; `auth-service` la implementa con `AuthCache` |
+| 6 | **`contest-service` y `feedback-service` son esqueletos** — Toda su lógica está pendiente | 🔴 Alta | Implementar según roadmap del proyecto |
+| 7 | **`users-service/` convive con `auth-service`** — Módulo obsoleto | 🟢 Baja | Decidir cuál queda y retirar el otro de `settings.gradle` |
+| 8 | **Registro de sesiones WebSocket es local a la instancia** — No escala horizontalmente | 🟡 Media | Compartir el registro vía Redis cuando se requiera más de una réplica |
+| 9 | **`traefik.yml` está vacío** — Sin API Gateway cada servicio se expone por su puerto | 🟡 Media | Configurar Traefik con reenvío de `Upgrade`/`Sec-WebSocket-Protocol` |
+| 10 | **`app.websocket.allowed-origins=*`** en `submission-service` | 🟡 Media | Restringir a los orígenes del frontend antes de exponer |
+| 11 | **Test package incorrecto** en `auth-service` | 🟢 Baja | La clase de test usa `co.uceva.judge.auth_service` en lugar de `co.uceva.auth` |
+| 12 | **`MonitorLimits` de `judge-service` no persisten** — Los límites del sandbox se pierden en cada reinicio | 🟢 Baja | Añadir persistencia (Redis o BD) si se quieren límites configurables persistentes |
 
 ---
 
-## 10. Cómo agregar un nuevo microservicio
+## 12. Cómo agregar un nuevo microservicio
 
-> ⚠️ Si en el futuro el sistema necesita escalar con un nuevo servicio (ej. `notification-service`), seguir estos pasos:
+> Si el sistema necesita escalar con un nuevo servicio (ej. `notification-service`):
 
 1. **Crear la carpeta** en `services/`:
    ```
@@ -658,7 +787,6 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 4. **Crear clase principal** `NotificationServiceApplication.java`:
    ```java
    package co.uceva.notification;
-
    @SpringBootApplication
    public class NotificationServiceApplication {
        public static void main(String[] args) {
@@ -671,11 +799,15 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
    ```properties
    spring.application.name=notification-service
    server.port=8087
+   app.security.jwt.secret=${JWT_SECRET}
+   app.security.jwt.issuer=${JWT_ISSUER:goslint-judge}
    ```
+
+6. **Añadir `JwtConfig` + `JwtAuthenticationFilter` + `SecurityConfig`** siguiendo el patrón de `problem-service`.
 
 ---
 
-## 11. Checklist antes de hacer un PR
+## 13. Checklist antes de hacer un PR
 
 Antes de enviar cambios en cualquier microservicio, verificar:
 
@@ -683,11 +815,13 @@ Antes de enviar cambios en cualquier microservicio, verificar:
 - [ ] Los casos de uso en `application/` **no importan** clases de `infrastructure/`.
 - [ ] Los controladores REST están en `infrastructure/web/` y usan DTOs, **no** entidades de dominio directamente.
 - [ ] Las implementaciones de repositorios JPA están en `infrastructure/persistence/`.
-- [ ] Se creó una migración de Flyway en `src/main/resources/db/migration/` para cualquier cambio de esquema.
+- [ ] Se creó una migración de Flyway en `src/main/resources/db/migration/` para cualquier cambio de esquema (si el servicio tiene BD).
 - [ ] El nombre del paquete de test coincide con el paquete del código fuente (`co.uceva.<servicio>`).
 - [ ] El `build.gradle` del servicio tiene el plugin `org.springframework.boot` aplicado.
 - [ ] Se añadió la dependencia correcta en `settings.gradle` si se creó un nuevo módulo.
+- [ ] Las propiedades de JWT siguen la convención: `app.security.jwt.secret` y `app.security.jwt.issuer` sin valores por defecto.
+- [ ] Los tests pasan con `./gradlew :<servicio>:test` desde la raíz del backend.
 
 ---
 
-*Documento generado el 2026-06-10; última actualización el 2026-09-05. Actualizar cuando cambien decisiones arquitectónicas.*
+*Documento actualizado el 2026-09-30. Última revisión completa del código fuente a la fecha. Actualizar cuando cambien decisiones arquitectónicas.*

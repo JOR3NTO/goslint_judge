@@ -10,9 +10,8 @@ import org.springframework.context.annotation.Configuration;
  * <p>
  * Vive aparte de {@link SecurityConfig} porque son dos cosas distintas: aquella
  * configura la cadena de filtros HTTP, y esto provee la pieza que reconoce a un
- * usuario a partir de su token. Hoy su único consumidor es el handshake del
- * WebSocket; cuando llegue el filtro JWT de los endpoints HTTP, usará este mismo
- * bean y ambos lados validarán exactamente igual.
+ * usuario a partir de su token. Lo comparten el filtro JWT de los endpoints HTTP
+ * y el handshake del WebSocket para validar de la misma forma.
  * </p>
  */
 @Configuration

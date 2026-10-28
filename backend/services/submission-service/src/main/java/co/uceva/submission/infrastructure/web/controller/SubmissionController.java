@@ -15,7 +15,9 @@ import co.uceva.submission.infrastructure.web.dto.SubmitCodeRequestDTO;
 import co.uceva.submission.infrastructure.web.dto.SubmissionMetricsResponseDTO;
 import co.uceva.submission.infrastructure.web.dto.SubmissionResponseDTO;
 import co.uceva.submission.infrastructure.web.mapper.SubmissionWebMapper;
+import co.uceva.shared.infrastructure.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -71,12 +73,14 @@ public class SubmissionController {
      * </p>
      *
      * @param request DTO con los datos del envío.
+     * @param user    Usuario autenticado (principal del contexto de seguridad).
      * @return 201 CREATED con el envío creado.
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER')")
-    public ResponseEntity<SubmissionResponseDTO> create(@RequestBody SubmitCodeRequestDTO request) {
-        var command = SubmissionWebMapper.toCommand(request);
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER')")
+    public ResponseEntity<SubmissionResponseDTO> create(@RequestBody SubmitCodeRequestDTO request,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        var command = SubmissionWebMapper.toCommand(request, user);
         Submission created = submitCodeUseCase.execute(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(SubmissionWebMapper.toResponse(created));
     }
@@ -91,7 +95,7 @@ public class SubmissionController {
      * @return 200 OK con el envío encontrado.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<SubmissionResponseDTO> getById(@PathVariable("id") UUID id) {
         Submission submission = getSubmissionByIdUseCase.execute(id);
         return ResponseEntity.ok(SubmissionWebMapper.toResponse(submission));
@@ -106,7 +110,7 @@ public class SubmissionController {
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<List<SubmissionResponseDTO>> getAll() {
         List<Submission> submissions = getAllSubmissionsUseCase.execute();
         List<SubmissionResponseDTO> response = submissions.stream()
@@ -125,7 +129,7 @@ public class SubmissionController {
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping("/problem/{problemId}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<List<SubmissionResponseDTO>> getByProblem(@PathVariable("problemId") UUID problemId) {
         List<Submission> submissions = getSubmissionsByProblemUseCase.execute(problemId);
         List<SubmissionResponseDTO> response = submissions.stream()
@@ -144,7 +148,7 @@ public class SubmissionController {
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping("/team/{teamId}")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<List<SubmissionResponseDTO>> getByTeam(@PathVariable("teamId") UUID teamId) {
         List<Submission> submissions = getSubmissionsByTeamUseCase.execute(teamId);
         List<SubmissionResponseDTO> response = submissions.stream()
@@ -164,7 +168,7 @@ public class SubmissionController {
      * @return 200 OK con la lista de envíos.
      */
     @GetMapping("/history")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<List<SubmissionResponseDTO>> getHistory(
             @RequestParam("problemId") UUID problemId,
             @RequestParam("teamId") UUID teamId) {
@@ -186,7 +190,7 @@ public class SubmissionController {
      * @return 200 OK con las métricas del envío.
      */
     @GetMapping("/{id}/metrics")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<SubmissionMetricsResponseDTO> getMetrics(@PathVariable("id") UUID id) {
         SubmissionMetrics metrics = getSubmissionMetricsUseCase.execute(id);
         return ResponseEntity.ok(SubmissionWebMapper.toResponse(metrics));
@@ -202,7 +206,7 @@ public class SubmissionController {
      * @return 204 NO CONTENT.
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<Void> delete(@PathVariable("id") UUID id) {
         deleteSubmissionUseCase.execute(id);
         return ResponseEntity.noContent().build();

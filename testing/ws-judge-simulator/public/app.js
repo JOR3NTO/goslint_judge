@@ -155,7 +155,7 @@ function classifyState(status, verdict) {
   if (status === "JUDGED") {
     return verdict === "ACCEPTED" ? "accepted" : "rejected";
   }
-  if (status === "SYSTEM_ERROR") return "system-error";
+  if (status === "ENQUEUE_ERROR") return "enqueue-error";
   if (status === "QUEUED" || status === "PENDING") return "queued";
   return "queued";
 }
@@ -172,8 +172,8 @@ function labelFor(state, verdict) {
       return "ACCEPTED";
     case "rejected":
       return verdict || "Rechazado";
-    case "system-error":
-      return "SYSTEM_ERROR";
+    case "enqueue-error":
+      return "ENQUEUE_ERROR";
     default:
       return state;
   }

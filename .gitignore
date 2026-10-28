@@ -16,6 +16,13 @@ backend/debug.log
 backend/TestLombok.*
 backend/delomboked_auth/
 
+
+package.json
+
+pnpm*
+
+*/graphify-out/*
+
 # Carpetas bin generadas por el IDE (VSCode Java, Eclipse)
 backend/**/bin/
 

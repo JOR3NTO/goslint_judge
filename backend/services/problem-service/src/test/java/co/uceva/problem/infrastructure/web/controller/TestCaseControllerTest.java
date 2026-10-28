@@ -3,6 +3,7 @@ package co.uceva.problem.infrastructure.web.controller;
 import co.uceva.problem.application.usecase.*;
 import co.uceva.problem.domain.model.TestCase;
 import co.uceva.problem.fixtures.ProblemFixtures;
+import co.uceva.problem.infrastructure.config.JwtConfig;
 import co.uceva.problem.infrastructure.config.SecurityConfig;
 import co.uceva.problem.infrastructure.web.dto.CreateTestCaseBatchRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.CreateTestCaseRequestDTO;
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -30,7 +32,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TestCaseController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, JwtConfig.class})
+@TestPropertySource(properties = {
+        "app.security.jwt.secret=test-secret-key-at-least-32-bytes-long",
+        "app.security.jwt.issuer=goslint-judge"
+})
 class TestCaseControllerTest {
 
     @Autowired
