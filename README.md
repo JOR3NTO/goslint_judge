@@ -50,12 +50,11 @@ goslint_judge/
 │       └── admin-app/    (puerto 3001) ← Panel administrativo
 │
 ├── infrastructure/           ← Docker Compose, Traefik
-│   ├── docker/               ← docker-compose.yml (PostgreSQL, Redis, RabbitMQ y los servicios) + README paso a paso
+│   ├── docker/               ← docker-compose.yml (PostgreSQL + RabbitMQ)
 │   └── traefik/              ← Configuración del API Gateway
 │
 └── testing/                  ← Utilidades de prueba manual
-    ├── ws-judge-simulator/   ← Simula judge-service para ver el WebSocket en vivo
-    └── integration-runner/   ← Panel web: flujo completo auth → problema → envío → juez
+    └── ws-judge-simulator/   ← Simula judge-service para ver el WebSocket en vivo
 ```
 
 ---
@@ -117,10 +116,8 @@ goslint_judge/
 ### Backend
 
 ```bash
-# 1. Levantar la infraestructura (PostgreSQL + Redis + RabbitMQ).
-#    Requiere infrastructure/docker/.env (copiar de .env.example). Para levantar también
-#    los servicios en contenedores: `docker compose up -d --build` — ver infrastructure/docker/README.md
-docker compose -f infrastructure/docker/docker-compose.yml up -d postgres redis rabbitmq
+# 1. Levantar la infraestructura (PostgreSQL + RabbitMQ)
+docker compose -f infrastructure/docker/docker-compose.yml up -d
 
 cd backend
 
@@ -168,22 +165,23 @@ pnpm dev:admin
 
 | Componente          | Estado                | Notas                                              |
 |---------------------|-----------------------|----------------------------------------------------|
-| `auth-service`      | 🟢 Funcional          | Registro y login implementados. Emite JWT (access 15 min + refresh 8 h). Bloqueo de cuenta por intentos fallidos en Redis. Sin Flyway aún |
+| `auth-service`      | 🟡 Parcial            | Solo registro de usuarios. **Falta el login**, y con él la emisión de JWT |
 | `problem-service`   | 🟢 Funcional          | CRUD de problemas y casos de prueba, con roles declarados. Falta su migración de Flyway |
 | `submission-service`| 🟢 Funcional          | Envío → RabbitMQ → veredicto → WebSocket, con reintentos y colas de fallidos |
-| `judge-service`     | 🟡 Parcial            | Evalúa Python en sandbox (`bwrap` + cgroups v2). Validado en Manjaro x86_64 y OCI A1-flex ARM. C, C++ y Java pendientes |
+| `judge-service`     | 🔴 Esqueleto          | Sin implementar; lo simula `testing/ws-judge-simulator/` |
 | `feedback-service`  | 🔴 Esqueleto          | Sin implementar                                    |
 | `contest-service`   | 🔴 Esqueleto          | Sin implementar; los equipos se tratan como individuales mientras tanto |
-| `student-app`       | 🟢 UI base lista      | Landing, Login, Register, Contests migrados. Perfil (`/profile`) con avatar DiceBear listo; datos completos pendientes de `GET /api/v1/auth/me` en `auth-service` |
+| `student-app`       | 🟢 UI base lista      | Landing, Login, Register, Contests migrados        |
 | `admin-app`         | 🔴 Pendiente          | Placeholder - en construcción                      |
-| `docker-compose`    | 🟢 Listo              | Levanta PostgreSQL, Redis, RabbitMQ y auth, problem y submission; perfil `sandbox` (solo Linux) agrega `judge-service` |
+| `docker-compose`    | 🟢 Listo              | Levanta PostgreSQL y RabbitMQ                      |
 | `traefik`           | 🔴 Pendiente          | `traefik.yml` aún vacío                            |
 | `Gradle Wrapper`    | 🟢 Listo              | `./gradlew` disponible en `backend/`               |
 
 ### Lo que falta para cerrar el flujo de extremo a extremo
 
-1. **Lenguajes en `judge-service`** — Python funciona; C, C++ y Java requieren el compilador (`Compiler`), que va en otra HU.
-2. **Detección de MLE** — en kernels modernos el OOM killer sale con EXIT=0; `TestCaseRunner` debe usar `oom_kill` de `memory.events` en lugar de comparar `memory.peak > memory.max`.
+1. **Login en `auth-service`** — hoy no hay quien emita los JWT que el resto valida.
+2. **Filtro JWT para los endpoints HTTP** — las restricciones por rol están escritas pero no se aplican; en local se usa un bypass temporal (`AUTH_BYPASS=true`).
+3. **`judge-service`** — los envíos se encolan correctamente, pero nadie los evalúa todavía.
 
 ---
 

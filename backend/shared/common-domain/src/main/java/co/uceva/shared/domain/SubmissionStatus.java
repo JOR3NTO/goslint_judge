@@ -29,5 +29,5 @@ public enum SubmissionStatus {
      * se quede indefinidamente aparentando estar en curso.
      * </p>
      */
-    ENQUEUE_ERROR
+    SYSTEM_ERROR
 }

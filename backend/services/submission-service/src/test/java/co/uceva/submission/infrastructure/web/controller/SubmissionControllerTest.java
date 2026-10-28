@@ -10,19 +10,14 @@ import co.uceva.submission.application.usecase.GetSubmissionMetricsUseCase.Submi
 import co.uceva.submission.application.usecase.GetSubmissionsByProblemUseCase;
 import co.uceva.submission.application.usecase.GetSubmissionsByTeamUseCase;
 import co.uceva.submission.application.usecase.SubmitCodeUseCase;
-import co.uceva.submission.application.exception.ContestServiceUnavailableException;
-import co.uceva.submission.domain.model.SubmissionRejectionReason;
 import co.uceva.submission.domain.exception.DuplicateSubmissionException;
-import co.uceva.submission.domain.exception.SubmissionNotAllowedException;
 import co.uceva.submission.domain.exception.SubmissionNotFoundException;
 import co.uceva.submission.domain.model.Submission;
 import co.uceva.submission.fixtures.SubmissionFixtures;
-import co.uceva.submission.infrastructure.config.JwtConfig;
 import co.uceva.submission.infrastructure.config.SecurityConfig;
 import co.uceva.submission.infrastructure.web.dto.SubmitCodeRequestDTO;
 import co.uceva.submission.infrastructure.web.exception.SubmissionExceptionHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -31,34 +26,20 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.context.TestPropertySource;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
-import static io.jsonwebtoken.security.Keys.hmacShaKeyFor;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(SubmissionController.class)
-@Import({SecurityConfig.class, JwtConfig.class, SubmissionExceptionHandler.class})
-@TestPropertySource(properties = {
-        "app.security.jwt.secret=clave-de-pruebas-solo-para-tests-0123456789",
-        "app.security.jwt.issuer=goslint-judge"
-})
+@Import({SecurityConfig.class, SubmissionExceptionHandler.class})
 class SubmissionControllerTest {
-
-    private static final String JWT_SECRET = "clave-de-pruebas-solo-para-tests-0123456789";
-    private static final String JWT_ISSUER = "goslint-judge";
 
     @Autowired
     private MockMvc mockMvc;
@@ -101,38 +82,11 @@ class SubmissionControllerTest {
         when(submitCodeUseCase.execute(any())).thenReturn(SubmissionFixtures.aSubmission(submissionId));
 
         mockMvc.perform(post("/api/v1/submissions")
-                        .with(authentication(SubmissionFixtures.authenticatedAs("STUDENT")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(submissionId.toString()))
                 .andExpect(jsonPath("$.verdict").value("PENDING"));
-    }
-
-    @Test
-    void shouldCreateSubmissionWithAValidJwt() throws Exception {
-        SubmitCodeRequestDTO request = SubmissionFixtures.submitCodeRequest();
-        when(submitCodeUseCase.execute(any())).thenReturn(SubmissionFixtures.aSubmission(submissionId));
-
-        mockMvc.perform(post("/api/v1/submissions")
-                        .header("Authorization", "Bearer " + studentToken())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(submissionId.toString()));
-    }
-
-    private String studentToken() {
-        SecretKey key = hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
-        Instant now = Instant.now();
-        return Jwts.builder()
-                .issuer(JWT_ISSUER)
-                .subject(UUID.randomUUID().toString())
-                .claim("role", "STUDENT")
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(300)))
-                .signWith(key)
-                .compact();
     }
 
     @Test
@@ -143,7 +97,6 @@ class SubmissionControllerTest {
                 .thenReturn(SubmissionFixtures.aSubmission(submissionId, SubmissionStatus.QUEUED));
 
         mockMvc.perform(post("/api/v1/submissions")
-                        .with(authentication(SubmissionFixtures.authenticatedAs("STUDENT")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -156,7 +109,6 @@ class SubmissionControllerTest {
         SubmitCodeRequestDTO request = SubmissionFixtures.submitCodeRequest();
 
         mockMvc.perform(post("/api/v1/submissions")
-                        .with(authentication(SubmissionFixtures.authenticatedAs("SERVICE")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isForbidden());
@@ -197,57 +149,10 @@ class SubmissionControllerTest {
                 new DuplicateSubmissionException(teamId, problemId, co.uceva.shared.domain.ProgrammingLanguage.PYTHON));
 
         mockMvc.perform(post("/api/v1/submissions")
-                        .with(authentication(SubmissionFixtures.authenticatedAs("STUDENT")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").exists());
-    }
-
-    @Test
-    void shouldReturnForbiddenWhenTheSubmissionIsNotAllowed() throws Exception {
-        SubmitCodeRequestDTO request = SubmissionFixtures.submitCodeRequest();
-        when(submitCodeUseCase.execute(any())).thenThrow(
-                new SubmissionNotAllowedException(SubmissionRejectionReason.CONTEST_NOT_ACTIVE));
-
-        mockMvc.perform(post("/api/v1/submissions")
-                        .with(authentication(SubmissionFixtures.authenticatedAs("STUDENT")))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").exists());
-    }
-
-    @Test
-    void shouldReturnServiceUnavailableWhenContestServiceIsDown() throws Exception {
-        SubmitCodeRequestDTO request = SubmissionFixtures.submitCodeRequest();
-        when(submitCodeUseCase.execute(any())).thenThrow(
-                new ContestServiceUnavailableException("timeout", new RuntimeException()));
-
-        mockMvc.perform(post("/api/v1/submissions")
-                        .with(authentication(SubmissionFixtures.authenticatedAs("STUDENT")))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.message").exists());
-    }
-
-    @Test
-    void shouldPassTheAuthenticatedUserToTheUseCase() throws Exception {
-        SubmitCodeRequestDTO request = SubmissionFixtures.submitCodeRequest();
-        when(submitCodeUseCase.execute(any())).thenReturn(SubmissionFixtures.aSubmission(submissionId));
-
-        mockMvc.perform(post("/api/v1/submissions")
-                        .with(authentication(SubmissionFixtures.authenticatedAs("ORGANIZER")))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated());
-
-        org.mockito.ArgumentCaptor<SubmitCodeUseCase.SubmitCodeCommand> captor =
-                org.mockito.ArgumentCaptor.forClass(SubmitCodeUseCase.SubmitCodeCommand.class);
-        org.mockito.Mockito.verify(submitCodeUseCase).execute(captor.capture());
-        org.assertj.core.api.Assertions.assertThat(captor.getValue().submitterId())
-                .isEqualTo(SubmissionFixtures.USER_ID);
     }
 
     @Test

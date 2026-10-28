@@ -2,7 +2,6 @@
 
 import Link from "next/link"
 import { useState } from "react"
-import { useHasSession } from "@/shared/hooks/use-session"
 import { Button } from "@/shared/ui/primitives/button"
 import {
   Code2,
@@ -13,12 +12,10 @@ import {
   X,
   User,
   LogIn,
-  UserCircle,
 } from "lucide-react"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const hasSession = useHasSession()
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
@@ -58,30 +55,18 @@ export function Navbar() {
 
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center gap-3">
-            {hasSession === true && (
-              <Link href="/profile">
-                <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-green-sm">
-                  <UserCircle className="h-4 w-4" />
-                  Mi perfil
-                </Button>
-              </Link>
-            )}
-            {hasSession === false && (
-              <>
-                <Link href="/login">
-                  <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground">
-                    <LogIn className="h-4 w-4" />
-                    Iniciar Sesión
-                  </Button>
-                </Link>
-                <Link href="/register">
-                  <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-green-sm">
-                    <User className="h-4 w-4" />
-                    Registrarse
-                  </Button>
-                </Link>
-              </>
-            )}
+            <Link href="/login">
+              <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground">
+                <LogIn className="h-4 w-4" />
+                Iniciar Sesión
+              </Button>
+            </Link>
+            <Link href="/register">
+              <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-green-sm">
+                <User className="h-4 w-4" />
+                Registrarse
+              </Button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -117,30 +102,18 @@ export function Navbar() {
               </Button>
             </Link>
             <div className="pt-4 border-t border-border space-y-2">
-              {hasSession === true && (
-                <Link href="/profile" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
-                    <UserCircle className="h-4 w-4" />
-                    Mi perfil
-                  </Button>
-                </Link>
-              )}
-              {hasSession === false && (
-                <>
-                  <Link href="/login" onClick={() => setIsOpen(false)}>
-                    <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
-                      <LogIn className="h-4 w-4" />
-                      Iniciar Sesión
-                    </Button>
-                  </Link>
-                  <Link href="/register" onClick={() => setIsOpen(false)}>
-                    <Button className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
-                      <User className="h-4 w-4" />
-                      Registrarse
-                    </Button>
-                  </Link>
-                </>
-              )}
+              <Link href="/login" onClick={() => setIsOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
+                  <LogIn className="h-4 w-4" />
+                  Iniciar Sesión
+                </Button>
+              </Link>
+              <Link href="/register" onClick={() => setIsOpen(false)}>
+                <Button className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+                  <User className="h-4 w-4" />
+                  Registrarse
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

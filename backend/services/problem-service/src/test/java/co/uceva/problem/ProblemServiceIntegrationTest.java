@@ -107,17 +107,6 @@ class ProblemServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void shouldReturnNotFoundForUnknownProblem() throws Exception {
-        UUID unknown = UUID.randomUUID();
-
-        mockMvc.perform(get("/api/v1/problems/{id}", unknown))
-                .andExpect(status().isNotFound());
-        mockMvc.perform(delete("/api/v1/problems/{id}", unknown)
-                        .with(user("admin").roles("ADMIN")))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
     void shouldExecuteBatchTestCaseOperations() throws Exception {
         // 1. Create problem
         MvcResult createResult = mockMvc.perform(post("/api/v1/problems")

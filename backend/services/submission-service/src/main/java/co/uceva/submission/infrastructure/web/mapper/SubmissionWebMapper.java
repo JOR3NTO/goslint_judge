@@ -6,7 +6,6 @@ import co.uceva.submission.domain.model.Submission;
 import co.uceva.submission.infrastructure.web.dto.SubmissionMetricsResponseDTO;
 import co.uceva.submission.infrastructure.web.dto.SubmissionResponseDTO;
 import co.uceva.submission.infrastructure.web.dto.SubmitCodeRequestDTO;
-import co.uceva.shared.infrastructure.security.AuthenticatedUser;
 
 /**
  * Mapper encargado de convertir entre DTOs de la capa web y comandos/entidades
@@ -18,14 +17,12 @@ public class SubmissionWebMapper {
      * Convierte un DTO de creación de envío en un comando de aplicación.
      *
      * @param request DTO con los datos de creación.
-     * @param user    Usuario autenticado que realiza el envío.
      * @return Comando listo para ser ejecutado por el caso de uso.
      */
-    public static SubmitCodeCommand toCommand(SubmitCodeRequestDTO request, AuthenticatedUser user) {
+    public static SubmitCodeCommand toCommand(SubmitCodeRequestDTO request) {
         return new SubmitCodeCommand(
                 request.teamId(),
                 request.problemId(),
-                user.userId(),
                 request.language(),
                 request.sourceCode()
         );

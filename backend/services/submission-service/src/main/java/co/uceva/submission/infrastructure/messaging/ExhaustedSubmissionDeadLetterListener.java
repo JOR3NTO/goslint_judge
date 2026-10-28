@@ -1,9 +1,8 @@
 package co.uceva.submission.infrastructure.messaging;
 
 import co.uceva.shared.domain.event.SubmissionJudgedEvent;
-import co.uceva.shared.domain.event.SubmissionJudgingStartedEvent;
 import co.uceva.shared.domain.event.SubmissionReceivedEvent;
-import co.uceva.submission.application.usecase.MarkSubmissionEnqueueErrorUseCase;
+import co.uceva.submission.application.usecase.MarkSubmissionSystemErrorUseCase;
 import co.uceva.submission.domain.exception.SubmissionNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +19,7 @@ import java.util.UUID;
  * Un mensaje llega a esas colas cuando su consumidor lo rechazó definitivamente
  * tras agotar los reintentos. Sin este listener, esos envíos quedarían retenidos
  * en el broker y el estudiante seguiría viendo indefinidamente un envío "en cola"
- * que nadie va a evaluar. Convertirlos en {@code ENQUEUE_ERROR} es lo que cierra
+ * que nadie va a evaluar. Convertirlos en {@code SYSTEM_ERROR} es lo que cierra
  * la espera y permite avisarle.
  * </p>
  * <p>
@@ -29,7 +28,6 @@ import java.util.UUID;
  * </p>
  * <ul>
  *   <li>{@code submission.evaluate.dlq} — el juez no consiguió evaluar el envío.</li>
- *   <li>{@code submission.judging.dlq} — el aviso de inicio de evaluación llegó pero no pudo registrarse.</li>
  *   <li>{@code submission.judged.dlq} — el veredicto llegó pero no pudo registrarse.</li>
  * </ul>
  * <p>
@@ -43,16 +41,16 @@ public class ExhaustedSubmissionDeadLetterListener {
 
     private static final Logger log = LoggerFactory.getLogger(ExhaustedSubmissionDeadLetterListener.class);
 
-    private final MarkSubmissionEnqueueErrorUseCase markSubmissionEnqueueErrorUseCase;
+    private final MarkSubmissionSystemErrorUseCase markSubmissionSystemErrorUseCase;
 
     /**
      * Inyección de dependencias mediante constructor.
      *
-     * @param markSubmissionEnqueueErrorUseCase Caso de uso que marca el envío como fallido.
+     * @param markSubmissionSystemErrorUseCase Caso de uso que marca el envío como fallido.
      */
     public ExhaustedSubmissionDeadLetterListener(
-            MarkSubmissionEnqueueErrorUseCase markSubmissionEnqueueErrorUseCase) {
-        this.markSubmissionEnqueueErrorUseCase = markSubmissionEnqueueErrorUseCase;
+            MarkSubmissionSystemErrorUseCase markSubmissionSystemErrorUseCase) {
+        this.markSubmissionSystemErrorUseCase = markSubmissionSystemErrorUseCase;
     }
 
     /**
@@ -62,19 +60,8 @@ public class ExhaustedSubmissionDeadLetterListener {
      */
     @RabbitListener(queues = "${app.messaging.submission.dead-letter-queue}")
     public void onEvaluationExhausted(SubmissionReceivedEvent event) {
-        markAsEnqueueError(event.submissionId(),
+        markAsSystemError(event.submissionId(),
                 "el motor de evaluación agotó los reintentos sin poder evaluar el envío");
-    }
-
-    /**
-     * Cierra un envío cuyo aviso de inicio de evaluación no pudo registrarse.
-     *
-     * @param event Aviso de inicio que no consiguió aplicarse.
-     */
-    @RabbitListener(queues = "${app.messaging.submission.judging-dead-letter-queue}")
-    public void onJudgingExhausted(SubmissionJudgingStartedEvent event) {
-        markAsEnqueueError(event.submissionId(),
-                "se agotaron los reintentos de registro del aviso de inicio de evaluación");
     }
 
     /**
@@ -84,7 +71,7 @@ public class ExhaustedSubmissionDeadLetterListener {
      */
     @RabbitListener(queues = "${app.messaging.submission.judged-dead-letter-queue}")
     public void onVerdictExhausted(SubmissionJudgedEvent event) {
-        markAsEnqueueError(event.submissionId(),
+        markAsSystemError(event.submissionId(),
                 "se agotaron los reintentos de registro del veredicto emitido por el juez");
     }
 
@@ -94,9 +81,9 @@ public class ExhaustedSubmissionDeadLetterListener {
      * @param submissionId Envío que no pudo completar su evaluación.
      * @param reason       Motivo del fallo, para trazabilidad.
      */
-    private void markAsEnqueueError(UUID submissionId, String reason) {
+    private void markAsSystemError(UUID submissionId, String reason) {
         try {
-            markSubmissionEnqueueErrorUseCase.execute(submissionId, reason);
+            markSubmissionSystemErrorUseCase.execute(submissionId, reason);
         } catch (SubmissionNotFoundException e) {
             log.error("Mensaje fallido descartado: el envío {} no existe.", submissionId, e);
         } catch (RuntimeException e) {

@@ -7,13 +7,7 @@ import co.uceva.submission.application.usecase.SubmitCodeUseCase.SubmitCodeComma
 import co.uceva.submission.domain.model.Submission;
 import co.uceva.submission.infrastructure.web.dto.SubmitCodeRequestDTO;
 
-import co.uceva.shared.infrastructure.security.AuthenticatedUser;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 public final class SubmissionFixtures {
@@ -24,7 +18,6 @@ public final class SubmissionFixtures {
     public static final UUID SUBMISSION_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     public static final UUID TEAM_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     public static final UUID PROBLEM_ID = UUID.fromString("33333333-3333-3333-3333-333333333333");
-    public static final UUID USER_ID = UUID.fromString("44444444-4444-4444-4444-444444444444");
     public static final String SOURCE_CODE = "print('hello world')";
 
     public static Submission aSubmission() {
@@ -77,16 +70,9 @@ public final class SubmissionFixtures {
         return new SubmitCodeCommand(
                 TEAM_ID,
                 PROBLEM_ID,
-                USER_ID,
                 ProgrammingLanguage.PYTHON,
                 SOURCE_CODE
         );
-    }
-
-    /** Autenticación cuyo principal es un {@link AuthenticatedUser}, como la que deja el filtro JWT. */
-    public static Authentication authenticatedAs(String role) {
-        return new UsernamePasswordAuthenticationToken(
-                new AuthenticatedUser(USER_ID, role), null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
     }
 
     public static SubmitCodeRequestDTO submitCodeRequest() {
