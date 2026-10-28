@@ -28,12 +28,14 @@ public interface SubmitCodeUseCase {
      *
      * @param teamId     Identificador del equipo que envía la solución.
      * @param problemId  Identificador del problema a resolver.
+     * @param submitterId Usuario autenticado que realiza el envío.
      * @param language   Lenguaje de programación del código fuente.
      * @param sourceCode Código fuente en texto plano.
      */
     record SubmitCodeCommand(
             UUID teamId,
             UUID problemId,
+            UUID submitterId,
             ProgrammingLanguage language,
             String sourceCode
     ) {}

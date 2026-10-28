@@ -5,7 +5,7 @@ import co.uceva.shared.domain.VerdictStatus;
 import co.uceva.shared.domain.event.SubmissionJudgedEvent;
 import co.uceva.shared.domain.event.SubmissionJudgingStartedEvent;
 import co.uceva.shared.domain.event.SubmissionReceivedEvent;
-import co.uceva.submission.application.usecase.MarkSubmissionSystemErrorUseCase;
+import co.uceva.submission.application.usecase.MarkSubmissionEnqueueErrorUseCase;
 import co.uceva.submission.domain.exception.SubmissionNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ExhaustedSubmissionDeadLetterListenerTest {
 
-    @Mock private MarkSubmissionSystemErrorUseCase markSubmissionSystemErrorUseCase;
+    @Mock private MarkSubmissionEnqueueErrorUseCase markSubmissionEnqueueErrorUseCase;
     @InjectMocks private ExhaustedSubmissionDeadLetterListener listener;
 
     @Test
@@ -43,7 +43,7 @@ class ExhaustedSubmissionDeadLetterListenerTest {
 
         listener.onEvaluationExhausted(event);
 
-        verify(markSubmissionSystemErrorUseCase).execute(eq(submissionId), any(String.class));
+        verify(markSubmissionEnqueueErrorUseCase).execute(eq(submissionId), any(String.class));
     }
 
     @Test
@@ -53,7 +53,7 @@ class ExhaustedSubmissionDeadLetterListenerTest {
 
         listener.onJudgingExhausted(event);
 
-        verify(markSubmissionSystemErrorUseCase).execute(eq(submissionId), any(String.class));
+        verify(markSubmissionEnqueueErrorUseCase).execute(eq(submissionId), any(String.class));
     }
 
     @Test
@@ -64,7 +64,7 @@ class ExhaustedSubmissionDeadLetterListenerTest {
 
         listener.onVerdictExhausted(event);
 
-        verify(markSubmissionSystemErrorUseCase).execute(eq(submissionId), any(String.class));
+        verify(markSubmissionEnqueueErrorUseCase).execute(eq(submissionId), any(String.class));
     }
 
     /** Reencolar un mensaje ya fallido en su propia cola de fallidos solo produciría un bucle. */
@@ -72,7 +72,7 @@ class ExhaustedSubmissionDeadLetterListenerTest {
     void shouldSwallowFailuresWhileMarkingSystemError() {
         UUID submissionId = UUID.randomUUID();
         SubmissionJudgingStartedEvent event = new SubmissionJudgingStartedEvent(submissionId, Instant.now());
-        when(markSubmissionSystemErrorUseCase.execute(eq(submissionId), any(String.class)))
+        when(markSubmissionEnqueueErrorUseCase.execute(eq(submissionId), any(String.class)))
                 .thenThrow(new RuntimeException("la base de datos no responde"));
 
         assertThatCode(() -> listener.onJudgingExhausted(event)).doesNotThrowAnyException();
@@ -83,7 +83,7 @@ class ExhaustedSubmissionDeadLetterListenerTest {
         UUID submissionId = UUID.randomUUID();
         SubmissionJudgingStartedEvent event = new SubmissionJudgingStartedEvent(submissionId, Instant.now());
         doThrow(new SubmissionNotFoundException(submissionId))
-                .when(markSubmissionSystemErrorUseCase).execute(eq(submissionId), any(String.class));
+                .when(markSubmissionEnqueueErrorUseCase).execute(eq(submissionId), any(String.class));
 
         assertThatCode(() -> listener.onJudgingExhausted(event)).doesNotThrowAnyException();
     }

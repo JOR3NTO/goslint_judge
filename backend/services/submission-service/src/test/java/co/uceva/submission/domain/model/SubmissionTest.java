@@ -127,11 +127,11 @@ class SubmissionTest {
                 UUID.randomUUID(), UUID.randomUUID(), ProgrammingLanguage.PYTHON, "print(1)"
         );
         submission.markQueued();
-        submission.markSystemError();
+        submission.markEnqueueError();
 
         submission.markJudging();
 
-        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.SYSTEM_ERROR);
+        assertThat(submission.getStatus()).isEqualTo(SubmissionStatus.ENQUEUE_ERROR);
     }
 
     @Test

@@ -3,7 +3,6 @@ package co.uceva.problem.infrastructure.web.controller;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.Test;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -37,7 +36,6 @@ import co.uceva.problem.infrastructure.config.JwtConfig;
 import co.uceva.problem.infrastructure.config.SecurityConfig;
 import co.uceva.problem.infrastructure.web.dto.CreateProblemRequestDTO;
 import co.uceva.problem.infrastructure.web.dto.UpdateProblemRequestDTO;
-import jakarta.servlet.ServletException;
 
 @WebMvcTest(ProblemController.class)
 @Import({SecurityConfig.class, JwtConfig.class})
@@ -143,12 +141,12 @@ class ProblemControllerTest {
     }
 
     @Test
-    void shouldPropagateNotFoundException() {
+    void shouldReturnNotFoundWhenProblemDoesNotExist() throws Exception {
         when(getProblemByIdUseCase.execute(problemId)).thenThrow(new ProblemNotFoundException(problemId));
 
-        assertThatThrownBy(() -> mockMvc.perform(get("/api/v1/problems/{id}", problemId)))
-                .isInstanceOf(ServletException.class)
-                .hasCauseInstanceOf(ProblemNotFoundException.class);
+        mockMvc.perform(get("/api/v1/problems/{id}", problemId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(new ProblemNotFoundException(problemId).getMessage()));
     }
 
     @Test
