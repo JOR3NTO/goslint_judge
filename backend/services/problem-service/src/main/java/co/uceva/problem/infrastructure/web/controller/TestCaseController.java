@@ -77,7 +77,7 @@ public class TestCaseController {
      * @return 201 CREATED con el caso de prueba creado.
      */
     @PostMapping("/{problemId}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<TestCaseResponseDTO> create(
             @PathVariable("problemId") UUID problemId,
             @RequestBody CreateTestCaseRequestDTO request) {
@@ -101,7 +101,7 @@ public class TestCaseController {
      * @return 201 CREATED con la lista de casos de prueba.
      */
     @GetMapping("/{problemId}/all")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<List<TestCaseResponseDTO>> getAll(@PathVariable("problemId") UUID problemId) {
         List<TestCase> testCases = getAllTestCaseByProblemIdUseCase.execute(problemId);
         List<TestCaseResponseDTO> testCasesResponce = testCases.stream()
@@ -122,7 +122,7 @@ public class TestCaseController {
      * @return 201 CREATED con el caso de prueba encontrado.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER','SERVICE')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER','SERVICE')")
     public ResponseEntity<TestCaseResponseDTO> getById(@PathVariable("id") UUID id) {
         TestCase testCase = getTestCaseByIdUseCase.execute(id);
         return ResponseEntity.status(HttpStatus.CREATED).body(TestCaseWebMapper.toResponse(testCase));
@@ -140,7 +140,7 @@ public class TestCaseController {
      * @return 200 OK con el caso de prueba actualizado.
      */
     @PutMapping("/{problemId}/{testCaseId}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<TestCaseResponseDTO> update(
             @PathVariable("problemId") UUID problemId,
             @PathVariable("testCaseId") UUID testCaseId,
@@ -164,7 +164,7 @@ public class TestCaseController {
      * @return 204 NO CONTENT.
      */
     @PutMapping("/{problemId}/reorder")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<Void> reorder(
             @PathVariable("problemId") UUID problemId,
             @RequestBody ReorderTestCasesRequestDTO request) {
@@ -183,7 +183,7 @@ public class TestCaseController {
      * @return 204 NO CONTENT.
      */
     @DeleteMapping("/{problemId}/{testCaseId}")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<Void> delete(
             @PathVariable("problemId") UUID problemId,
             @PathVariable("testCaseId") UUID testCaseId) {
@@ -202,7 +202,7 @@ public class TestCaseController {
      * @return 201 CREATED con la lista de casos de prueba creados.
      */
     @PostMapping("/{problemId}/batch")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<List<TestCaseResponseDTO>> createBatch(
             @PathVariable("problemId") UUID problemId,
             @RequestBody CreateTestCaseBatchRequestDTO request) {
@@ -227,7 +227,7 @@ public class TestCaseController {
      * @return 204 NO CONTENT.
      */
     @PostMapping("/batch-delete")
-    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','ORGANIZER')")
     public ResponseEntity<Void> deleteBatch(@RequestBody DeleteTestCaseBatchRequestDTO request) {
         deleteTestCaseBatchUseCase.execute(request.testCaseIds());
         return ResponseEntity.noContent().build();
