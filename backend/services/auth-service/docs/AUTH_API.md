@@ -11,13 +11,13 @@
 
 | Funcionalidad | Estado |
 |---|---|
-| Registro de usuario (`POST /register`) | ✅ Implementado |
-| Inicio de sesión (`POST /login`) | ✅ Implementado |
-| Generación de Access Token (JWT) | ✅ Implementado |
-| Generación de Refresh Token (JWT) | ✅ Implementado |
-| Bloqueo por intentos fallidos (Redis) | ✅ Implementado |
-| Filtro JWT para endpoints protegidos | 🔴 Pendiente |
-| Refresh Token endpoint | 🔴 Pendiente |
+| Registro (`POST /register`) | ✅ |
+| Inicio de sesión (`POST /login`) | ✅ |
+| Cierre de sesión (`POST /logout`) | ✅ |
+| Renovación de tokens (`POST /refresh`) | ✅ |
+| Perfil (`GET /me`), cambio de usuario (`PATCH /me/username`) y de contraseña (`PATCH /me/password`) | ✅ |
+| Bloqueo por intentos fallidos (Redis) | ✅ |
+| Lista negra de access tokens (Redis) | ✅ |
 
 ---
 
@@ -31,252 +31,187 @@ DB_USERNAME=postgres
 DB_PASSWORD=<tu_password>
 ```
 
-Las siguientes tienen valores por defecto en `application.properties` y son opcionales:
+Opcionales (valores por defecto en `application.properties`):
 
 ```bash
-REDIS_HOST=localhost       # default: localhost
-REDIS_PORT=6379            # default: 6379
-JWT_SECRET=<clave_hex>     # default: clave de desarrollo hardcodeada (NO usar en producción)
-JWT_EXPIRATION_ACCESS=900000    # default: 15 minutos en ms
-JWT_EXPIRATION_REFRESH=28800000 # default: 8 horas en ms
+REDIS_HOST=localhost            # default: localhost
+REDIS_PORT=6379                 # default: 6379
+JWT_SECRET=<clave>              # mínimo 32 caracteres; el default es solo para desarrollo (NO usar en producción)
+JWT_EXPIRATION_ACCESS=900000    # 15 minutos en ms
+JWT_EXPIRATION_REFRESH=28800000 # 8 horas en ms
+JPA_SHOW_SQL=false              # true para ver el SQL en consola
 ```
 
-### 2. Servicios externos necesarios
+### 2. Servicios externos
 
-- **PostgreSQL** corriendo en `localhost:5432` con la base de datos `goslint_judge`.
-- **Redis** corriendo en `localhost:6379`.
+- **PostgreSQL** en `localhost:5432` con la base `goslint_judge`.
+- **Redis** en `localhost:6379`.
 
-```bash
-# Instalar e iniciar Redis (macOS)
-brew install redis
-brew services start redis
+### 3. Arrancar
 
-# Verificar que Redis está activo
-redis-cli ping  # Debe responder: PONG
-```
-
-### 3. Arrancar el servicio
-
-Desde la raíz del proyecto (`backend/`):
+Desde `backend/`:
 
 ```bash
-DB_PASSWORD=<tu_password> \
-DB_USERNAME=postgres \
-DB_URL=jdbc:postgresql://localhost:5432/goslint_judge \
-JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home \
-sh ./gradlew :services:auth-service:bootRun
+./gradlew :services:auth-service:bootRun
 ```
 
 ---
 
 ## Endpoints
 
-### `POST /api/v1/auth/register`
+Todos los errores tienen la forma `{ "error": "mensaje" }`, salvo `400` por validación, que devuelve `{ "campo": "mensaje" }`.
 
-Registra un nuevo usuario en el sistema con rol `STUDENT` por defecto.
-
-#### Request Body
-
-```json
-{
-  "username": "jortorres",
-  "email": "jorge@uceva.edu.co",
-  "password": "password123",
-  "institution": "UCEVA"
-}
-```
-
-#### Validaciones
+### Política de campos
 
 | Campo | Regla |
 |---|---|
-| `username` | Obligatorio · Entre 3 y 50 caracteres |
-| `email` | Obligatorio · Formato válido (x@y.com) |
-| `password` | Obligatorio · Mínimo 6 caracteres |
-| `institution` | Opcional |
+| `username` | 3–30 caracteres: letras, dígitos, `_` y `.` · único sin distinguir mayúsculas |
+| `email` | Formato válido · se guarda en minúsculas · único |
+| `password` | Mínimo 8 caracteres, con al menos una mayúscula, un número y un carácter especial (en registro **y** en cambio de contraseña) |
+| `firstName`, `lastName` | 2–50 caracteres |
+| `institution` | Opcional · máximo 255 caracteres |
 
-#### Respuesta exitosa — `201 Created`
+### `POST /register`
 
 ```json
-{
-  "message": "Usuario registrado exitosamente",
-  "userId": "a3f1bc2d-4e5f-6789-abcd-ef0123456789"
-}
+{ "firstName": "Jorge", "lastName": "Torres", "username": "jortorres",
+  "email": "jorge@uceva.edu.co", "password": "Secreta1!", "institution": "UCEVA" }
 ```
 
-#### Respuestas de error
+| Status | Cuándo |
+|---|---|
+| `201` | `{ "message": "...", "userId": "<uuid>" }` |
+| `400` | Validación fallida |
+| `409` | Correo o username ya registrados |
 
-| HTTP Status | Cuándo ocurre | Ejemplo de body |
-|---|---|---|
-| `400 Bad Request` | Validación fallida en algún campo | `{ "email": "Debe proporcionar un correo electrónico válido" }` |
-| `409 Conflict` | El email o username ya existe | `{ "error": "El correo electrónico ya está registrado." }` |
+### `POST /login`
+
+```json
+{ "email": "jorge@uceva.edu.co", "password": "Secreta1!" }
+```
+
+`200`:
+
+```json
+{ "accessToken": "eyJ...", "refreshToken": "eyJ...", "type": "Bearer", "expiresIn": 900000 }
+```
+
+`expiresIn` es la vigencia del access token en milisegundos.
+
+| Status | Cuándo |
+|---|---|
+| `400` | Validación fallida |
+| `401` | Credenciales incorrectas. El mensaje es el mismo si el correo no existe, la contraseña falla o la cuenta está inactiva (evita enumerar usuarios) |
+| `423` | Cuenta bloqueada por 5 intentos fallidos |
+
+### `POST /logout`
+
+Header `Authorization: Bearer <accessToken>`. Siempre responde `200`, aunque el token falte o sea inválido. Si es válido, lo revoca hasta que expire y borra el refresh token del usuario.
+
+### `POST /refresh`
+
+```json
+{ "refreshToken": "eyJ..." }
+```
+
+`200` con un par nuevo (misma forma que `/login`). El refresh token usado deja de servir (rotación).
+
+| Status | Cuándo |
+|---|---|
+| `400` | Falta `refreshToken` |
+| `401` | No es un refresh token, expiró, no es el vigente (ya rotado o sesión cerrada) o el usuario no existe |
+| `403` | Cuenta desactivada |
+
+### `GET /me`
+
+Header `Authorization: Bearer <accessToken>`. `200`:
+
+```json
+{ "id": "<uuid>", "firstName": "Jorge", "lastName": "Torres", "username": "jortorres",
+  "email": "jorge@uceva.edu.co", "role": "STUDENT", "institution": "UCEVA",
+  "isActive": true, "createdAt": "2026-03-01T10:30:00" }
+```
+
+`401` si el token falta, es inválido, expiró, es un refresh token o fue revocado · `403` si la cuenta está desactivada.
+
+### `PATCH /me/username`
+
+```json
+{ "username": "nuevo_user" }
+```
+
+`200` con el perfil actualizado · `400` formato inválido · `401` token inválido · `409` username en uso. El dueño puede cambiar solo la capitalización del suyo.
+
+### `PATCH /me/password`
+
+```json
+{ "currentPassword": "Secreta1!", "newPassword": "Otra2@clave" }
+```
+
+`204` sin cuerpo · `400` la nueva no cumple la política o es igual a la actual · `401` token inválido · `422` la contraseña actual es incorrecta.
+
+**Cierra todas las sesiones:** revoca el access token usado y borra el refresh token, así que el cliente debe volver a iniciar sesión.
+
+El correo no se puede modificar desde el perfil.
 
 ---
 
-### `POST /api/v1/auth/login`
+## Tokens JWT
 
-Autentica un usuario y devuelve un par de tokens JWT (access + refresh).
-
-#### Request Body
+Access y refresh token comparten claims y se distinguen por `type`:
 
 ```json
 {
-  "email": "jorge@uceva.edu.co",
-  "password": "password123"
-}
-```
-
-#### Validaciones
-
-| Campo | Regla |
-|---|---|
-| `email` | Obligatorio · Formato válido |
-| `password` | Obligatorio |
-
-#### Respuesta exitosa — `200 OK`
-
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiJ9...",
-  "type": "Bearer",
-  "expiresIn": 900000
-}
-```
-
-| Campo | Descripción |
-|---|---|
-| `accessToken` | Token JWT de corta duración (15 min). Usar en cabecera `Authorization: Bearer <token>` |
-| `refreshToken` | Token JWT de larga duración (8 horas). Guardado en Redis. Usar para renovar el access token |
-| `type` | Tipo del token. Siempre `"Bearer"` |
-| `expiresIn` | Tiempo de expiración del access token en **milisegundos** (900000 = 15 min) |
-
-#### Respuestas de error
-
-| HTTP Status | Cuándo ocurre | Body |
-|---|---|---|
-| `400 Bad Request` | Validación fallida | `{ "email": "..." }` |
-| `401 Unauthorized` | Email o contraseña incorrectos (mensaje genérico, no revela si el usuario existe) | `{ "error": "Credenciales incorrectas" }` |
-| `423 Locked` | La cuenta fue bloqueada por 5+ intentos fallidos | `{ "error": "Su cuenta ha sido bloqueada por 15 minutos..." }` |
-
-> **Nota de seguridad:** El error `401` es genérico a propósito. No se revela si el usuario existe o no, para prevenir ataques de enumeración de usuarios.
-
----
-
-## Estructura del JWT (Access Token)
-
-El token se genera con los siguientes claims:
-
-```json
-{
-  "sub": "a3f1bc2d-4e5f-6789-abcd-ef0123456789",   // UUID del usuario
+  "jti": "uuid-único",
+  "sub": "a3f1bc2d-4e5f-6789-abcd-ef0123456789",
   "iss": "goslint-auth-service",
   "email": "jorge@uceva.edu.co",
   "role": "STUDENT",
-  "iat": 1726324800,   // Emitido en (timestamp)
-  "exp": 1726325700    // Expira en (timestamp, 15 min después)
+  "type": "access",
+  "iat": 1726324800,
+  "exp": 1726325700
 }
 ```
 
----
-
-## Mecanismo de seguridad — Bloqueo por intentos fallidos
-
-Implementado con Redis. Funciona así:
-
-1. Cada intento de login fallido incrementa un contador en Redis con clave `auth:failed_attempts:<email>`.
-2. El contador tiene TTL de 1 hora (se limpia solo después de una hora sin intentos).
-3. Si el contador llega a **5 intentos fallidos**, la cuenta se bloquea en Redis con clave `auth:lock:<email>` por **15 minutos**.
-4. Cualquier intento de login durante el bloqueo devuelve directamente `423 Locked` con el tiempo de espera restante.
-5. Un login exitoso **limpia** el contador de intentos fallidos.
+| Tipo | Vigencia | Uso |
+|---|---|---|
+| `access` | 15 min | Header `Authorization: Bearer` en todos los servicios |
+| `refresh` | 8 h | Solo en `POST /refresh`. `JwtTokenValidator` (módulo compartido) lo rechaza como credencial de acceso |
 
 ---
 
-## Cómo probar con Postman o Thunder Client
+## Redis
 
-### Paso 1: Registrar un usuario
+| Clave | TTL | Contenido |
+|---|---|---|
+| `auth:failed_attempts:<email>` | 1 h desde el primer fallo | Contador de intentos fallidos |
+| `auth:lock:<email>` | 15 min | Bloqueo de la cuenta |
+| `auth:refresh_token:<userId>` | 8 h | Único refresh token vigente del usuario |
+| `auth:blacklist:<sha256(token)>` | Vigencia restante del token | Access tokens revocados |
 
-```
-POST http://localhost:8081/api/v1/auth/register
-Content-Type: application/json
+### Bloqueo por intentos fallidos
 
-{
-  "username": "jortorres",
-  "email": "jorge@uceva.edu.co",
-  "password": "password123",
-  "institution": "UCEVA"
-}
-```
-
-### Paso 2: Hacer login
-
-```
-POST http://localhost:8081/api/v1/auth/login
-Content-Type: application/json
-
-{
-  "email": "jorge@uceva.edu.co",
-  "password": "password123"
-}
-```
-
-Copia el valor de `accessToken` de la respuesta.
-
-### Paso 3: Usar el token en endpoints protegidos (cuando estén disponibles)
-
-```
-GET http://localhost:8082/api/v1/problems
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
-```
+1. Cada login fallido suma al contador del correo (en minúsculas).
+2. Al quinto fallo el correo se bloquea 15 minutos y el contador se reinicia.
+3. Mientras dura el bloqueo, el login responde `423` con los minutos restantes (redondeados hacia arriba).
+4. Un login exitoso borra el contador.
 
 ---
 
-## Arquitectura interna (Clean Architecture)
+## Estructura del código
+
+Capas planas de Spring Boot, sin interfaces de casos de uso ni adaptadores:
 
 ```
-auth-service/
-├── domain/
-│   ├── model/
-│   │   ├── User.java              ← Entidad de dominio pura
-│   │   ├── AuthToken.java         ← Value object para los tokens
-│   │   └── Role.java              ← Enum: STUDENT, ADMIN, ORGANIZER, SERVICE
-│   ├── exception/
-│   │   ├── UserAlreadyExistsException.java
-│   │   ├── BadCredentialsException.java
-│   │   ├── AccountLockedException.java
-│   │   └── InvalidUserDataException.java
-│   ├── repository/
-│   │   ├── UserRepository.java        ← Interfaz (contrato para persistencia)
-│   │   └── AuthCacheRepository.java   ← Interfaz (contrato para Redis)
-│   └── service/
-│       ├── TokenProvider.java     ← Interfaz (contrato para generación de JWT)
-│       └── PasswordEncoder.java   ← Interfaz (contrato para BCrypt)
-│
-├── application/
-│   └── usecase/
-│       ├── RegisterUserUseCase.java   ← Interfaz del caso de uso
-│       ├── LoginUserUseCase.java      ← Interfaz del caso de uso
-│       └── impl/
-│           ├── RegisterUserUseCaseImpl.java  ← Lógica de registro
-│           └── LoginUserUseCaseImpl.java     ← Lógica de login + control de intentos
-│
-└── infrastructure/
-    ├── web/
-    │   ├── controller/
-    │   │   ├── AuthController.java        ← Endpoints REST
-    │   │   └── AuthExceptionHandler.java  ← Manejo global de errores
-    │   └── dto/
-    │       ├── RegisterRequest.java
-    │       ├── LoginRequest.java
-    │       └── LoginResponse.java
-    ├── persistence/
-    │   ├── entity/    UserJpaEntity.java
-    │   ├── repository/ SpringDataUserRepository.java
-    │   └── adapter/   UserRepositoryAdapter.java
-    ├── cache/
-    │   └── RedisCacheAdapter.java     ← Implementa AuthCacheRepository con Redis
-    ├── security/
-    │   └── JwtTokenProviderAdapter.java  ← Implementa TokenProvider con JJWT
-    └── config/
-        └── SecurityConfig.java        ← Spring Security + Bean PasswordEncoder
+co.uceva.auth/
+├── controller/   AuthController, AuthExceptionHandler
+├── service/      AuthService (register, login, logout, refresh)
+│                 ProfileService (me, username, password)
+├── repository/   UserRepository (Spring Data JPA)
+├── model/        User (@Entity), Role
+├── dto/          Requests/responses (records) y ValidationRules
+├── exception/    Excepciones de negocio, mapeadas a HTTP por AuthExceptionHandler
+├── security/     JwtService (emite y lee JWT)
+├── cache/        AuthCache (Redis; implementa TokenBlacklist del módulo compartido)
+└── config/       SecurityConfig (CORS, cadena de filtros, BCrypt)
 ```
