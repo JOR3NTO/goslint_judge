@@ -11,6 +11,17 @@ backend/build/
 backend/.gradle/
 backend/**/build/
 backend/**/.gradle/
+backend/lombok.jar
+backend/debug.log
+backend/TestLombok.*
+backend/delomboked_auth/
+
+
+package.json
+
+pnpm*
+
+*/graphify-out/*
 
 # Carpetas bin generadas por el IDE (VSCode Java, Eclipse)
 backend/**/bin/
@@ -31,6 +42,7 @@ backend/**/target/
 # ===========================================================================
 
 # Dependencias instaladas
+node_modules/
 frontend/node_modules/
 frontend/apps/**/node_modules/
 frontend/.pnpm-store/
@@ -101,10 +113,10 @@ $RECYCLE.BIN/
 *.iml
 *.iws
 *.ipr
-out/
+/out/
 
-# VSCode — guardar solo settings compartidos, no personales
-# .vscode/ se incluye en el repo (contiene settings.json del proyecto)
+# VSCode — configuraciones locales
+.vscode/
 
 # Eclipse
 .classpath

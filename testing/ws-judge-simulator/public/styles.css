@@ -1,0 +1,370 @@
+:root {
+  --bg: #0f172a;
+  --panel: #1e293b;
+  --panel-border: #334155;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --err: #ef4444;
+  --gray: #64748b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+header {
+  padding: 24px 32px 8px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.subtitle {
+  color: var(--text-dim);
+  margin: 0;
+  max-width: 800px;
+}
+
+main {
+  padding: 16px 32px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1100px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+
+.panel h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.hint {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 4px 0 12px;
+}
+
+.hint.warn {
+  color: var(--warn);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
+  margin-bottom: 12px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+label.full {
+  grid-column: 1 / -1;
+}
+
+label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+label.checkbox input {
+  width: auto;
+}
+
+input,
+select,
+textarea {
+  background: #0b1220;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+textarea {
+  resize: vertical;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 6px;
+}
+
+.input-with-button input {
+  flex: 1;
+  min-width: 0;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--panel-border);
+  background: #0b1220;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent-hover);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.status {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-offline {
+  background: rgba(100, 116, 139, 0.2);
+  color: var(--gray);
+}
+
+.status-connecting {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warn);
+}
+
+.status-online {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--ok);
+}
+
+.status-error {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--err);
+}
+
+.empty {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.pending-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pending-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  background: #0b1220;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.pending-item .meta {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.pending-item .meta strong {
+  color: var(--text);
+  font-family: monospace;
+}
+
+.pending-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pending-controls select,
+.pending-controls input {
+  padding: 6px 8px;
+  font-size: 12px;
+  width: auto;
+}
+
+.pending-controls input[type="number"] {
+  width: 90px;
+}
+
+.pending-item.judging {
+  border-color: var(--warn);
+}
+
+.judging-badge {
+  font-size: 11px;
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  border-radius: 10px;
+  padding: 14px;
+  border: 1px solid var(--panel-border);
+  background: #0b1220;
+  transition: border-color 0.3s, background 0.3s;
+}
+
+.card .card-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  word-break: break-all;
+}
+
+.card .badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+
+.card .details {
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card .details b {
+  color: var(--text);
+}
+
+/* Estados */
+.badge-created,
+.card.state-created {
+  border-color: var(--gray);
+}
+.badge-created {
+  background: rgba(100, 116, 139, 0.25);
+  color: #cbd5e1;
+}
+
+.badge-queued,
+.card.state-queued {
+  border-color: #38bdf8;
+}
+.badge-queued {
+  background: rgba(56, 189, 248, 0.2);
+  color: #7dd3fc;
+}
+
+.badge-judging,
+.card.state-judging {
+  border-color: var(--warn);
+}
+.badge-judging {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--warn);
+  animation: pulse 1.4s infinite;
+}
+
+.badge-accepted,
+.card.state-accepted {
+  border-color: var(--ok);
+}
+.badge-accepted {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--ok);
+}
+
+.badge-rejected,
+.card.state-rejected {
+  border-color: var(--err);
+}
+.badge-rejected {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+.badge-system-error,
+.card.state-system-error {
+  border-color: #a855f7;
+}
+.badge-system-error {
+  background: rgba(168, 85, 247, 0.2);
+  color: #d8b4fe;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+#log {
+  max-height: 220px;
+  overflow-y: auto;
+  background: #0b1220;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  white-space: pre-wrap;
+  margin: 0;
+}

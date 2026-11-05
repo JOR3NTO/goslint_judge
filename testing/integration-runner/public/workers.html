@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prueba de workers · goslint-judge</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="workers.css" />
+</head>
+<body>
+
+<header>
+  <h1>Prueba de workers</h1>
+  <p class="subtitle">Lanza muchos envíos a la vez y muestra cuántos evalúa el juez en paralelo y cuánto espera cada uno en la cola. <a href="index.html">Volver al probador de integración</a></p>
+</header>
+
+<div class="service-bar">
+  <div class="service-item"><span class="dot dot-unknown" id="dot-auth"></span><span>auth-service <code>:8081</code></span></div>
+  <div class="service-item"><span class="dot dot-unknown" id="dot-problem"></span><span>problem-service <code>:8082</code></span></div>
+  <div class="service-item"><span class="dot dot-unknown" id="dot-submission"></span><span>submission-service <code>:8083</code></span></div>
+  <div class="service-item"><span class="dot dot-unknown" id="dot-judge"></span><span>judge-service <code>:8084</code></span></div>
+  <button type="button" id="btn-health" class="btn-small">Verificar servicios</button>
+</div>
+
+<main>
+
+  <!-- ── Panel 1: Preparación ───────────────────────────────── -->
+  <section class="panel">
+    <h2>1. Prueba</h2>
+    <p class="hint">Al lanzar, la página firma sus propios tokens con el <code>JWT_SECRET</code> del <code>.env</code>, crea un problema («Doble de un número», tres casos de prueba) si no se indica uno, y envía todas las soluciones al mismo tiempo. No hace falta iniciar sesión.</p>
+    <div class="grid">
+      <label>
+        Envíos simultáneos
+        <input id="count" type="number" min="1" max="60" value="12" />
+      </label>
+      <label>
+        <span>Workers del juez (<code>JUDGE_WORKERS</code>)</span>
+        <input id="expected-workers" type="number" min="1" max="64" value="2" />
+      </label>
+      <label>
+        Carga
+        <select id="workload">
+          <option value="burn" selected>CPU: unos 2 s por envío</option>
+          <option value="fast">Rápida: milisegundos por envío</option>
+          <option value="mix">Mezcla de veredictos (solo Python)</option>
+        </select>
+      </label>
+      <label>
+        Lenguaje
+        <select id="language">
+          <option value="PYTHON" selected>Python</option>
+          <option value="C">C</option>
+          <option value="CPP">C++</option>
+          <option value="JAVA">Java</option>
+          <option value="ALL">Los cuatro, alternados</option>
+        </select>
+      </label>
+      <label class="full">
+        problemId (vacío: se crea uno nuevo y se reutiliza en las siguientes pruebas)
+        <input id="problem-id" type="text" placeholder="UUID del problema" />
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" id="btn-run" class="primary">Lanzar prueba</button>
+      <span id="run-status" class="status status-offline">Sin lanzar</span>
+      <span id="ws-status" class="status status-offline">WebSocket desconectado</span>
+    </div>
+  </section>
+
+  <!-- ── Panel 2: Resumen ───────────────────────────────────── -->
+  <section class="panel">
+    <h2>2. Resumen</h2>
+    <div class="tiles">
+      <div class="tile tile-hero">
+        <div class="tile-label">Pico de evaluaciones simultáneas</div>
+        <div class="tile-value" id="t-peak">0</div>
+        <div class="tile-note" id="t-peak-note">de 2 workers esperados</div>
+      </div>
+      <div class="tile"><div class="tile-label">En cola</div><div class="tile-value" id="t-waiting">0</div></div>
+      <div class="tile"><div class="tile-label">Evaluándose</div><div class="tile-value" id="t-judging">0</div></div>
+      <div class="tile"><div class="tile-label">Terminados</div><div class="tile-value" id="t-done">0</div><div class="tile-note" id="t-done-note">de 0 envíos</div></div>
+      <div class="tile"><div class="tile-label">Veredicto esperado</div><div class="tile-value" id="t-correct">0</div><div class="tile-note" id="t-correct-note">de 0 terminados</div></div>
+      <div class="tile"><div class="tile-label">Tiempo total</div><div class="tile-value" id="t-total">0,0 s</div></div>
+    </div>
+    <p id="check" class="check check-idle">Lanza una prueba para comprobar el paralelismo.</p>
+  </section>
+
+  <!-- ── Panel 3: Línea de tiempo ───────────────────────────── -->
+  <section class="panel">
+    <h2>3. Línea de tiempo de los envíos</h2>
+    <div class="legend" aria-hidden="true">
+      <span class="legend-item"><span class="legend-swatch seg-wait"></span>En cola</span>
+      <span class="legend-item"><span class="legend-swatch seg-judge"></span>Evaluándose</span>
+    </div>
+    <div id="timeline" class="timeline">
+      <p class="empty">Aún no hay envíos.</p>
+    </div>
+  </section>
+
+  <!-- ── Panel 4: Registro ──────────────────────────────────── -->
+  <section class="panel">
+    <h2>4. Registro de eventos</h2>
+    <pre id="log"></pre>
+  </section>
+
+</main>
+
+<div id="tooltip" class="tooltip" hidden></div>
+
+<script src="workers.js"></script>
+</body>
+</html>

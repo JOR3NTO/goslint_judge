@@ -1,4 +1,4 @@
-# uceva-judge
+# Goslint Judge
 
 > **Sistema de Evaluación Automática de Código Fuente para Maratones de Programación — UCEVA**  
 > Trabajo de Grado · Programa de Ingeniería de Sistemas  
@@ -8,7 +8,7 @@
 
 ## ¿Qué es este proyecto?
 
-El **uceva-judge** es una plataforma de juez en línea (*Online Judge*) institucional que permite a la UCEVA:
+El **Goslint Judge** es una plataforma de juez en línea (*Online Judge*) institucional que permite a la UCEVA:
 
 - Gestionar un repositorio propio de problemas algorítmicos.
 - Diseñar y ejecutar maratones de programación internas.
@@ -21,10 +21,9 @@ El **uceva-judge** es una plataforma de juez en línea (*Online Judge*) instituc
 ## Estructura del Monorepo
 
 ```
-uceva-judge/
+goslint_judge/
 ├── .gitignore
 ├── README.md                 ← Este archivo
-├── Trabajo_de_grado.md       ← Documento de la investigación completa
 │
 ├── backend/                  ← Microservicios Java / Spring Boot
 │   ├── ARCHITECTURE.md       ← 📖 Guía técnica del backend
@@ -37,6 +36,7 @@ uceva-judge/
 │       ├── auth-service/          (puerto 8081)
 │       ├── problem-service/       (puerto 8082)
 │       ├── submission-service/    (puerto 8083)
+│       │   └── docs/              ← 📖 RABBITMQ.md · WEBSOCKET.md
 │       ├── judge-service/         (puerto 8084)
 │       ├── feedback-service/      (puerto 8085)
 │       └── contest-service/       (puerto 8086)
@@ -50,12 +50,12 @@ uceva-judge/
 │       └── admin-app/    (puerto 3001) ← Panel administrativo
 │
 ├── infrastructure/           ← Docker Compose, Traefik
-│   ├── docker/               ← docker-compose.yml (BD, colas, reverse proxy)
+│   ├── docker/               ← docker-compose.yml (PostgreSQL, Redis, RabbitMQ y los servicios) + README paso a paso
 │   └── traefik/              ← Configuración del API Gateway
 │
-└── docs/
-    ├── api/                  ← Contratos OpenAPI / Swagger por servicio
-    └── architecture/         ← Diagramas y ADRs
+└── testing/                  ← Utilidades de prueba manual
+    ├── ws-judge-simulator/   ← Simula judge-service para ver el WebSocket en vivo
+    └── integration-runner/   ← Panel web: flujo completo auth → problema → envío → juez
 ```
 
 ---
@@ -66,6 +66,9 @@ uceva-judge/
 |----------------|------------------------------------------------------------------|
 | Backend        | [`backend/ARCHITECTURE.md`](./backend/ARCHITECTURE.md)          |
 | Frontend       | [`frontend/README.md`](./frontend/README.md)                     |
+| Mensajería (RabbitMQ) | [`backend/services/submission-service/docs/RABBITMQ.md`](./backend/services/submission-service/docs/RABBITMQ.md) |
+| Notificación en tiempo real (WebSocket) | [`backend/services/submission-service/docs/WEBSOCKET.md`](./backend/services/submission-service/docs/WEBSOCKET.md) |
+| Probador manual del WebSocket | [`testing/ws-judge-simulator/README.md`](./testing/ws-judge-simulator/README.md) |
 
 ---
 
@@ -77,7 +80,7 @@ uceva-judge/
 | Java 17        | Lenguaje de desarrollo                               |
 | Spring Boot 3.2| Framework de microservicios                          |
 | Gradle 8.x     | Build system multi-proyecto                          |
-| PostgreSQL      | Persistencia relacional (una BD por servicio)        |
+| PostgreSQL     | Persistencia relacional (una BD por servicio)        |
 | RabbitMQ       | Cola de mensajes (pipeline de evaluación asíncrono)  |
 | Redis          | Caché (scoreboard, rate-limiting)                    |
 | Docker SDK     | Sandboxing de código fuente del estudiante           |
@@ -114,10 +117,12 @@ uceva-judge/
 ### Backend
 
 ```bash
-cd backend
+# 1. Levantar la infraestructura (PostgreSQL + Redis + RabbitMQ).
+#    Requiere infrastructure/docker/.env (copiar de .env.example). Para levantar también
+#    los servicios en contenedores: `docker compose up -d --build` — ver infrastructure/docker/README.md
+docker compose -f infrastructure/docker/docker-compose.yml up -d postgres redis rabbitmq
 
-# 1. Inicializar el Gradle Wrapper (solo la primera vez, requiere Gradle global)
-gradle wrapper --gradle-version 8.9
+cd backend
 
 # 2. Compilar todos los módulos
 ./gradlew build
@@ -125,10 +130,20 @@ gradle wrapper --gradle-version 8.9
 # 3. Correr un microservicio específico
 ./gradlew :services:auth-service:bootRun
 ./gradlew :services:problem-service:bootRun
+./gradlew :services:submission-service:bootRun
 ```
 
-> ⚠️ Cada microservicio necesita su base de datos PostgreSQL corriendo.  
-> Próximamente el `docker-compose.yml` levantará toda la infraestructura con un solo comando.
+> `submission-service` **no arranca sin `JWT_SECRET`** (mínimo 32 bytes): la clave
+> no tiene valor por defecto a propósito, para que un secreto de ejemplo no acabe
+> heredado en un entorno real. Las variables van en `backend/.env`:
+>
+> ```bash
+> set -a && source backend/.env && set +a
+> ./gradlew :services:submission-service:bootRun
+> ```
+>
+> Sin RabbitMQ el servicio arranca igualmente: los envíos quedan en `PENDING` y se
+> reintentan solos cuando el broker vuelva.
 
 ---
 
@@ -153,16 +168,22 @@ pnpm dev:admin
 
 | Componente          | Estado                | Notas                                              |
 |---------------------|-----------------------|----------------------------------------------------|
-| `auth-service`      | 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `problem-service`   | 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `submission-service`| 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `judge-service`     | 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `feedback-service`  | 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `contest-service`   | 🟡 Esqueleto          | Estructura Clean Architecture lista                |
-| `student-app`       | 🟢 UI base lista      | Landing, Login, Register, Contests migrados        |
+| `auth-service`      | 🟢 Funcional          | Registro y login implementados. Emite JWT (access 15 min + refresh 8 h). Bloqueo de cuenta por intentos fallidos en Redis. Sin Flyway aún |
+| `problem-service`   | 🟢 Funcional          | CRUD de problemas y casos de prueba, con roles declarados. Falta su migración de Flyway |
+| `submission-service`| 🟢 Funcional          | Envío → RabbitMQ → veredicto → WebSocket, con reintentos y colas de fallidos |
+| `judge-service`     | 🟡 Parcial            | Evalúa Python en sandbox (`bwrap` + cgroups v2). Validado en Manjaro x86_64 y OCI A1-flex ARM. C, C++ y Java pendientes |
+| `feedback-service`  | 🔴 Esqueleto          | Sin implementar                                    |
+| `contest-service`   | 🔴 Esqueleto          | Sin implementar; los equipos se tratan como individuales mientras tanto |
+| `student-app`       | 🟢 UI base lista      | Landing, Login, Register, Contests migrados. Perfil (`/profile`) con avatar DiceBear listo; datos completos pendientes de `GET /api/v1/auth/me` en `auth-service` |
 | `admin-app`         | 🔴 Pendiente          | Placeholder - en construcción                      |
-| `docker-compose`    | 🔴 Pendiente          | Infraestructura aún por configurar                 |
-| `Gradle Wrapper`    | 🔴 Pendiente          | Requiere Gradle global para inicializar            |
+| `docker-compose`    | 🟢 Listo              | Levanta PostgreSQL, Redis, RabbitMQ y auth, problem y submission; perfil `sandbox` (solo Linux) agrega `judge-service` |
+| `traefik`           | 🔴 Pendiente          | `traefik.yml` aún vacío                            |
+| `Gradle Wrapper`    | 🟢 Listo              | `./gradlew` disponible en `backend/`               |
+
+### Lo que falta para cerrar el flujo de extremo a extremo
+
+1. **Lenguajes en `judge-service`** — Python funciona; C, C++ y Java requieren el compilador (`Compiler`), que va en otra HU.
+2. **Detección de MLE** — en kernels modernos el OOM killer sale con EXIT=0; `TestCaseRunner` debe usar `oom_kill` de `memory.events` en lugar de comparar `memory.peak > memory.max`.
 
 ---
 
@@ -237,14 +258,14 @@ Los scopes identifican **qué parte del sistema** fue modificada:
 
 ```bash
 # Nueva funcionalidad
-feat(auth): implementar endpoint de registro de usuario con JWT
+feat(users): implementar endpoint de registro de usuario con JWT
 feat(judge): agregar soporte de sandboxing para código Python
 feat(contest): crear caso de uso para inscripción de equipos
 feat(student-app): agregar página de historial de envíos
 
 # Corrección de bugs
 fix(judge): corregir límite de memoria en contenedor Docker
-fix(auth): resolver error 401 al renovar token expirado
+fix(users): resolver error 401 al renovar token expirado
 fix(submission): manejar excepción cuando RabbitMQ no está disponible
 
 # Refactorización
@@ -273,7 +294,7 @@ ci: configurar GitHub Actions para build automático en develop
 Si el commit introduce un cambio que rompe la API existente, agregar `!` al tipo y documentarlo en el footer:
 
 ```bash
-feat(auth)!: cambiar esquema de respuesta del endpoint /login
+feat(users)!: cambiar esquema de respuesta del endpoint /login
 
 BREAKING CHANGE: el campo "token" fue renombrado a "accessToken".
 Todos los clientes deben actualizar su consumo del endpoint /api/auth/login.

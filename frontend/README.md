@@ -1,140 +1,144 @@
-# uceva-judge — Frontend
+# Goslint Judge — Frontend
 
 > **Monorepo Frontend** | Next.js 16 · TailwindCSS v4 · shadcn/ui · TypeScript · pnpm Workspaces
+
+Plataforma de programación competitiva e interfaz administrativa con arquitectura modular orientada a features.
 
 ---
 
 ## Estructura del Monorepo
 
-```
+```text
 frontend/
 ├── package.json              ← Raíz del workspace (scripts globales)
 ├── pnpm-workspace.yaml       ← Declaración de paquetes del monorepo
+├── ARCHITECTURE.md           ← Documentación detallada de la arquitectura
 ├── .gitignore                ← Ignores globales (node_modules, .next, etc.)
 │
 └── apps/
-    ├── student-app/          ← App pública (estudiantes, maratones, submissions)
-    │   ├── app/              ← Next.js App Router (rutas y layouts)
-    │   ├── components/       ← Componentes reutilizables + shadcn/ui
-    │   ├── hooks/            ← React hooks personalizados
-    │   ├── lib/              ← Utilidades (cn, fetchers, etc.)
-    │   ├── public/           ← Assets estáticos
-    │   └── package.json      ← @uceva-judge/student-app
-    │
+    ├── student-app/          ← App pública (estudiantes, maratones, envíos)
     └── admin-app/            ← App administrativa (ADMIN/ORGANIZER)
-        ├── app/              ← Next.js App Router (rutas y layouts)
-        ├── components/       ← Componentes del panel admin
-        ├── hooks/            ← React hooks personalizados
-        ├── lib/              ← Utilidades
-        └── package.json      ← @uceva-judge/admin-app
 ```
+
+Ambas aplicaciones (`student-app` y `admin-app`) comparten la misma **arquitectura orientada a features (Feature-Based Architecture)** dentro de sus respectivos directorios `src/`:
+
+```text
+src/
+├─ app/           # Thin wrappers del Next.js App Router (Rutas y Layouts)
+├─ features/      # Módulos por dominio funcional (home, auth, contests, etc.)
+│  └─ <feature>/
+│     ├─ components/
+│     ├─ hooks/
+│     ├─ services/
+│     ├─ types/
+│     └─ index.ts # API pública de la feature
+├─ shared/        # Código transversal agnóstico al negocio
+│  ├─ ui/         # Componentes UI reusables (e.g., shadcn/ui)
+│  ├─ hooks/      # Hooks genéricos
+│  ├─ utils/      # Utilidades (cn, formatters)
+│  └─ types/      
+└─ core/          # Infraestructura (Api Adapters, Event Bus, Config)
+```
+*Para más detalles sobre esta arquitectura, el Code Splitting y los Eventos, consulta el [`ARCHITECTURE.md`](./ARCHITECTURE.md).*
 
 ---
 
-## Apps
+## Aplicaciones
 
 ### `student-app` — Puerto 3000
 La aplicación principal que usan los estudiantes:
 - **Landing page** con presentación de la plataforma
 - **Login / Registro** de cuentas
+- **Perfil** (`/profile`, ruta protegida) — datos de la cuenta y avatar generado con [DiceBear](https://www.dicebear.com) (estilo `gaze`, CC0) a partir del `username`. Ver [estado del perfil](#estado-del-perfil-student-app)
 - **Maratones** (`/contests`) — listado, inscripción y participación
-- **Envío de código** — editor + selección de lenguaje (C, C++, Java, Python)
-- **Historial de envíos** — veredictos y métricas de ejecución
+- **Envío de código** — editor + selección de lenguaje
+- **Historial de envíos** — veredictos y métricas
 - **Retroalimentación IA** (`/ai-feedback`) — sugerencias del LLM
-- **Scoreboard** — ranking en tiempo real
+- **Scoreboard** — ranking en tiempo real vía WebSockets
 
-**Stack:** Next.js 16 · React 19 · TailwindCSS v4 · shadcn/ui (estilo `new-york`) · Geist font · Lucide icons
+#### Estado del perfil (`student-app`)
+
+| Pieza | Estado | Notas |
+|---|---|---|
+| Página `/profile` | 🟢 Lista | Cabecera (avatar, nombre, `@username`, rol), detalle de cuenta, skeleton y error con reintento |
+| Avatar DiceBear | 🟢 Lista | Semilla = `username` (o `id` si el perfil es parcial). Determinístico, no se guarda en BD. Se renderiza como `<img>` con data URI, sin `dangerouslySetInnerHTML` |
+| Navbar con sesión | 🟢 Lista | Con token muestra "Mi perfil"; sin token, Login/Registro |
+| Datos completos de la cuenta | 🟡 Depende del backend | Requiere `GET /api/v1/auth/me` en `auth-service` (**no existe aún**). Contrato en `features/profile/types/profile.types.ts` |
+| Fallback sin `/me` | 🟢 Lista | Si responde 404/405 o no hay conexión, se muestra un perfil parcial con los claims del JWT (id, correo, rol) y un aviso |
+| Cierre de sesión en el front | 🔴 Pendiente | Fuera de esta HU; el backend ya expone `POST /api/v1/auth/logout` |
+
+Cómo probarlo sin backend: `NEXT_PUBLIC_USE_MOCK=true pnpm dev:student`, guardar un `auth_token` de prueba en `localStorage` y abrir `/profile`.
 
 ### `admin-app` — Puerto 3001
 Panel de administración y gestión:
 - **Dashboard** de métricas del sistema
-- **Gestión de problemas** — CRUD + carga de casos de prueba
-- **Gestión de maratones** — crear, configurar y monitorear concursos
+- **Gestión de problemas** — CRUD + casos de prueba
+- **Gestión de maratones** — crear, configurar y monitorear
 - **Gestión de usuarios** — roles, activación, estadísticas
-- **Monitor del Judging Engine** — estado de la cola y veredictos
-
-**Stack:** Idéntico al `student-app`. Puerto 3001 para no colisionar.
+- **Monitor del Judging Engine**
 
 ---
 
-## Cómo arrancar
+## Cómo ejecutar el proyecto
 
 ### Prerrequisitos
 - **Node.js** ≥ 20
 - **pnpm** ≥ 9 → `npm install -g pnpm`
 
-### Instalar dependencias
+### 1. Instalar dependencias
 ```bash
-# Desde la raíz del frontend/
+# Ejecutar desde la raíz de la carpeta `frontend/`
 pnpm install
 ```
 
-### Correr en desarrollo
+### 2. Configurar variables de entorno
+Asegúrate de configurar las variables necesarias para conectar con el backend. Por defecto, en desarrollo el API base apunta a `localhost`.
+
+En tu `.env.local`:
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api
+NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
+NEXT_PUBLIC_USE_MOCK=false
+```
+
+### 3. Correr en modo de desarrollo (Dev Server)
+
+Puedes ejecutar ambas aplicaciones desde la raíz usando los scripts predefinidos:
 
 ```bash
-# Solo el student-app
+# Correr student-app (Puerto 3000)
 pnpm dev:student
 
-# Solo el admin-app
+# Correr admin-app (Puerto 3001)
 pnpm dev:admin
 ```
 
-O directamente dentro de cada app:
+O si prefieres, entrar al directorio de la app específica:
 ```bash
 cd apps/student-app
 pnpm dev
 ```
 
-### Compilar para producción
+### 4. Compilar para producción (Build)
+Para verificar que todo compila correctamente:
 ```bash
+# Compilar todo el monorepo
 pnpm build
+
+# O compilar aplicaciones individualmente
+pnpm --filter @uceva-judge/student-app build
+pnpm --filter @uceva-judge/admin-app build
 ```
 
 ---
 
-## Convenciones de Código
+## Convenciones de Código y Arquitectura
 
-### Estructura de carpetas por feature (`student-app`)
-
-```
-app/
-├── (auth)/           ← Route group para páginas públicas
-│   ├── login/
-│   └── register/
-├── (dashboard)/      ← Route group para páginas autenticadas
-│   ├── contests/
-│   ├── problems/
-│   ├── submissions/
-│   └── ai-feedback/
-├── layout.tsx        ← Root layout (fuentes, providers)
-└── page.tsx          ← Landing page
-```
-
-### Nomenclatura
-
-| Tipo              | Convención              | Ejemplo                          |
-|-------------------|-------------------------|----------------------------------|
-| Páginas           | `page.tsx` (kebab-case) | `app/contests/[id]/page.tsx`     |
-| Componentes       | PascalCase              | `ContestCard.tsx`                |
-| Hooks             | camelCase con `use`     | `useContestData.ts`              |
-| Utilidades        | camelCase               | `formatVerdict.ts`               |
-| Tipos/interfaces  | PascalCase              | `Contest`, `Submission`          |
-
-### Reglas importantes
-1. **No lógica de negocio en componentes** → usa hooks o servicios en `lib/`.
-2. **Componentes de UI generados con shadcn** van a `components/ui/`, no se modifican.
-3. **Componentes propios del proyecto** van directamente en `components/` (ej. `ContestCard.tsx`).
-4. **Llamadas a la API** van en `lib/api/` (por servicio: `auth.ts`, `problems.ts`, etc.).
-5. **Variables de entorno** nunca en el código — usar `.env.local`.
-
-### Variables de entorno (`.env.local`)
-```env
-NEXT_PUBLIC_API_AUTH_URL=http://localhost:8081
-NEXT_PUBLIC_API_PROBLEMS_URL=http://localhost:8082
-NEXT_PUBLIC_API_SUBMISSIONS_URL=http://localhost:8083
-NEXT_PUBLIC_API_CONTESTS_URL=http://localhost:8086
-NEXT_PUBLIC_API_FEEDBACK_URL=http://localhost:8085
-```
+1. **Feature-Based**: Todo el código de negocio va en `src/features/<nombre>`.
+2. **Encapsulamiento**: Una feature **solo** puede importar elementos expuestos en el `index.ts` de otra feature. Nunca accedas directamente a sus carpetas internas.
+3. **Páginas como Wrappers**: Los archivos en `src/app/` no deben contener lógica. Son "thin wrappers" que importan y renderizan el componente principal desde `src/features/`.
+4. **Patrón Adapter para API**: Evita hacer `fetch` directamente en componentes. Usa los servicios de tu feature, que a su vez utilizan `IApiAdapter` inyectado desde `src/core/api`.
+5. **Comunicación en Tiempo Real**: No te suscribas a WebSockets en la UI. Escucha eventos desde el Event Bus global (`src/core/events`).
 
 ---
 
@@ -148,19 +152,19 @@ El sistema de diseño sigue el tema **dark neon green** (paleta Goslint):
 - **Librería de componentes:** shadcn/ui estilo `new-york`
 - **Efectos:** glow-green, cursor-blink, animate-gradient
 
-Los tokens CSS están definidos en `apps/student-app/app/globals.css` y deben replicarse en `admin-app` para coherencia visual.
+Los tokens CSS están integrados vía `@theme inline` en Tailwind CSS v4. Se encuentran definidos y estandarizados en los archivos `src/app/globals.css` de ambas aplicaciones.
 
 ---
 
 ## Checklist antes de un PR
 
 - [ ] No hay `console.log()` dejados accidentalmente.
-- [ ] El componente tiene su tipo correcto (`interface Props {...}`).
-- [ ] Las llamadas a la API usan las URLs de `.env.local`, no hardcodeadas.
-- [ ] Se añadió `"use client"` solo cuando el componente usa estado o efectos del navegador.
-- [ ] Los componentes de `components/ui/` generados por shadcn no fueron modificados directamente.
-- [ ] El build pasa sin errores: `pnpm build`.
+- [ ] La estructura respeta las reglas de importación entre `features/`.
+- [ ] Las llamadas a la API se hacen mediante el adaptador (no `fetch` directo en componentes).
+- [ ] Los componentes de `shared/ui/primitives/` generados por shadcn no fueron modificados drásticamente para lógicas de negocio.
+- [ ] El tipado TypeScript es estricto y pasa el check: `pnpm --filter <app> type-check`.
+- [ ] El build de producción pasa sin errores: `pnpm build`.
 
 ---
 
-*Documento actualizado: 2026-06-10*
+*Documento actualizado: Septiembre 2026*
