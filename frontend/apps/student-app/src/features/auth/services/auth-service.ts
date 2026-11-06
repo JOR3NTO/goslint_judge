@@ -79,4 +79,17 @@ export class AuthService {
 
         return response.data as LoginResponse
     }
+
+    /**
+     * Cierra la sesión en el backend: `POST /api/v1/auth/logout` con el access token
+     * en `Authorization: Bearer`. El backend revoca el token y borra el refresh token
+     * del usuario. Responde 200 siempre, aunque el token ya no sea válido.
+     *
+     * @param accessToken - Access token de la sesión que se cierra.
+     */
+    async logout(accessToken: string): Promise<void> {
+        await this.api.post<void>("/v1/auth/logout", undefined, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        })
+    }
 }

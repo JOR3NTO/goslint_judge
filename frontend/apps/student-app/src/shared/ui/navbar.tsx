@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useState } from "react"
+import { useLogout } from "@/features/auth"
 import { useHasSession } from "@/shared/hooks/use-session"
 import { Button } from "@/shared/ui/primitives/button"
 import {
@@ -13,12 +14,14 @@ import {
   X,
   User,
   LogIn,
+  LogOut,
   UserCircle,
 } from "lucide-react"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
   const hasSession = useHasSession()
+  const { logout, isLoggingOut } = useLogout()
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
@@ -65,6 +68,17 @@ export function Navbar() {
                   Mi perfil
                 </Button>
               </Link>
+            )}
+            {hasSession === true && (
+              <Button
+                variant="ghost"
+                onClick={logout}
+                disabled={isLoggingOut}
+                className="gap-2 text-muted-foreground hover:text-foreground hover:bg-secondary"
+              >
+                <LogOut className="h-4 w-4" />
+                Cerrar sesión
+              </Button>
             )}
             {hasSession === false && (
               <>
@@ -124,6 +138,17 @@ export function Navbar() {
                     Mi perfil
                   </Button>
                 </Link>
+              )}
+              {hasSession === true && (
+                <Button
+                  variant="ghost"
+                  onClick={logout}
+                  disabled={isLoggingOut}
+                  className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Cerrar sesión
+                </Button>
               )}
               {hasSession === false && (
                 <>

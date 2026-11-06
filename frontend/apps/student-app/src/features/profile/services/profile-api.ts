@@ -1,5 +1,5 @@
 import { env } from "@/core/config/env"
-import { HttpApiAdapter, MockApiAdapter } from "@/core/api"
+import { createHttpApi, MockApiAdapter } from "@/core/api"
 import type { IApiAdapter } from "@/core/api"
 import type { UserProfile } from "../types/profile.types"
 
@@ -23,5 +23,5 @@ export function createProfileApi(): IApiAdapter {
   if (env.IS_MOCK) {
     return new MockApiAdapter().register("GET", "/v1/auth/me", () => ({ data: mockProfile }))
   }
-  return new HttpApiAdapter(env.API_BASE_URL)
+  return createHttpApi()
 }

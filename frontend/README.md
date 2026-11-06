@@ -65,7 +65,9 @@ La aplicación principal que usan los estudiantes:
 | Navbar con sesión | 🟢 Lista | Con token muestra "Mi perfil"; sin token, Login/Registro |
 | Datos completos de la cuenta | 🟡 Depende del backend | Requiere `GET /api/v1/auth/me` en `auth-service` (**no existe aún**). Contrato en `features/profile/types/profile.types.ts` |
 | Fallback sin `/me` | 🟢 Lista | Si responde 404/405 o no hay conexión, se muestra un perfil parcial con los claims del JWT (id, correo, rol) y un aviso |
-| Cierre de sesión en el front | 🔴 Pendiente | Fuera de esta HU; el backend ya expone `POST /api/v1/auth/logout` |
+| Cierre de sesión en el front | 🟢 Lista | Botón "Cerrar sesión" en el navbar (escritorio y móvil). Llama a `POST /api/v1/auth/logout`, borra los tokens de `localStorage` y redirige a `/login`, aunque la llamada falle |
+
+**Enrutamiento del API (`student-app`):** `next.config.mjs` reenvía `/api/v1/*` por prefijo a cada microservicio: contests, contest-problems, teams, invitations y clarifications a contest-service (8086); problems a problem-service (8082); submissions a submission-service (8083); el resto (auth, users, admin) a auth-service (8081). Los destinos se pueden cambiar con `CONTEST_SERVICE_URL`, `PROBLEM_SERVICE_URL`, `SUBMISSION_SERVICE_URL` y `AUTH_SERVICE_URL`.
 
 Cómo probarlo sin backend: `NEXT_PUBLIC_USE_MOCK=true pnpm dev:student`, guardar un `auth_token` de prueba en `localStorage` y abrir `/profile`.
 
