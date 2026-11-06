@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { createHttpApi } from "@/core/api"
 import { Button } from "@/shared/ui/primitives/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
 import { Input } from "@/shared/ui/primitives/input"
@@ -43,27 +44,21 @@ export function RegisterPage() {
     }
 
     try {
-      const response = await fetch("/api/v1/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          institution: "",
-        }),
+      const response = await createHttpApi().post<Record<string, unknown> | null>("/v1/auth/register", {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        institution: "",
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null)
+        const errorData = response.data
         console.error("Backend error response:", errorData)
         setServerError(
-          errorData?.message || 
-          errorData?.error || 
+          (typeof errorData?.message === "string" && errorData.message) ||
+          (typeof errorData?.error === "string" && errorData.error) ||
           (errorData ? JSON.stringify(errorData) : "Ocurrió un error al registrarse. Verifica tus datos.")
         )
         setIsLoading(false)

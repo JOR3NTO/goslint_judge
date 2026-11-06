@@ -1,118 +1,57 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Navbar } from "@/shared/ui/navbar"
 import { Footer } from "@/shared/ui/footer"
-import { ContestCard, type Contest } from "@/features/contests/components/contest-card"
+import { ContestCard, ContestCardSkeleton } from "./contest-card"
+import { ContestsLoadError } from "./contests-load-error"
+import { useContests } from "../hooks/use-contests"
 import { StatsCard } from "@/shared/ui/stats-card"
 import { Button } from "@/shared/ui/primitives/button"
 import { Input } from "@/shared/ui/primitives/input"
 import { Badge } from "@/shared/ui/primitives/badge"
-import { 
-  Trophy, 
-  Users, 
-  Calendar, 
+import type { ContestStatus } from "../types/contest.types"
+import {
+  Trophy,
+  Calendar,
   Search,
   Filter,
-  Zap
 } from "lucide-react"
 
-const allContests: Contest[] = [
-  {
-    id: "1",
-    title: "Goslint Weekly Challenge #42",
-    description: "Competencia semanal con problemas de estructuras de datos y algoritmos de grafos.",
-    startDate: "15 Ene 2025",
-    endDate: "15 Ene 2025",
-    duration: "3 horas",
-    participants: 234,
-    difficulty: "Intermedio",
-    status: "upcoming",
-    problems: 6
-  },
-  {
-    id: "2",
-    title: "Maratón Nacional de Algoritmos",
-    description: "La competencia más grande del año. Premios especiales para los top 10.",
-    startDate: "20 Ene 2025",
-    endDate: "20 Ene 2025",
-    duration: "5 horas",
-    participants: 1205,
-    difficulty: "Avanzado",
-    status: "active",
-    problems: 10
-  },
-  {
-    id: "3",
-    title: "Práctica: Programación Dinámica",
-    description: "Sesión de práctica enfocada en problemas clásicos de programación dinámica.",
-    startDate: "18 Ene 2025",
-    endDate: "18 Ene 2025",
-    duration: "2 horas",
-    participants: 89,
-    difficulty: "Principiante",
-    status: "upcoming",
-    problems: 5
-  },
-  {
-    id: "4",
-    title: "Desafío de Grafos Avanzados",
-    description: "Problemas complejos de teoría de grafos: flujo máximo, matching, y más.",
-    startDate: "22 Ene 2025",
-    endDate: "22 Ene 2025",
-    duration: "4 horas",
-    participants: 156,
-    difficulty: "Experto",
-    status: "upcoming",
-    problems: 8
-  },
-  {
-    id: "5",
-    title: "Introducción a Competitive Programming",
-    description: "Maratón especial para principiantes. Aprende las bases del competitive programming.",
-    startDate: "25 Ene 2025",
-    endDate: "25 Ene 2025",
-    duration: "2 horas",
-    participants: 342,
-    difficulty: "Principiante",
-    status: "upcoming",
-    problems: 4
-  },
-  {
-    id: "6",
-    title: "Goslint Speed Coding Challenge",
-    description: "Resuelve problemas fáciles lo más rápido posible. El tiempo es tu enemigo.",
-    startDate: "28 Ene 2025",
-    endDate: "28 Ene 2025",
-    duration: "1 hora",
-    participants: 189,
-    difficulty: "Intermedio",
-    status: "upcoming",
-    problems: 10
-  }
+/** Filtros por estado: "Todos" no filtra; el resto mapea al estado del backend. */
+const STATUS_FILTERS: { label: string; value: ContestStatus | "ALL" }[] = [
+  { label: "Todos", value: "ALL" },
+  { label: "En Curso", value: "ACTIVE" },
+  { label: "Próximamente", value: "UPCOMING" },
 ]
 
-const difficulties = ["Todos", "Principiante", "Intermedio", "Avanzado", "Experto"]
-const statuses = ["Todos", "En Curso", "Próximamente"]
-
 export function ContestsPage() {
+  const { contests, isLoading, error, reload } = useContests()
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedDifficulty, setSelectedDifficulty] = useState("Todos")
-  const [selectedStatus, setSelectedStatus] = useState("Todos")
+  const [selectedStatus, setSelectedStatus] = useState<ContestStatus | "ALL">("ALL")
 
-  const filteredContests = allContests.filter((contest) => {
-    const matchesSearch = contest.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          contest.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesDifficulty = selectedDifficulty === "Todos" || contest.difficulty === selectedDifficulty
-    const matchesStatus = selectedStatus === "Todos" || 
-                          (selectedStatus === "En Curso" && contest.status === "active") ||
-                          (selectedStatus === "Próximamente" && contest.status === "upcoming")
-    
-    return matchesSearch && matchesDifficulty && matchesStatus
-  })
+  const filteredContests = useMemo(() => {
+    if (!contests) return []
+    const query = searchQuery.trim().toLowerCase()
+    return contests.filter((contest) => {
+      const matchesSearch =
+        query === "" ||
+        contest.title.toLowerCase().includes(query) ||
+        contest.description.toLowerCase().includes(query)
+      const matchesStatus = selectedStatus === "ALL" || contest.status === selectedStatus
+      return matchesSearch && matchesStatus
+    })
+  }, [contests, searchQuery, selectedStatus])
 
-  const activeContests = allContests.filter(c => c.status === "active").length
-  const totalParticipants = allContests.reduce((acc, c) => acc + c.participants, 0)
+  // Estadísticas calculadas solo con datos del listado (participantes y problemas no vienen aquí).
+  const activeCount = contests?.filter((c) => c.status === "ACTIVE").length ?? 0
+  const upcomingCount = contests?.filter((c) => c.status === "UPCOMING").length ?? 0
+  const totalCount = contests?.length ?? 0
+
+  const clearFilters = () => {
+    setSearchQuery("")
+    setSelectedStatus("ALL")
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -127,33 +66,28 @@ export function ContestsPage() {
                 Maratones de <span className="text-primary text-glow">Programación</span>
               </h1>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Participa en competencias en tiempo real, resuelve problemas desafiantes y 
+                Participa en competencias en tiempo real, resuelve problemas desafiantes y
                 demuestra tus habilidades de algoritmos.
               </p>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <StatsCard
                 icon={Trophy}
                 label="Maratones Activas"
-                value={activeContests}
+                value={isLoading ? "—" : activeCount}
                 trend="En curso ahora"
               />
               <StatsCard
                 icon={Calendar}
                 label="Próximas Maratones"
-                value={allContests.filter(c => c.status === "upcoming").length}
+                value={isLoading ? "—" : upcomingCount}
               />
               <StatsCard
-                icon={Users}
-                label="Participantes Totales"
-                value={totalParticipants.toLocaleString()}
-              />
-              <StatsCard
-                icon={Zap}
-                label="Problemas Disponibles"
-                value={allContests.reduce((acc, c) => acc + c.problems, 0)}
+                icon={Trophy}
+                label="Maratones Registradas"
+                value={isLoading ? "—" : totalCount}
               />
             </div>
           </div>
@@ -175,44 +109,22 @@ export function ContestsPage() {
               </div>
 
               {/* Filters */}
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Filtrar:</span>
-                </div>
-                
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Filtrar:</span>
                 <div className="flex flex-wrap gap-2">
-                  {difficulties.map((diff) => (
+                  {STATUS_FILTERS.map((filter) => (
                     <Badge
-                      key={diff}
-                      variant={selectedDifficulty === diff ? "default" : "outline"}
+                      key={filter.value}
+                      variant={selectedStatus === filter.value ? "default" : "outline"}
                       className={`cursor-pointer transition-all ${
-                        selectedDifficulty === diff 
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90" 
+                        selectedStatus === filter.value
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
                           : "border-border hover:border-primary hover:bg-primary/10"
                       }`}
-                      onClick={() => setSelectedDifficulty(diff)}
+                      onClick={() => setSelectedStatus(filter.value)}
                     >
-                      {diff}
-                    </Badge>
-                  ))}
-                </div>
-
-                <div className="h-6 w-px bg-border hidden sm:block" />
-
-                <div className="flex flex-wrap gap-2">
-                  {statuses.map((status) => (
-                    <Badge
-                      key={status}
-                      variant={selectedStatus === status ? "default" : "outline"}
-                      className={`cursor-pointer transition-all ${
-                        selectedStatus === status 
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90" 
-                          : "border-border hover:border-primary hover:bg-primary/10"
-                      }`}
-                      onClick={() => setSelectedStatus(status)}
-                    >
-                      {status}
+                      {filter.label}
                     </Badge>
                   ))}
                 </div>
@@ -224,7 +136,28 @@ export function ContestsPage() {
         {/* Contests Grid */}
         <section className="py-12">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            {filteredContests.length > 0 ? (
+            {isLoading && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <ContestCardSkeleton key={i} />
+                ))}
+              </div>
+            )}
+
+            {!isLoading && error && <ContestsLoadError message={error} onRetry={reload} />}
+
+            {!isLoading && !error && contests && contests.length === 0 && (
+              <div className="text-center py-16">
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  Aún no hay maratones
+                </h3>
+                <p className="text-muted-foreground">
+                  Cuando se publique una maratón aparecerá aquí.
+                </p>
+              </div>
+            )}
+
+            {!isLoading && !error && contests && contests.length > 0 && filteredContests.length > 0 && (
               <>
                 <div className="flex items-center justify-between mb-8">
                   <p className="text-muted-foreground">
@@ -237,7 +170,9 @@ export function ContestsPage() {
                   ))}
                 </div>
               </>
-            ) : (
+            )}
+
+            {!isLoading && !error && contests && contests.length > 0 && filteredContests.length === 0 && (
               <div className="text-center py-16">
                 <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mx-auto mb-4">
                   <Search className="h-8 w-8 text-muted-foreground" />
@@ -250,11 +185,7 @@ export function ContestsPage() {
                 </p>
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setSearchQuery("")
-                    setSelectedDifficulty("Todos")
-                    setSelectedStatus("Todos")
-                  }}
+                  onClick={clearFilters}
                   className="border-border hover:border-primary hover:bg-primary/10"
                 >
                   Limpiar Filtros
