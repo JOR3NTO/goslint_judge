@@ -1,23 +1,24 @@
 import Link from "next/link"
 import { Code2, Github, Twitter, Mail } from "lucide-react"
+import { env } from "@/core/config/env"
 
 export function Footer() {
   return (
     <footer className="border-t border-border bg-card/50">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand */}
+          {/* Brand: lleva a la landing pública (otra app/origen, por eso <a> y no next/link) */}
           <div className="space-y-4">
-            <Link href="/" className="flex items-center gap-2">
+            <a href={env.LANDING_URL} className="flex items-center gap-2">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/30">
                 <Code2 className="h-5 w-5 text-primary" />
               </div>
               <span className="text-xl font-bold text-foreground">
                 Goslint<span className="text-primary">Judge</span>
               </span>
-            </Link>
+            </a>
             <p className="text-sm text-muted-foreground">
-              La plataforma de juez de programación competitiva con retroalimentación de IA.
+              La plataforma de juez de programación competitiva para maratones, problemas y ranking.
             </p>
           </div>
 
@@ -33,11 +34,6 @@ export function Footer() {
               <li>
                 <Link href="/past-contests" className="hover:text-primary transition-colors">
                   Maratones Anteriores
-                </Link>
-              </li>
-              <li>
-                <Link href="/ai-feedback" className="hover:text-primary transition-colors">
-                  AI Feedback
                 </Link>
               </li>
             </ul>

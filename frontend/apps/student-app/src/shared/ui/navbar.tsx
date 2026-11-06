@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { useLogout } from "@/features/auth"
 import { usePendingInvitationsCount } from "@/features/contests"
+import { env } from "@/core/config/env"
 import { useHasSession } from "@/shared/hooks/use-session"
 import { DemoModeBadge } from "@/shared/ui/demo-mode-badge"
 import { Button } from "@/shared/ui/primitives/button"
@@ -11,7 +12,6 @@ import {
   Code2,
   Trophy,
   History,
-  Sparkles,
   Menu,
   X,
   User,
@@ -49,15 +49,15 @@ export function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
+          {/* Logo: lleva a la landing pública (otra app/origen, por eso <a> y no next/link) */}
+          <a href={env.LANDING_URL} className="flex items-center gap-2 group">
             <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/30 group-hover:glow-green-sm transition-all">
               <Code2 className="h-5 w-5 text-primary" />
             </div>
             <span className="text-xl font-bold text-foreground">
               Goslint<span className="text-primary">Judge</span>
             </span>
-          </Link>
+          </a>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-1">
@@ -71,12 +71,6 @@ export function Navbar() {
               <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground hover:bg-secondary">
                 <History className="h-4 w-4" />
                 Anteriores
-              </Button>
-            </Link>
-            <Link href="/ai-feedback">
-              <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground hover:bg-secondary">
-                <Sparkles className="h-4 w-4" />
-                AI Feedback
               </Button>
             </Link>
             {hasSession === true && (
@@ -154,12 +148,6 @@ export function Navbar() {
               <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
                 <History className="h-4 w-4" />
                 Maratones Anteriores
-              </Button>
-            </Link>
-            <Link href="/ai-feedback" onClick={() => setIsOpen(false)}>
-              <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
-                <Sparkles className="h-4 w-4" />
-                AI Feedback
               </Button>
             </Link>
             {hasSession === true && (

@@ -47,13 +47,12 @@ src/
 
 ### `student-app` — Puerto 3000
 La aplicación principal que usan los estudiantes:
-- **Landing page** con presentación de la plataforma
+- **Inicio**: la ruta `/` redirige a la landing pública (`landing-app`, puerto 3002); el logo del navbar y del footer también la enlazan (`NEXT_PUBLIC_LANDING_URL`)
 - **Login / Registro** de cuentas
 - **Perfil** (`/profile`, ruta protegida) — datos de la cuenta y avatar generado con [DiceBear](https://www.dicebear.com) (estilo `gaze`, CC0) a partir del `username`. Ver [estado del perfil](#estado-del-perfil-student-app)
 - **Maratones** (`/contests`) — listado, inscripción y participación
 - **Envío de código** — editor + selección de lenguaje
 - **Historial de envíos** — veredictos y métricas
-- **Retroalimentación IA** (`/ai-feedback`) — sugerencias del LLM
 - **Scoreboard** — ranking en tiempo real vía WebSockets
 
 #### Estado del perfil (`student-app`)
@@ -101,6 +100,8 @@ En tu `.env.local`:
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api
 NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
 NEXT_PUBLIC_USE_MOCK=false
+# Landing pública (landing-app). Por defecto http://localhost:3002
+NEXT_PUBLIC_LANDING_URL=http://localhost:3002
 ```
 
 ### 3. Correr en modo de desarrollo (Dev Server)
@@ -208,7 +209,7 @@ Reglas del veredicto simulado (`mock/judge.ts`), en este orden:
 - **No hay WebSocket**: el seguimiento de envíos es solo por polling.
 - **Sin backend**: no hay base de datos, colas ni correos. Las invitaciones no se envían por email.
 - **Datos por pestaña**: `sessionStorage` es por pestaña. Una cuenta registrada en una pestaña no existe en otra.
-- **Sin** respuestas de aclaraciones (rol organizador), admin-app, AI feedback ni cambio de contraseña o usuario.
+- **Sin** respuestas de aclaraciones (rol organizador), admin-app ni cambio de contraseña o usuario.
 - Los tokens (y las cuentas de la demo) siguen siendo falsos: nunca sirven contra el backend real.
 
 ### Reiniciar los datos

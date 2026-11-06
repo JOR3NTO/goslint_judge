@@ -36,7 +36,7 @@ export function HeroSection() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/30 text-primary text-sm font-medium">
             <Sparkles className="h-4 w-4" />
-            <span>Plataforma de Programación Competitiva con IA</span>
+            <span>Plataforma de Programación Competitiva</span>
           </div>
 
           {/* Main Heading */}
@@ -48,8 +48,8 @@ export function HeroSection() {
 
           {/* Description */}
           <p className="max-w-2xl mx-auto text-lg sm:text-xl text-muted-foreground leading-relaxed">
-            Participa en maratones de programación, resuelve problemas desafiantes y recibe
-            <span className="text-primary font-medium"> retroalimentación con IA </span>
+            Participa en maratones de programación, resuelve problemas desafiantes y consulta
+            <span className="text-primary font-medium"> el veredicto de tus envíos y el ranking </span>
             para mejorar tus habilidades de algoritmos.
           </p>
 

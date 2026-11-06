@@ -17,7 +17,7 @@ export function Footer() {
               </span>
             </a>
             <p className="text-sm text-muted-foreground">
-              La plataforma de juez de programación competitiva con retroalimentación de IA.
+              La plataforma de juez de programación competitiva para maratones, problemas y ranking.
             </p>
           </div>
 
@@ -33,11 +33,6 @@ export function Footer() {
               <li>
                 <a href={`${env.APP_URL}/login`} className="hover:text-primary transition-colors">
                   Maratones Anteriores
-                </a>
-              </li>
-              <li>
-                <a href={`${env.APP_URL}/login`} className="hover:text-primary transition-colors">
-                  AI Feedback
                 </a>
               </li>
             </ul>

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Goslint Judge | Competitive Programming Platform',
-  description: 'The ultimate competitive programming judge platform. Join marathons, solve problems, and get AI-powered feedback to improve your coding skills.',
+  description: 'The ultimate competitive programming judge platform. Join marathons, solve problems, and get submission verdicts and rankings to improve your coding skills.',
   generator: 'Goslint Judge',
   keywords: ['competitive programming', 'coding contests', 'programming judge', 'algorithm challenges', 'ICPC', 'coding marathons'],
 }

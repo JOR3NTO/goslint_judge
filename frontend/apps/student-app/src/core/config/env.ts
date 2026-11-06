@@ -5,6 +5,8 @@
 export const env = {
   API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api",
   WS_URL:       process.env.NEXT_PUBLIC_WS_URL ?? "/ws",
+  /** Landing pública (landing-app). El logo de la app y la ruta "/" apuntan aquí. */
+  LANDING_URL:  process.env.NEXT_PUBLIC_LANDING_URL ?? "http://localhost:3002",
   /** WebSocket directo a submission-service (los rewrites de Next no proxean WS). */
   SUBMISSION_WS_URL: process.env.NEXT_PUBLIC_SUBMISSION_WS_URL ?? "ws://localhost:8083/ws/submissions",
   /** `NEXT_PUBLIC_USE_MOCK=true`. Por sí solo no basta: en producción el mock se ignora (ver `MOCK_ENABLED`). */
