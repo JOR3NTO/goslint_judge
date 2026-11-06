@@ -16,6 +16,7 @@ import { Label } from "@/shared/ui/primitives/label"
 import { Loader2 } from "lucide-react"
 import { ContestApiError } from "../services/contests-service"
 import type { ContestFieldErrors } from "../types/contest.types"
+import { validateTeamName } from "../utils/team-rules"
 
 interface JoinContestDialogProps {
   open: boolean
@@ -54,7 +55,8 @@ export function JoinContestDialog({ open, onOpenChange, contestTitle, onJoin }: 
     if (isSubmitting) return
 
     const localErrors: ContestFieldErrors = {}
-    if (!teamName.trim()) localErrors[FIELD_TEAM] = "El nombre del equipo es obligatorio."
+    const teamNameError = validateTeamName(teamName)
+    if (teamNameError) localErrors[FIELD_TEAM] = teamNameError
     if (!contestPassword) localErrors[FIELD_PASSWORD] = "La contraseña de la maratón es obligatoria."
     setFieldErrors(localErrors)
     setServerError(null)
@@ -103,9 +105,13 @@ export function JoinContestDialog({ open, onOpenChange, contestTitle, onJoin }: 
               placeholder="Ej: Los Algoritmos"
               autoComplete="off"
               aria-invalid={Boolean(fieldErrors[FIELD_TEAM])}
+              aria-describedby="team-name-help"
               className="bg-input border-border focus:border-primary"
               disabled={isSubmitting}
             />
+            <p id="team-name-help" className="text-xs text-muted-foreground">
+              El equipo puede tener de 1 a 3 integrantes; tras crearlo podrás invitar a los demás.
+            </p>
             {fieldErrors[FIELD_TEAM] && (
               <p className="text-sm text-destructive">{fieldErrors[FIELD_TEAM]}</p>
             )}

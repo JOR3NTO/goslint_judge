@@ -134,6 +134,99 @@ pnpm --filter @uceva-judge/admin-app build
 
 ---
 
+## Modo demo (mock)
+
+Permite ver y probar **todo el flujo del estudiante sin backend ni base de datos**. Las respuestas
+las simula `apps/student-app/src/core/api/mock/` (un servidor en memoria con enrutador) y el estado
+se guarda en `sessionStorage` de la pestaña.
+
+### Cómo activarlo
+
+Desde `frontend/`:
+
+```bash
+# bash / Git Bash
+NEXT_PUBLIC_USE_MOCK=true pnpm dev:student
+```
+
+```powershell
+# PowerShell
+$env:NEXT_PUBLIC_USE_MOCK="true"; pnpm dev:student
+```
+
+O crea `apps/student-app/.env.local` a partir de `apps/student-app/.env.local.example` (el archivo
+`.env.local` no se versiona) y deja `NEXT_PUBLIC_USE_MOCK=true`.
+
+El mock **nunca** se activa en producción: con `next build` / `next start` se ignora, se avisa en
+consola y la app usa el backend real. Con `NEXT_PUBLIC_USE_MOCK` distinto de `true` el comportamiento
+es el de siempre.
+
+Con el mock activo aparece la insignia **"Modo demo (datos simulados)"** en la barra superior, con
+el botón **"Reiniciar datos demo"**. En `/login` aparece además **"Entrar como estudiante demo"**.
+
+### Credenciales demo
+
+| Qué | Dato |
+|-----|------|
+| Estudiante demo | `estudiante@uceva.edu.co` / `Demo1234!` (usuario `demo_student`) |
+| Contraseña de la maratón con inscripción (`Copa Goslint Novatos`, UPCOMING) | `maraton123` |
+| Contraseña de `Reto Relámpago de Algoritmos` (UPCOMING) | `reto-secreto-2026` |
+| Compañeros ficticios (`ana.gomez@uceva.edu.co`, `carlos.mendoza@uceva.edu.co`, `laura.restrepo@uceva.edu.co`, etc.) | `Demo1234!` |
+| Organizador (ADMIN) | `coordinacion@uceva.edu.co` / `Demo1234!` |
+
+### Qué cubre
+
+- **Auth**: login (400 por campo, 401 con contraseña incorrecta, 423 tras 5 intentos fallidos durante 15 min),
+  registro con las mismas validaciones que auth-service (400 y 409 por correo o usuario repetido),
+  `me`, `refresh`, `logout` y `check-username`. El token es un **JWT falso** (`header.payload.mock-signature`)
+  con expiración de 15 min, así que caduca igual que el real. Un verificador real lo rechaza.
+- **Maratones**: `C1` ACTIVE con 5 problemas (el estudiante ya está inscrito con «Los Algoritmos»),
+  `C2` y `C3` UPCOMING, `C4` y `C5` ENDED. El estado se recalcula según la hora real.
+- **Equipos**: inscripción con contraseña (403 si es incorrecta, 409 si el nombre ya existe o el usuario
+  ya está en un equipo, 409 si la maratón ya inició), renombrar, quitar integrantes e invitar.
+  Las invitaciones solo las envía el capitán, con máximo 3 integrantes y antes del inicio.
+- **Invitaciones**: aceptar (y pasar a ser integrante), rechazar, estados `PENDING`, `ACCEPTED`,
+  `REJECTED` y `EXPIRED`, y contador en la navbar.
+- **Envíos**: `PENDING → QUEUED → JUDGING → JUDGED` en unos 6 s, con el polling de la arena
+  (sin WebSocket). Errores: 403 si la maratón no está ACTIVE o quien envía no es integrante, 409 si el
+  envío es idéntico a uno previo, 400 con lenguaje no válido.
+- **Ranking ICPC**: puntos y penalización calculados desde los envíos juzgados.
+- **Aclaraciones**: listar y preguntar (las respuestas del organizador no están).
+
+Reglas del veredicto simulado (`mock/judge.ts`), en este orden:
+
+| Código enviado | Veredicto |
+|----------------|-----------|
+| Casi vacío (menos de 20 caracteres sin espacios) o con `TODO` | `WRONG_ANSWER` |
+| `while(true)` o `while True` | `TIME_LIMIT_EXCEEDED` |
+| Contiene `syntax_error` | `COMPILATION_ERROR` |
+| Cualquier otro | `ACCEPTED` |
+
+### Qué no cubre
+
+- **No hay juez real**: no compila ni ejecuta código. El veredicto son las reglas de arriba aplicadas al texto.
+- **No hay WebSocket**: el seguimiento de envíos es solo por polling.
+- **Sin backend**: no hay base de datos, colas ni correos. Las invitaciones no se envían por email.
+- **Datos por pestaña**: `sessionStorage` es por pestaña. Una cuenta registrada en una pestaña no existe en otra.
+- **Sin** respuestas de aclaraciones (rol organizador), admin-app, AI feedback ni cambio de contraseña o usuario.
+- Los tokens (y las cuentas de la demo) siguen siendo falsos: nunca sirven contra el backend real.
+
+### Reiniciar los datos
+
+- Botón **"Reiniciar datos demo"** de la barra superior (pide confirmación y recarga la página).
+- O borra la clave `goslint:mock-db:v1` de `sessionStorage` (cerrar la pestaña también la borra).
+
+### Prueba de humo
+
+Sin navegador ni dependencias nuevas, desde `frontend/apps/student-app`:
+
+```bash
+node scripts/mock-smoke.cjs
+```
+
+Recorre login, listado, inscripción por contraseña, invitación, envío con veredicto y los errores
+principales (31 comprobaciones). Usa el paquete `typescript` que ya está instalado en el proyecto.
+
 ## Convenciones de Código y Arquitectura
 
 1. **Feature-Based**: Todo el código de negocio va en `src/features/<nombre>`.

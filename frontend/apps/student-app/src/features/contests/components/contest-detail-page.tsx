@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { Navbar } from "@/shared/ui/navbar"
@@ -28,6 +28,7 @@ import {
   Medal,
   CheckCircle2,
   UserPlus,
+  Swords,
 } from "lucide-react"
 import { useContestDetail } from "../hooks/use-contest-detail"
 import type { ContestStatus, ContestProblemItem, TeamDTO } from "../types/contest.types"
@@ -36,6 +37,7 @@ import { readContestSession } from "../utils/session"
 import { ContestTimer } from "./contest-timer"
 import { ContestsLoadError } from "./contests-load-error"
 import { JoinContestDialog } from "./join-contest-dialog"
+import { MyTeamPanel } from "./my-team-panel"
 
 const statusColors: Record<ContestStatus, string> = {
   UPCOMING: "bg-blue-500/10 text-blue-400 border-blue-500/30",
@@ -63,8 +65,15 @@ export function ContestDetailPage() {
     isLoading,
     reload,
     joinContest,
+    replaceMyTeam,
+    clearMyTeam,
   } = useContestDetail(id)
   const [isJoinOpen, setIsJoinOpen] = useState(false)
+  // Id del usuario autenticado; se lee en el cliente tras montar (no hay localStorage en SSR).
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  useEffect(() => {
+    setCurrentUserId(readContestSession()?.userId ?? null)
+  }, [])
 
   const openJoin = () => {
     // Sin sesión no se puede inscribir: se manda al login.
@@ -150,11 +159,35 @@ export function ContestDetailPage() {
                       Inscribirme
                     </Button>
                   ) : null}
+
+                  {myTeam && contest.status !== "UPCOMING" && (
+                    <Link href={`/contests/${contest.id}/arena`}>
+                      <Button className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-green-sm">
+                        <Swords className="h-4 w-4" />
+                        {contest.status === "ACTIVE" ? "Entrar al maratón" : "Ver arena"}
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
             )}
           </div>
         </section>
+
+        {/* Mi equipo: solo si el usuario ya está inscrito en esta maratón */}
+        {!isLoading && !error && contest && myTeam && (
+          <section className="pt-8">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <MyTeamPanel
+                contest={contest}
+                team={myTeam}
+                currentUserId={currentUserId}
+                onTeamChanged={replaceMyTeam}
+                onTeamLeft={clearMyTeam}
+              />
+            </div>
+          </section>
+        )}
 
         {/* Content */}
         {!isLoading && !error && contest && (

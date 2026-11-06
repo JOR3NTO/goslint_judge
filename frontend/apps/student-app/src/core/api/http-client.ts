@@ -12,6 +12,7 @@
  */
 import type { IApiAdapter, RequestOptions, ApiResponse } from "./types"
 import { env } from "@/core/config/env"
+import { getMockServer } from "./mock/server"
 
 /** Clave de localStorage del access token (la escribe use-login). */
 const AUTH_TOKEN_KEY = "auth_token"
@@ -128,9 +129,26 @@ export class HttpApiAdapter implements IApiAdapter {
 }
 
 /**
- * Adapter HTTP compartido por las features, apuntando a `env.API_BASE_URL`.
- * Mismo patrón de factory que `createProfileApi()` (features/profile/services/profile-api.ts).
+ * Adapter compartido por las features, apuntando a `env.API_BASE_URL`.
+ *
+ * Con `NEXT_PUBLIC_USE_MOCK=true` devuelve el MockServer (singleton) en lugar del backend,
+ * salvo en producción: ahí el mock se ignora, se avisa en consola y se usa el backend real.
+ * Con IS_MOCK en false el comportamiento es el de siempre.
  */
+let warnedMockInProduction = false
+
 export function createHttpApi(): IApiAdapter {
+  if (env.IS_MOCK) {
+    if (process.env.NODE_ENV === "production") {
+      if (!warnedMockInProduction) {
+        warnedMockInProduction = true
+        console.warn(
+          "[goslint] NEXT_PUBLIC_USE_MOCK=true se ignora en producción: se usa el backend real."
+        )
+      }
+    } else {
+      return getMockServer()
+    }
+  }
   return new HttpApiAdapter(env.API_BASE_URL)
 }

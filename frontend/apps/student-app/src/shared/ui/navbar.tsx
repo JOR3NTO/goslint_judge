@@ -3,7 +3,9 @@
 import Link from "next/link"
 import { useState } from "react"
 import { useLogout } from "@/features/auth"
+import { usePendingInvitationsCount } from "@/features/contests"
 import { useHasSession } from "@/shared/hooks/use-session"
+import { DemoModeBadge } from "@/shared/ui/demo-mode-badge"
 import { Button } from "@/shared/ui/primitives/button"
 import {
   Code2,
@@ -16,12 +18,32 @@ import {
   LogIn,
   LogOut,
   UserCircle,
+  Mail,
 } from "lucide-react"
+
+/** Texto del enlace "Invitaciones" con contador de pendientes (el contador se oculta si es 0 o no se pudo cargar). */
+function InvitationsLabel({ count }: { count: number | null }) {
+  return (
+    <>
+      Invitaciones
+      {count !== null && count > 0 && (
+        <span
+          className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
+          aria-label={`${count} pendientes`}
+        >
+          {count}
+        </span>
+      )}
+    </>
+  )
+}
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
   const hasSession = useHasSession()
   const { logout, isLoggingOut } = useLogout()
+  // Best effort: un fallo al pedir invitaciones no afecta a la navbar.
+  const pendingInvitations = usePendingInvitationsCount(hasSession === true)
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
@@ -57,10 +79,19 @@ export function Navbar() {
                 AI Feedback
               </Button>
             </Link>
+            {hasSession === true && (
+              <Link href="/invitations">
+                <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground hover:bg-secondary">
+                  <Mail className="h-4 w-4" />
+                  <InvitationsLabel count={pendingInvitations} />
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            <DemoModeBadge />
             {hasSession === true && (
               <Link href="/profile">
                 <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-green-sm">
@@ -112,6 +143,7 @@ export function Navbar() {
       {isOpen && (
         <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-xl">
           <div className="px-4 py-4 space-y-2">
+            <DemoModeBadge />
             <Link href="/contests" onClick={() => setIsOpen(false)}>
               <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
                 <Trophy className="h-4 w-4" />
@@ -130,6 +162,14 @@ export function Navbar() {
                 AI Feedback
               </Button>
             </Link>
+            {hasSession === true && (
+              <Link href="/invitations" onClick={() => setIsOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
+                  <Mail className="h-4 w-4" />
+                  <InvitationsLabel count={pendingInvitations} />
+                </Button>
+              </Link>
+            )}
             <div className="pt-4 border-t border-border space-y-2">
               {hasSession === true && (
                 <Link href="/profile" onClick={() => setIsOpen(false)}>

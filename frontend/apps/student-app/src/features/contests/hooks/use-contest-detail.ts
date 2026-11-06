@@ -34,6 +34,10 @@ interface UseContestDetailReturn {
    * del backend para que el diálogo los muestre.
    */
   joinContest: (teamName: string, contestPassword: string) => Promise<void>
+  /** Sustituye el equipo del usuario (tras renombrar o quitar integrantes) en `myTeam` y en `teams`. */
+  replaceMyTeam: (team: TeamDTO) => void
+  /** El usuario dejó el equipo: quita `myTeam` y el equipo de la lista. */
+  clearMyTeam: (teamId: string) => void
 }
 
 const NO_SECTION_ERRORS: ContestSectionErrors = { problems: false, scoreboard: false, teams: false }
@@ -133,6 +137,17 @@ export function useContestDetail(contestId: string): UseContestDetailReturn {
 
   const reload = useCallback(() => setAttempt((n) => n + 1), [])
 
+  /** Refresca el ranking sin volver a mostrar el skeleton; si falla, se conserva el anterior. */
+  const refreshScoreboard = useCallback(() => {
+    createContestsService()
+      .getScoreboard(contestId)
+      .then((list) => {
+        setScoreboard(list)
+        setSectionErrors((prev) => ({ ...prev, scoreboard: false }))
+      })
+      .catch(() => setSectionErrors((prev) => ({ ...prev, scoreboard: true })))
+  }, [contestId])
+
   const joinContest = useCallback(
     async (teamName: string, contestPassword: string) => {
       if (!readContestSession()) {
@@ -144,14 +159,30 @@ export function useContestDetail(contestId: string): UseContestDetailReturn {
 
       setMyTeam(team)
       setTeams((prev) => [...prev, team])
-
-      // Refresca el ranking sin volver a mostrar el skeleton; si falla, se conserva el anterior.
-      service
-        .getScoreboard(contestId)
-        .then(setScoreboard)
-        .catch(() => setSectionErrors((prev) => ({ ...prev, scoreboard: true })))
+      refreshScoreboard()
     },
-    [contestId]
+    [contestId, refreshScoreboard]
+  )
+
+  const replaceMyTeam = useCallback(
+    (team: TeamDTO) => {
+      setMyTeam(team)
+      setTeams((prev) => {
+        const exists = prev.some((t) => t.id === team.id)
+        return exists ? prev.map((t) => (t.id === team.id ? team : t)) : [...prev, team]
+      })
+      refreshScoreboard()
+    },
+    [refreshScoreboard]
+  )
+
+  const clearMyTeam = useCallback(
+    (teamId: string) => {
+      setMyTeam(null)
+      setTeams((prev) => prev.filter((t) => t.id !== teamId))
+      refreshScoreboard()
+    },
+    [refreshScoreboard]
   )
 
   return {
@@ -165,5 +196,7 @@ export function useContestDetail(contestId: string): UseContestDetailReturn {
     isLoading,
     reload,
     joinContest,
+    replaceMyTeam,
+    clearMyTeam,
   }
 }

@@ -31,11 +31,13 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useLogin } from "../hooks/use-login"
+import { env } from "@/core/config/env"
+import { DEMO_STUDENT_EMAIL, DEMO_STUDENT_PASSWORD } from "@/core/api/mock"
 import { Button } from "@/shared/ui/primitives/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
 import { Input } from "@/shared/ui/primitives/input"
 import { Label } from "@/shared/ui/primitives/label"
-import { Code2, Eye, EyeOff, Github, Mail, ArrowLeft, Loader2 } from "lucide-react"
+import { Code2, Eye, EyeOff, Github, Mail, ArrowLeft, Loader2, FlaskConical } from "lucide-react"
 
 export function LoginPage() {
   /** Toggle para mostrar/ocultar la contraseña en texto plano. */
@@ -48,6 +50,7 @@ export function LoginPage() {
     isLoading,
     handleChange,
     handleSubmit,
+    loginAsDemo,
   } = useLogin()
 
   return (
@@ -167,6 +170,25 @@ export function LoginPage() {
                 {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
               </Button>
             </form>
+
+            {/* Solo modo mock (fuera de producción): acceso directo con la cuenta demo. */}
+            {env.MOCK_ENABLED && (
+              <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-primary/50 text-primary hover:bg-primary/10"
+                  onClick={() => loginAsDemo()}
+                  disabled={isLoading}
+                >
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                  Entrar como estudiante demo
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  Datos simulados · {DEMO_STUDENT_EMAIL} / {DEMO_STUDENT_PASSWORD}
+                </p>
+              </div>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

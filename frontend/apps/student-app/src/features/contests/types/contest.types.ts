@@ -60,6 +60,35 @@ export interface JoinContestRequest {
   contestPassword: string
 }
 
+/** Estado de una invitación (enum `InvitationStatus` del backend). */
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED"
+
+/** `POST /v1/teams/{teamId}/invitations` y elementos de `GET /v1/invitations/me`. */
+export interface InvitationDTO {
+  id: string
+  teamId: string
+  invitedUserId: string
+  invitedEmail: string
+  status: InvitationStatus
+  createdAt: string
+  respondedAt: string | null
+}
+
+/**
+ * Body de `POST /v1/teams/{teamId}/invitations`.
+ * El backend exige `userId` Y `email` (Invitation.create rechaza el nulo con 400),
+ * aunque el DTO los declare opcionales.
+ */
+export interface InviteMemberRequest {
+  userId: string
+  email: string
+}
+
+/** Body de `PUT /v1/teams/{id}`. */
+export interface UpdateTeamRequest {
+  teamName: string
+}
+
 /** `GET /v1/problems/{problemId}` (problem-service). */
 export interface ProblemDTO {
   id: string
