@@ -9,13 +9,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/shared/ui/primitives/input"
 import { Label } from "@/shared/ui/primitives/label"
 import { Checkbox } from "@/shared/ui/primitives/checkbox"
-import { Code2, Eye, EyeOff, Github, Mail, User, ArrowLeft, Check } from "lucide-react"
+import { Building2, Code2, Eye, EyeOff, Github, Mail, User, ArrowLeft, Check } from "lucide-react"
 
 export function RegisterPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [institutionError, setInstitutionError] = useState<string | null>(null)
   const [acceptTerms, setAcceptTerms] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -23,6 +24,7 @@ export function RegisterPage() {
     lastName: "",
     username: "",
     email: "",
+    institution: "",
     password: "",
   })
 
@@ -30,18 +32,23 @@ export function RegisterPage() {
     const { id, value } = e.target
     setFormData(prev => ({ ...prev, [id]: value }))
     if (serverError) setServerError(null)
+    if (id === "institution" && institutionError) setInstitutionError(null)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setServerError(null)
+    setInstitutionError(null)
 
     if (!acceptTerms) {
       setServerError("Debes aceptar los Términos de Servicio y la Política de Privacidad para continuar.")
       setIsLoading(false)
       return
     }
+
+    // La institución es opcional: si queda vacía no se envía la clave (el backend la guarda como null).
+    const institution = formData.institution.trim()
 
     try {
       const response = await createHttpApi().post<Record<string, unknown> | null>("/v1/auth/register", {
@@ -50,17 +57,26 @@ export function RegisterPage() {
         username: formData.username,
         email: formData.email,
         password: formData.password,
-        institution: "",
+        ...(institution ? { institution } : {}),
       })
 
       if (!response.ok) {
         const errorData = response.data
         console.error("Backend error response:", errorData)
-        setServerError(
-          (typeof errorData?.message === "string" && errorData.message) ||
-          (typeof errorData?.error === "string" && errorData.error) ||
-          (errorData ? JSON.stringify(errorData) : "Ocurrió un error al registrarse. Verifica tus datos.")
-        )
+        if (typeof errorData?.institution === "string") {
+          // Error de validación de campo: se muestra junto al campo institución.
+          setInstitutionError(errorData.institution)
+          const otherMessages = Object.entries(errorData)
+            .filter(([field, value]) => field !== "institution" && typeof value === "string")
+            .map(([, value]) => value as string)
+          setServerError(otherMessages.length > 0 ? otherMessages.join(" ") : null)
+        } else {
+          setServerError(
+            (typeof errorData?.message === "string" && errorData.message) ||
+            (typeof errorData?.error === "string" && errorData.error) ||
+            (errorData ? JSON.stringify(errorData) : "Ocurrió un error al registrarse. Verifica tus datos.")
+          )
+        }
         setIsLoading(false)
         return
       }
@@ -188,6 +204,31 @@ export function RegisterPage() {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="institution" className="text-foreground">
+                  Institución <span className="text-muted-foreground font-normal">(opcional)</span>
+                </Label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="institution"
+                    type="text"
+                    maxLength={255}
+                    placeholder="Universidad, colegio u organización"
+                    className="pl-10 bg-input border-border focus:border-primary focus:ring-primary"
+                    value={formData.institution}
+                    onChange={handleChange}
+                    aria-invalid={institutionError ? true : undefined}
+                    aria-describedby={institutionError ? "institution-error" : undefined}
+                  />
+                </div>
+                {institutionError && (
+                  <p id="institution-error" className="text-xs text-red-500">
+                    {institutionError}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">

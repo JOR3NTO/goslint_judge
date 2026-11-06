@@ -12,12 +12,10 @@ export type UserRole = "STUDENT" | "ADMIN"
 /**
  * Respuesta esperada de `GET /api/v1/auth/me`.
  *
- * ┌──────────────────────────────────────────────────────────────────────┐
- * │ CONTRATO PENDIENTE EN BACKEND: hoy auth-service no expone este        │
- * │ endpoint. Mientras tanto la feature degrada a los claims del JWT      │
- * │ (ver `ProfileService.getMyProfile`). Campos devueltos por el          │
- * │ endpoint: todos los de esta interfaz, `createdAt` en ISO-8601.        │
- * └──────────────────────────────────────────────────────────────────────┘
+ * Lo expone auth-service (`UserProfileResponse`). Si el endpoint falla con 404/405
+ * o no hay conexión, la feature degrada a los claims del JWT
+ * (ver `ProfileService.getMyProfile`), sin `institution` ni nombres.
+ * `createdAt` en ISO-8601.
  */
 export interface UserProfile {
   id: string

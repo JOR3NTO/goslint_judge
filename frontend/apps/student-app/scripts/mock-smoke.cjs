@@ -354,6 +354,31 @@ async function main() {
     assert.equal(login.status, 200)
   })
 
+  await step("registro con institución: /me la devuelve (sin espacios sobrantes)", async () => {
+    const created = await server.post("/v1/auth/register", {
+      firstName: "Con", lastName: "Institucion", username: "con_institucion", email: "con.institucion@uceva.edu.co",
+      password: "Clave123!", institution: "  Universidad de Prueba  ",
+    })
+    assert.equal(created.status, 201)
+    const login = await server.post("/v1/auth/login", { email: "con.institucion@uceva.edu.co", password: "Clave123!" })
+    assert.equal(login.status, 200)
+    const me = await server.get("/v1/auth/me", withToken(login.data.accessToken))
+    assert.equal(me.status, 200)
+    assert.equal(me.data.institution, "Universidad de Prueba")
+  })
+
+  await step("registro sin institución: /me devuelve institution null (nunca cadena vacía)", async () => {
+    const created = await server.post("/v1/auth/register", {
+      firstName: "Sin", lastName: "Institucion", username: "sin_institucion", email: "sin.institucion@uceva.edu.co",
+      password: "Clave123!",
+    })
+    assert.equal(created.status, 201)
+    const login = await server.post("/v1/auth/login", { email: "sin.institucion@uceva.edu.co", password: "Clave123!" })
+    const me = await server.get("/v1/auth/me", withToken(login.data.accessToken))
+    assert.equal(me.status, 200)
+    assert.equal(me.data.institution, null)
+  })
+
   await step("cinco intentos fallidos bloquean la cuenta con 423", async () => {
     let last
     for (let i = 0; i < 5; i++) {
