@@ -17,7 +17,7 @@
 
 /**
  * Request body para `POST /api/v1/auth/login`.
- * Mapea → `LoginRequest.java` (co.uceva.auth.infrastructure.web.dto)
+ * Mapea → `LoginRequest.java` (co.uceva.contestsplatform.auth.infrastructure.web.dto)
  *
  * Validaciones del backend:
  * - `email`: @NotBlank + @Email
@@ -30,7 +30,7 @@ export interface LoginRequest {
 
 /**
  * Response body exitosa de `POST /api/v1/auth/login` (HTTP 200).
- * Mapea → `LoginResponse.java` (co.uceva.auth.infrastructure.web.dto)
+ * Mapea → `LoginResponse.java` (co.uceva.contestsplatform.auth.infrastructure.web.dto)
  */
 export interface LoginResponse {
     /** Token JWT de corta duración (15 min por defecto). */

@@ -4,6 +4,7 @@ import co.uceva.contestsplatform.contestmodule.domain.service.PasswordEncoder;
 import co.uceva.shared.infrastructure.security.JwtTokenValidator;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -30,9 +31,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  * endpoint que exija un rol que el principal anónimo no tiene.
  * </p>
  */
-@Configuration
+@Configuration("contestSecurityConfig")
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
+@Order(2)
 public class SecurityConfig {
 
     /**
@@ -72,7 +74,7 @@ public class SecurityConfig {
      * @return Codificador de contraseñas basado en BCrypt.
      */
     @Bean
-    public PasswordEncoder passwordEncoder() {
+    public PasswordEncoder contestPasswordEncoder() {
         return new PasswordEncoder() {
             private final org.springframework.security.crypto.password.PasswordEncoder delegate =
                     new BCryptPasswordEncoder();

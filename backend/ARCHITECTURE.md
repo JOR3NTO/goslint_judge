@@ -750,7 +750,7 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 | 8 | **Registro de sesiones WebSocket es local a la instancia** — No escala horizontalmente | 🟡 Media | Compartir el registro vía Redis cuando se requiera más de una réplica |
 | 9 | **`traefik.yml` está vacío** — Sin API Gateway cada servicio se expone por su puerto | 🟡 Media | Configurar Traefik con reenvío de `Upgrade`/`Sec-WebSocket-Protocol` |
 | 10 | **`app.websocket.allowed-origins=*`** en `submission-service` | 🟡 Media | Restringir a los orígenes del frontend antes de exponer |
-| 11 | **Test package incorrecto** en `auth-service` | 🟢 Baja | La clase de test usa `co.uceva.judge.auth_service` en lugar de `co.uceva.auth` |
+| 11 | **Test package incorrecto** en `auth-service` | 🟢 Baja | La clase de test usa `co.uceva.judge.auth_service` en lugar de `co.uceva.contestsplatform.auth` |
 | 12 | **`MonitorLimits` de `judge-service` no persisten** — Los límites del sandbox se pierden en cada reinicio | 🟢 Baja | Añadir persistencia (Redis o BD) si se quieren límites configurables persistentes |
 
 ---

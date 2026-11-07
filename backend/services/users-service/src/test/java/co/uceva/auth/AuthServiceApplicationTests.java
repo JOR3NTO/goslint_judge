@@ -1,4 +1,4 @@
-package co.uceva.auth;
+package co.uceva.contestsplatform.auth;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

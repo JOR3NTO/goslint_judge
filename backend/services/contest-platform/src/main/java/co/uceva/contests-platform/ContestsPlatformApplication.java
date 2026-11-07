@@ -1,4 +1,4 @@
-package co.uceva.contestsplatform.contestmodule;
+package co.uceva.contestsplatform;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
