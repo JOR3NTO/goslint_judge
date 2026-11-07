@@ -2,6 +2,8 @@ package co.uceva.contests_platform.contest.infrastructure.client;
 
 import java.util.UUID;
 
+import co.uceva.contests_platform.problem.application.usecase.GetProblemByIdUseCase;
+import co.uceva.contests_platform.problem.domain.exception.ProblemNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -19,35 +21,28 @@ import co.uceva.contests_platform.contest.domain.service.ProblemCatalog;
 @Component
 public class ProblemServiceCatalogAdapter implements ProblemCatalog {
 
-    private final RestClient restClient;
+    private final GetProblemByIdUseCase getProblemByIdUseCase;
 
     /**
-     * @param problemServiceRestClient Cliente HTTP hacia {@code problem-service}.
+     * @param getProblemByIdUseCase Caso de uso para consultar un problema por id.
      */
-    public ProblemServiceCatalogAdapter(RestClient problemServiceRestClient) {
-        this.restClient = problemServiceRestClient;
+    public ProblemServiceCatalogAdapter(GetProblemByIdUseCase getProblemByIdUseCase) {
+        this.getProblemByIdUseCase = getProblemByIdUseCase;
     }
 
     /**
      * {@inheritDoc}
      * <p>
-     * Un 404 significa que el problema no existe; cualquier otro fallo (red, tiempo
-     * de espera, 5xx, 401/403) se informa como catálogo no disponible para no
-     * confundirlo con un problema inexistente.
+     * Una excepcion significa que el problema no existe.
      * </p>
      */
     @Override
     public boolean exists(UUID problemId) {
         try {
-            restClient.get()
-                    .uri("/api/v1/problems/{id}", problemId)
-                    .retrieve()
-                    .toBodilessEntity();
-            return true;
-        } catch (HttpClientErrorException.NotFound e) {
+            getProblemByIdUseCase.execute(problemId);
+        }catch (ProblemNotFoundException e){
             return false;
-        } catch (RestClientException e) {
-            throw new ProblemCatalogUnavailableException("No se pudo consultar problem-service.", e);
         }
+        return true;
     }
 }
