@@ -3,11 +3,16 @@ plugins {
 }
 
 dependencies {
+    implementation project(':shared:common-domain')
     implementation project(':shared:common-infrastructure')
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-amqp'   // RabbitMQ
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'  // Notificacion de veredictos
     runtimeOnly 'org.postgresql:postgresql'
+    testImplementation 'org.springframework.amqp:spring-rabbit-test'
     testRuntimeOnly 'com.h2database:h2'
     compileOnly 'org.projectlombok:lombok:1.18.30'
     annotationProcessor 'org.projectlombok:lombok:1.18.30'

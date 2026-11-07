@@ -1,0 +1,173 @@
+package co.uceva.contests_platform.submission;
+
+import co.uceva.shared.domain.ProgrammingLanguage;
+import co.uceva.shared.domain.SubmissionStatus;
+import co.uceva.shared.domain.VerdictStatus;
+import co.uceva.contests_platform.submission.application.port.out.ContestDataPort;
+import co.uceva.contests_platform.submission.application.port.out.SubmissionStatusNotifier;
+import co.uceva.contests_platform.submission.application.port.out.TeamDTO;
+import co.uceva.contests_platform.submission.application.port.out.TeamMembershipPort;
+import co.uceva.contests_platform.submission.application.usecase.MarkSubmissionEnqueueErrorUseCase;
+import co.uceva.contests_platform.submission.application.usecase.SubmitCodeUseCase;
+import co.uceva.contests_platform.submission.application.usecase.UpdateSubmissionVerdictUseCase;
+import co.uceva.contests_platform.submission.application.usecase.UpdateSubmissionVerdictUseCase.UpdateSubmissionVerdictCommand;
+import co.uceva.contests_platform.submission.domain.model.ContestSnapshot;
+import co.uceva.contests_platform.submission.domain.model.Submission;
+import co.uceva.contests_platform.submission.domain.model.TeamSnapshot;
+import co.uceva.contests_platform.submission.domain.repository.SubmissionRepository;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Recorre el camino completo desde que el juez devuelve un resultado hasta que la
+ * notificación sale hacia los interesados.
+ * <p>
+ * Es lo que las pruebas unitarias no pueden cubrir: que el evento interno, el
+ * listener transaccional y el puerto de notificación estén realmente conectados
+ * entre sí dentro del contexto de Spring. El canal WebSocket se sustituye por un
+ * simulacro del puerto, porque lo que se comprueba aquí es el cableado, no el
+ * transporte.
+ * </p>
+ */
+@SpringBootTest
+class SubmissionVerdictNotificationIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private SubmitCodeUseCase submitCodeUseCase;
+
+    @Autowired
+    private UpdateSubmissionVerdictUseCase updateSubmissionVerdictUseCase;
+
+    @Autowired
+    private MarkSubmissionEnqueueErrorUseCase markSubmissionEnqueueErrorUseCase;
+
+    @Autowired
+    private SubmissionRepository submissionRepository;
+
+    @MockBean
+    private SubmissionStatusNotifier submissionStatusNotifier;
+
+    @MockBean
+    private TeamMembershipPort teamMembershipPort;
+
+    /** Se simula contest-service: cada equipo de estas pruebas es elegible para su envío. */
+    @MockBean
+    private ContestDataPort contestDataPort;
+
+    @Test
+    void shouldPersistAndNotifyTheQueuedStatusAfterSuccessfulEnqueue() {
+        UUID teamId = UUID.randomUUID();
+        UUID integrante = UUID.randomUUID();
+        when(teamMembershipPort.findTeam(teamId)).thenReturn(new TeamDTO(teamId, List.of(integrante)));
+
+        Submission submission = givenASubmission(teamId);
+
+        Submission persisted = submissionRepository.findById(submission.getId()).orElseThrow();
+        assertThat(persisted.getStatus()).isEqualTo(SubmissionStatus.QUEUED);
+
+        ArgumentCaptor<Submission> notificado = ArgumentCaptor.forClass(Submission.class);
+        ArgumentCaptor<List<UUID>> destinatarios = ArgumentCaptor.forClass(List.class);
+        verify(submissionStatusNotifier).notifyStatusChanged(notificado.capture(), destinatarios.capture());
+        assertThat(notificado.getValue().getId()).isEqualTo(submission.getId());
+        assertThat(notificado.getValue().getStatus()).isEqualTo(SubmissionStatus.QUEUED);
+        assertThat(destinatarios.getValue()).containsExactly(integrante);
+    }
+
+    /**
+     * El criterio de aceptación completo: el veredicto y sus métricas quedan
+     * registrados y el cambio sale hacia el dueño del envío sin que nadie recargue
+     * nada.
+     */
+    @Test
+    void shouldPersistTheVerdictAndNotifyTheOwnerWhenTheJudgeFinishes() {
+        UUID teamId = UUID.randomUUID();
+        UUID integrante = UUID.randomUUID();
+        when(teamMembershipPort.findTeam(teamId)).thenReturn(new TeamDTO(teamId, List.of(integrante)));
+        Submission submission = givenASubmission(teamId);
+        clearInvocations(submissionStatusNotifier);
+
+        updateSubmissionVerdictUseCase.execute(new UpdateSubmissionVerdictCommand(
+                submission.getId(), VerdictStatus.ACCEPTED, 120, 2048));
+
+        Submission persisted = submissionRepository.findById(submission.getId()).orElseThrow();
+        assertThat(persisted.getVerdict()).isEqualTo(VerdictStatus.ACCEPTED);
+        assertThat(persisted.getStatus()).isEqualTo(SubmissionStatus.JUDGED);
+        assertThat(persisted.getExecutionTimeMs()).isEqualTo(120);
+        assertThat(persisted.getMemoryUsedKb()).isEqualTo(2048);
+
+        ArgumentCaptor<Submission> notificado = ArgumentCaptor.forClass(Submission.class);
+        ArgumentCaptor<List<UUID>> destinatarios = ArgumentCaptor.forClass(List.class);
+        verify(submissionStatusNotifier).notifyStatusChanged(notificado.capture(), destinatarios.capture());
+        assertThat(notificado.getValue().getId()).isEqualTo(submission.getId());
+        assertThat(notificado.getValue().getVerdict()).isEqualTo(VerdictStatus.ACCEPTED);
+        assertThat(destinatarios.getValue()).containsExactly(integrante);
+    }
+
+    /**
+     * El tercer criterio de aceptación: agotados los reintentos, el envío no se
+     * queda colgado y su nuevo estado viaja por el mismo canal.
+     */
+    @Test
+    void shouldMarkEnqueueErrorAndNotifyItThroughTheSameChannel() {
+        UUID teamId = UUID.randomUUID();
+        UUID integrante = UUID.randomUUID();
+        when(teamMembershipPort.findTeam(teamId)).thenReturn(new TeamDTO(teamId, List.of(integrante)));
+        Submission submission = givenASubmission(teamId);
+        clearInvocations(submissionStatusNotifier);
+
+        markSubmissionEnqueueErrorUseCase.execute(submission.getId(), "el juez agotó los reintentos");
+
+        Submission persisted = submissionRepository.findById(submission.getId()).orElseThrow();
+        assertThat(persisted.getStatus()).isEqualTo(SubmissionStatus.ENQUEUE_ERROR);
+        assertThat(persisted.getVerdict()).isEqualTo(VerdictStatus.PENDING);
+
+        ArgumentCaptor<Submission> notificado = ArgumentCaptor.forClass(Submission.class);
+        verify(submissionStatusNotifier).notifyStatusChanged(notificado.capture(), anyList());
+        assertThat(notificado.getValue().getStatus()).isEqualTo(SubmissionStatus.ENQUEUE_ERROR);
+    }
+
+    /**
+     * Si no se sabe a quién pertenece el envío, no se notifica a nadie. Es la
+     * postura segura: ante la duda, callar antes que difundir.
+     */
+    @Test
+    void shouldNotifyNobodyWhenTheOwningTeamHasNoKnownMembers() {
+        UUID teamId = UUID.randomUUID();
+        when(teamMembershipPort.findTeam(teamId)).thenReturn(new TeamDTO(teamId, List.of()));
+        Submission submission = givenASubmission(teamId);
+
+        updateSubmissionVerdictUseCase.execute(new UpdateSubmissionVerdictCommand(
+                submission.getId(), VerdictStatus.WRONG_ANSWER, 30, 256));
+
+        verify(submissionStatusNotifier, never()).notifyStatusChanged(any(), anyList());
+    }
+
+    private Submission givenASubmission(UUID teamId) {
+        UUID submitterId = UUID.randomUUID();
+        UUID contestId = UUID.randomUUID();
+        UUID problemId = UUID.randomUUID();
+        when(contestDataPort.findTeam(teamId)).thenReturn(Optional.of(
+                new TeamSnapshot(teamId, contestId, List.of(submitterId))));
+        when(contestDataPort.findContest(contestId)).thenReturn(Optional.of(new ContestSnapshot(
+                contestId, Instant.now().minusSeconds(3600), Instant.now().plusSeconds(3600))));
+        when(contestDataPort.findContestProblemIds(contestId)).thenReturn(List.of(problemId));
+        return submitCodeUseCase.execute(new SubmitCodeUseCase.SubmitCodeCommand(
+                teamId, problemId, submitterId, ProgrammingLanguage.PYTHON, "print(" + UUID.randomUUID() + ")"));
+    }
+}
