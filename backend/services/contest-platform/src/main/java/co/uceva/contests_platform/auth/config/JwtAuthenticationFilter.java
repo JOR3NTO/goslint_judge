@@ -1,4 +1,4 @@
-package co.uceva.contests_platform.contest.infrastructure.config;
+package co.uceva.contests_platform.auth.config;
 
 import co.uceva.shared.infrastructure.security.AuthenticatedUser;
 import co.uceva.shared.infrastructure.security.InvalidTokenException;
