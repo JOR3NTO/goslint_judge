@@ -1,4 +1,4 @@
-package co.uceva.contestsplatform.auth.cache;
+package co.uceva.contests_platform.auth.cache;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

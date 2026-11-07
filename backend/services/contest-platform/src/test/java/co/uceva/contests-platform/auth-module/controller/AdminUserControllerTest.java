@@ -1,14 +1,14 @@
-package co.uceva.contestsplatform.auth.controller;
+package co.uceva.contests_platform.auth.controller;
 
-import co.uceva.contestsplatform.auth.config.SecurityConfig;
-import co.uceva.contestsplatform.auth.exception.BadCredentialsException;
-import co.uceva.contestsplatform.auth.exception.ForbiddenOperationException;
-import co.uceva.contestsplatform.auth.exception.UserNotFoundException;
-import co.uceva.contestsplatform.auth.model.Role;
-import co.uceva.contestsplatform.auth.model.User;
-import co.uceva.contestsplatform.auth.service.AdminUserService;
-import co.uceva.contestsplatform.auth.service.AuthService;
-import co.uceva.contestsplatform.auth.service.ProfileService;
+import co.uceva.contests_platform.auth.config.SecurityConfig;
+import co.uceva.contests_platform.auth.exception.BadCredentialsException;
+import co.uceva.contests_platform.auth.exception.ForbiddenOperationException;
+import co.uceva.contests_platform.auth.exception.UserNotFoundException;
+import co.uceva.contests_platform.auth.model.Role;
+import co.uceva.contests_platform.auth.model.User;
+import co.uceva.contests_platform.auth.service.AdminUserService;
+import co.uceva.contests_platform.auth.service.AuthService;
+import co.uceva.contests_platform.auth.service.ProfileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

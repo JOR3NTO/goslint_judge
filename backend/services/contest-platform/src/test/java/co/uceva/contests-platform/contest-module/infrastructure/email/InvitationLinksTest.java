@@ -1,4 +1,4 @@
-package co.uceva.contestsplatform.contestmodule.infrastructure.email;
+package co.uceva.contests_platform.contest.infrastructure.email;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

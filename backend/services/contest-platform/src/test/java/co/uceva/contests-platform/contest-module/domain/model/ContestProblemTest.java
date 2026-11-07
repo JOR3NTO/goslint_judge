@@ -1,7 +1,7 @@
-package co.uceva.contestsplatform.contestmodule.domain.model;
+package co.uceva.contests_platform.contest.domain.model;
 
-import co.uceva.contestsplatform.contestmodule.domain.exception.InvalidContestProblemException;
-import co.uceva.contestsplatform.contestmodule.domain.valueobject.BalloonColor;
+import co.uceva.contests_platform.contest.domain.exception.InvalidContestProblemException;
+import co.uceva.contests_platform.contest.domain.valueobject.BalloonColor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

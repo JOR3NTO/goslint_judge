@@ -1,6 +1,6 @@
-package co.uceva.contestsplatform.contestmodule.domain.model;
+package co.uceva.contests_platform.contest.domain.model;
 
-import co.uceva.contestsplatform.contestmodule.domain.exception.InvalidClarificationException;
+import co.uceva.contests_platform.contest.domain.exception.InvalidClarificationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

@@ -1,11 +1,11 @@
-package co.uceva.contestsplatform.contestmodule.domain.model;
+package co.uceva.contests_platform.contest.domain.model;
 
-import co.uceva.contestsplatform.contestmodule.domain.exception.InvalidTeamException;
-import co.uceva.contestsplatform.contestmodule.domain.exception.MaxTeamMembersReachedException;
-import co.uceva.contestsplatform.contestmodule.domain.exception.MemberAlreadyInTeamException;
-import co.uceva.contestsplatform.contestmodule.domain.exception.MemberNotFoundException;
-import co.uceva.contestsplatform.contestmodule.domain.valueobject.TeamName;
-import co.uceva.contestsplatform.contestmodule.domain.valueobject.TeamScore;
+import co.uceva.contests_platform.contest.domain.exception.InvalidTeamException;
+import co.uceva.contests_platform.contest.domain.exception.MaxTeamMembersReachedException;
+import co.uceva.contests_platform.contest.domain.exception.MemberAlreadyInTeamException;
+import co.uceva.contests_platform.contest.domain.exception.MemberNotFoundException;
+import co.uceva.contests_platform.contest.domain.valueobject.TeamName;
+import co.uceva.contests_platform.contest.domain.valueobject.TeamScore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

@@ -1,16 +1,16 @@
-package co.uceva.contestsplatform.auth.controller;
+package co.uceva.contests_platform.auth.controller;
 
-import co.uceva.contestsplatform.auth.config.SecurityConfig;
-import co.uceva.contestsplatform.auth.dto.LoginResponse;
-import co.uceva.contestsplatform.auth.exception.AccountLockedException;
-import co.uceva.contestsplatform.auth.exception.BadCredentialsException;
-import co.uceva.contestsplatform.auth.exception.InvalidCurrentPasswordException;
-import co.uceva.contestsplatform.auth.exception.UserAlreadyExistsException;
-import co.uceva.contestsplatform.auth.exception.UsernameTakenException;
-import co.uceva.contestsplatform.auth.model.Role;
-import co.uceva.contestsplatform.auth.model.User;
-import co.uceva.contestsplatform.auth.service.AuthService;
-import co.uceva.contestsplatform.auth.service.ProfileService;
+import co.uceva.contests_platform.auth.config.SecurityConfig;
+import co.uceva.contests_platform.auth.dto.LoginResponse;
+import co.uceva.contests_platform.auth.exception.AccountLockedException;
+import co.uceva.contests_platform.auth.exception.BadCredentialsException;
+import co.uceva.contests_platform.auth.exception.InvalidCurrentPasswordException;
+import co.uceva.contests_platform.auth.exception.UserAlreadyExistsException;
+import co.uceva.contests_platform.auth.exception.UsernameTakenException;
+import co.uceva.contests_platform.auth.model.Role;
+import co.uceva.contests_platform.auth.model.User;
+import co.uceva.contests_platform.auth.service.AuthService;
+import co.uceva.contests_platform.auth.service.ProfileService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,7 +100,7 @@ class AuthControllerTest {
                 .andExpect(status().isCreated());
         // RegisterRequest no tiene campo de rol: AuthService solo puede crear estudiantes (User.newStudent).
         org.junit.jupiter.api.Assertions.assertEquals(0,
-                java.util.Arrays.stream(co.uceva.contestsplatform.auth.dto.RegisterRequest.class.getRecordComponents())
+                java.util.Arrays.stream(co.uceva.contests_platform.auth.dto.RegisterRequest.class.getRecordComponents())
                         .filter(c -> c.getName().equals("role")).count());
     }
 

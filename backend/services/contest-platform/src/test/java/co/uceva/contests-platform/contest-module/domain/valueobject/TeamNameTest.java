@@ -1,6 +1,6 @@
-package co.uceva.contestsplatform.contestmodule.domain.valueobject;
+package co.uceva.contests_platform.contest.domain.valueobject;
 
-import co.uceva.contestsplatform.contestmodule.domain.exception.InvalidTeamException;
+import co.uceva.contests_platform.contest.domain.exception.InvalidTeamException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

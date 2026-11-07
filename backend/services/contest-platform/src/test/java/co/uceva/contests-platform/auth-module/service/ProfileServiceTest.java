@@ -1,15 +1,15 @@
-package co.uceva.contestsplatform.auth.service;
+package co.uceva.contests_platform.auth.service;
 
-import co.uceva.contestsplatform.auth.cache.AuthCache;
-import co.uceva.contestsplatform.auth.exception.AccountDisabledException;
-import co.uceva.contestsplatform.auth.exception.BadCredentialsException;
-import co.uceva.contestsplatform.auth.exception.InvalidCurrentPasswordException;
-import co.uceva.contestsplatform.auth.exception.InvalidUserDataException;
-import co.uceva.contestsplatform.auth.exception.UsernameTakenException;
-import co.uceva.contestsplatform.auth.model.Role;
-import co.uceva.contestsplatform.auth.model.User;
-import co.uceva.contestsplatform.auth.repository.UserRepository;
-import co.uceva.contestsplatform.auth.security.JwtService;
+import co.uceva.contests_platform.auth.cache.AuthCache;
+import co.uceva.contests_platform.auth.exception.AccountDisabledException;
+import co.uceva.contests_platform.auth.exception.BadCredentialsException;
+import co.uceva.contests_platform.auth.exception.InvalidCurrentPasswordException;
+import co.uceva.contests_platform.auth.exception.InvalidUserDataException;
+import co.uceva.contests_platform.auth.exception.UsernameTakenException;
+import co.uceva.contests_platform.auth.model.Role;
+import co.uceva.contests_platform.auth.model.User;
+import co.uceva.contests_platform.auth.repository.UserRepository;
+import co.uceva.contests_platform.auth.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

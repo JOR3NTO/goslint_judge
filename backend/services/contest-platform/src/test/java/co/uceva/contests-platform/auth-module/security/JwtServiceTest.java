@@ -1,7 +1,7 @@
-package co.uceva.contestsplatform.auth.security;
+package co.uceva.contests_platform.auth.security;
 
-import co.uceva.contestsplatform.auth.model.Role;
-import co.uceva.contestsplatform.auth.model.User;
+import co.uceva.contests_platform.auth.model.Role;
+import co.uceva.contests_platform.auth.model.User;
 import co.uceva.shared.infrastructure.security.InvalidTokenException;
 import co.uceva.shared.infrastructure.security.JwtTokenValidator;
 import io.jsonwebtoken.Jwts;

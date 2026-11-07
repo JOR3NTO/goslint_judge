@@ -1,8 +1,8 @@
-package co.uceva.contestsplatform.auth.config;
+package co.uceva.contests_platform.auth.config;
 
-import co.uceva.contestsplatform.auth.model.Role;
-import co.uceva.contestsplatform.auth.model.User;
-import co.uceva.contestsplatform.auth.repository.UserRepository;
+import co.uceva.contests_platform.auth.model.Role;
+import co.uceva.contests_platform.auth.model.User;
+import co.uceva.contests_platform.auth.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;

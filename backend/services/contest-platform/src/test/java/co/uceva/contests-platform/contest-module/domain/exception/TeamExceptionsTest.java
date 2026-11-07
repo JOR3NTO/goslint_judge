@@ -1,4 +1,4 @@
-package co.uceva.contestsplatform.contestmodule.domain.exception;
+package co.uceva.contests_platform.contest.domain.exception;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package co.uceva.contestsplatform.contestmodule.infrastructure.client;
+package co.uceva.contests_platform.contest.infrastructure.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -9,7 +9,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import java.util.UUID;
 
-import co.uceva.contestsplatform.contestmodule.domain.exception.ProblemCatalogUnavailableException;
+import co.uceva.contests_platform.contest.domain.exception.ProblemCatalogUnavailableException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.client.MockRestServiceServer;

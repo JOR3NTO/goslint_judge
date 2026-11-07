@@ -1,4 +1,4 @@
-package co.uceva.contestsplatform.contestmodule.application;
+package co.uceva.contests_platform.contest.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -12,22 +12,22 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import co.uceva.contestsplatform.contestmodule.application.usecase.AddProblemToContestUseCase.AddProblemToContestCommand;
-import co.uceva.contestsplatform.contestmodule.application.usecase.UpdateContestProblemUseCase.UpdateContestProblemCommand;
-import co.uceva.contestsplatform.contestmodule.application.usecase.impl.AddProblemToContestUseCaseImpl;
-import co.uceva.contestsplatform.contestmodule.application.usecase.impl.GetProblemsByContestUseCaseImpl;
-import co.uceva.contestsplatform.contestmodule.application.usecase.impl.RemoveProblemFromContestUseCaseImpl;
-import co.uceva.contestsplatform.contestmodule.application.usecase.impl.UpdateContestProblemUseCaseImpl;
-import co.uceva.contestsplatform.contestmodule.domain.exception.ContestNotFoundException;
-import co.uceva.contestsplatform.contestmodule.domain.exception.ContestProblemNotFoundException;
-import co.uceva.contestsplatform.contestmodule.domain.exception.ExistingContestProblemException;
-import co.uceva.contestsplatform.contestmodule.domain.model.Contest;
-import co.uceva.contestsplatform.contestmodule.domain.model.ContestProblem;
-import co.uceva.contestsplatform.contestmodule.domain.repository.ContestProblemRepository;
-import co.uceva.contestsplatform.contestmodule.domain.exception.ProblemNotFoundException;
-import co.uceva.contestsplatform.contestmodule.domain.repository.ContestRepository;
-import co.uceva.contestsplatform.contestmodule.domain.service.ProblemCatalog;
-import co.uceva.contestsplatform.contestmodule.domain.valueobject.BalloonColor;
+import co.uceva.contests_platform.contest.application.usecase.AddProblemToContestUseCase.AddProblemToContestCommand;
+import co.uceva.contests_platform.contest.application.usecase.UpdateContestProblemUseCase.UpdateContestProblemCommand;
+import co.uceva.contests_platform.contest.application.usecase.impl.AddProblemToContestUseCaseImpl;
+import co.uceva.contests_platform.contest.application.usecase.impl.GetProblemsByContestUseCaseImpl;
+import co.uceva.contests_platform.contest.application.usecase.impl.RemoveProblemFromContestUseCaseImpl;
+import co.uceva.contests_platform.contest.application.usecase.impl.UpdateContestProblemUseCaseImpl;
+import co.uceva.contests_platform.contest.domain.exception.ContestNotFoundException;
+import co.uceva.contests_platform.contest.domain.exception.ContestProblemNotFoundException;
+import co.uceva.contests_platform.contest.domain.exception.ExistingContestProblemException;
+import co.uceva.contests_platform.contest.domain.model.Contest;
+import co.uceva.contests_platform.contest.domain.model.ContestProblem;
+import co.uceva.contests_platform.contest.domain.repository.ContestProblemRepository;
+import co.uceva.contests_platform.contest.domain.exception.ProblemNotFoundException;
+import co.uceva.contests_platform.contest.domain.repository.ContestRepository;
+import co.uceva.contests_platform.contest.domain.service.ProblemCatalog;
+import co.uceva.contests_platform.contest.domain.valueobject.BalloonColor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

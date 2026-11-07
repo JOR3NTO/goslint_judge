@@ -1,12 +1,12 @@
-package co.uceva.contestsplatform.auth.service;
+package co.uceva.contests_platform.auth.service;
 
-import co.uceva.contestsplatform.auth.cache.AuthCache;
-import co.uceva.contestsplatform.auth.exception.BadCredentialsException;
-import co.uceva.contestsplatform.auth.exception.ForbiddenOperationException;
-import co.uceva.contestsplatform.auth.exception.UserNotFoundException;
-import co.uceva.contestsplatform.auth.model.Role;
-import co.uceva.contestsplatform.auth.model.User;
-import co.uceva.contestsplatform.auth.repository.UserRepository;
+import co.uceva.contests_platform.auth.cache.AuthCache;
+import co.uceva.contests_platform.auth.exception.BadCredentialsException;
+import co.uceva.contests_platform.auth.exception.ForbiddenOperationException;
+import co.uceva.contests_platform.auth.exception.UserNotFoundException;
+import co.uceva.contests_platform.auth.model.Role;
+import co.uceva.contests_platform.auth.model.User;
+import co.uceva.contests_platform.auth.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

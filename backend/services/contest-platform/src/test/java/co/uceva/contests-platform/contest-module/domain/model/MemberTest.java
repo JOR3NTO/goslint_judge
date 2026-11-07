@@ -1,4 +1,4 @@
-package co.uceva.contestsplatform.contestmodule.domain.model;
+package co.uceva.contests_platform.contest.domain.model;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
