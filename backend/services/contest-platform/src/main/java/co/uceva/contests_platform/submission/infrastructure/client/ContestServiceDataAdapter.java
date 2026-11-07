@@ -92,7 +92,7 @@ public class ContestServiceDataAdapter implements ContestDataPort {
         try {
             problems = getProblemsByContestUseCase.execute(contestId)
                     .stream()
-                    .map(ContestProblem::getId).toList();
+                    .map(ContestProblem::getProblemId).toList();
         }catch (ContestNotFoundException e) {
             return List.of();
         }

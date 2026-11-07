@@ -5,11 +5,14 @@ import co.uceva.contests_platform.contest.application.usecase.GetProblemsByConte
 import co.uceva.contests_platform.contest.application.usecase.GetTeamByIdUseCase;
 import co.uceva.contests_platform.contest.domain.exception.ContestNotFoundException;
 import co.uceva.contests_platform.contest.domain.exception.TeamNotFoundException;
+import co.uceva.contests_platform.contest.domain.valueobject.BalloonColor;
+import co.uceva.contests_platform.contest.domain.model.ContestProblem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,5 +54,13 @@ class ContestServiceDataAdapterTest {
         when(getProblemsByContestUseCase.execute(contestId)).thenThrow(ContestNotFoundException.class);
 
         assertThat(adapter.findContestProblemIds(contestId)).isEmpty();
+    }
+
+    @Test
+    void shouldReturnProblemIdsNotContestProblemAssignmentIds() {
+        var assignment = ContestProblem.create(contestId, problemId, "A", 1, BalloonColor.of("#FF0000"));
+        when(getProblemsByContestUseCase.execute(contestId)).thenReturn(List.of(assignment));
+
+        assertThat(adapter.findContestProblemIds(contestId)).containsExactly(problemId);
     }
 }
