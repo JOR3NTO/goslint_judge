@@ -1,8 +1,8 @@
-# Auth Service — Documentación de API
+# Módulo `auth` — Documentación de API
 
-> **Servicio:** `auth-service`  
-> **Puerto:** `8081`  
-> **Base URL:** `http://localhost:8081/api/v1/auth`  
+> **Servicio:** `contest-platform` (módulo `auth`; antes era el microservicio `auth-service`)  
+> **Puerto:** `8080` (`SERVER_PORT`)  
+> **Base URL:** `http://localhost:8080/api/v1/auth`  
 > **Stack:** Java 17 · Spring Boot 3.2.4 · PostgreSQL · Redis · JWT (JJWT 0.12.5)
 
 ---
@@ -32,6 +32,7 @@
 DB_URL=jdbc:postgresql://localhost:5432/goslint_judge_db
 DB_USERNAME=postgres
 DB_PASSWORD=<tu_password>
+JWT_SECRET=<clave>              # OBLIGATORIA, mínimo 32 caracteres; sin ella el servicio no arranca
 ```
 
 Opcionales (valores por defecto en `application.properties`):
@@ -39,7 +40,6 @@ Opcionales (valores por defecto en `application.properties`):
 ```bash
 REDIS_HOST=localhost            # default: localhost
 REDIS_PORT=6379                 # default: 6379
-JWT_SECRET=<clave>              # mínimo 32 caracteres; el default es solo para desarrollo (NO usar en producción)
 JWT_EXPIRATION_ACCESS=900000    # 15 minutos en ms
 JWT_EXPIRATION_REFRESH=28800000 # 8 horas en ms
 JPA_SHOW_SQL=false              # true para ver el SQL en consola
@@ -59,7 +59,7 @@ SUPER_ADMIN_USERNAME=superadmin # default: superadmin
 Desde `backend/`:
 
 ```bash
-./gradlew :services:auth-service:bootRun
+./gradlew :services:contest-platform:bootRun
 ```
 
 ---

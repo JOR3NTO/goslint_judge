@@ -1,6 +1,6 @@
-# Probador manual del WebSocket de `submission-service`
+# Probador manual del WebSocket de `contest-platform` (módulo `submission`)
 
-`judge-service` todavía no existe. Esta carpeta simula su rol para poder ver en
+`judge-service` necesita Linux, cgroups v2 y `bwrap`. Esta carpeta simula su rol para poder ver en
 vivo, desde el navegador, cómo cambia el estado de un envío por el canal
 `/ws/submissions` — con control manual de cuándo "termina" de evaluar cada uno.
 
@@ -17,12 +17,12 @@ vivo, desde el navegador, cómo cambia el estado de un envío por el canal
 ## Requisitos previos
 
 1. Postgres y RabbitMQ corriendo (`docker compose -f infrastructure/docker/docker-compose.yml up -d`).
-2. `submission-service` arrancado con las variables de `backend/.env`
+2. `contest-platform` (:8080) arrancado con las variables de `backend/.env`
    (es quien declara la topología de RabbitMQ que este simulador consume, y
    quien recibe los envíos por `POST /api/v1/submissions`):
    ```bash
    set -a && source backend/.env && set +a
-   ./gradlew :services:submission-service:bootRun
+   ./gradlew :services:contest-platform:bootRun
    ```
    El envío HTTP requiere un JWT con rol `STUDENT`, `ADMIN` u `ORGANIZER`.
    El simulador genera un token válido para probar tanto el POST como el

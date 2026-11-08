@@ -136,7 +136,7 @@ Comprobado en el host: mientras una ejecución corre, su `cgroup.procs` contiene
 - **`memory.peak` nunca supera `memory.max`.** En la prueba dieron ambos `52428800`. Por eso una condición como `memory.peak > límite` casi nunca se cumple, y un programa que se pasó de memoria terminaría juzgado como `WRONG_ANSWER` con salida vacía. El veredicto `MEMORY_LIMIT_EXCEEDED` debe decidirse con `oom_kill > 0` en `memory.events`, que es lo que hace `TestCaseRunner`. En la prueba: `oom_kill=1`, salida 137.
 - **El `/tmp` del sandbox cuenta contra `memory.max`.** Es un tmpfs, así que vive en memoria. Por eso cada `--tmpfs` del comando de bwrap debe declarar su `--size` (ver [BWRAP.md](./BWRAP.md), sección 3).
 
-El límite por problema llega desde `problem-service` como `memoryLimitKb` y se convierte a bytes al llamar al `Runner`.
+El límite por problema llega desde el módulo `problem` de `contest-platform` como `memoryLimitKb` y se convierte a bytes al llamar al `Runner`.
 
 ### Procesos e hilos
 
@@ -233,7 +233,7 @@ Lo que cualquier implementación debe cumplir:
 
 ## 13. Configuración
 
-Los límites por problema (`timeLimitMs`, `memoryLimitKb`) llegan desde `problem-service`. Los de los monitores viven en [application.properties](../src/main/resources/application.properties) y un `ADMIN` puede cambiarlos en caliente con `PUT /api/v1/judge/monitor-limits`:
+Los límites por problema (`timeLimitMs`, `memoryLimitKb`) llegan desde el módulo `problem` de `contest-platform`. Los de los monitores viven en [application.properties](../src/main/resources/application.properties) y un `ADMIN` puede cambiarlos en caliente con `PUT /api/v1/judge/monitor-limits`:
 
 | Propiedad | Por defecto | Rol |
 |-----------|-------------|-----|
