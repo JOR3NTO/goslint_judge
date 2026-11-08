@@ -25,7 +25,7 @@ goslint_judge/
 ├── .gitignore
 ├── README.md                 ← Este archivo
 │
-├── backend/                  ← Microservicios Java / Spring Boot
+├── backend/                  ← Java / Spring Boot: monolito modular + juez
 │   ├── ARCHITECTURE.md       ← 📖 Guía técnica del backend
 │   ├── build.gradle          ← Configuración raíz de Gradle
 │   ├── settings.gradle       ← Registro de todos los sub-proyectos
@@ -33,13 +33,10 @@ goslint_judge/
 │   │   ├── common-domain/         ← Entidades y eventos compartidos (sin Spring)
 │   │   └── common-infrastructure/ ← Config transversal (excepciones, JWT base)
 │   └── services/
-│       ├── auth-service/          (puerto 8081)
-│       ├── problem-service/       (puerto 8082)
-│       ├── submission-service/    (puerto 8083)
-│       │   └── docs/              ← 📖 RABBITMQ.md · WEBSOCKET.md
-│       ├── judge-service/         (puerto 8084)
-│       ├── feedback-service/      (puerto 8085)
-│       └── contest-service/       (puerto 8086)
+│       ├── contest-platform/      (puerto 8080) ← monolito modular: auth, problem, contest, submission y feedback (esqueleto)
+│       │   └── docs/              ← 📖 AUTH_API.md · RABBITMQ.md · WEBSOCKET.md
+│       └── judge-service/         (puerto 8084) ← sandbox bwrap + cgroups v2
+│           └── docs/              ← 📖 BWRAP.md · CGROUPS.md · REQUIREMENTS.md · WORKERS.md
 │
 ├── frontend/                 ← Apps Next.js (pnpm Workspaces)
 │   ├── README.md             ← 📖 Guía técnica del frontend
@@ -66,8 +63,10 @@ goslint_judge/
 |----------------|------------------------------------------------------------------|
 | Backend        | [`backend/ARCHITECTURE.md`](./backend/ARCHITECTURE.md)          |
 | Frontend       | [`frontend/README.md`](./frontend/README.md)                     |
-| Mensajería (RabbitMQ) | [`backend/services/submission-service/docs/RABBITMQ.md`](./backend/services/submission-service/docs/RABBITMQ.md) |
-| Notificación en tiempo real (WebSocket) | [`backend/services/submission-service/docs/WEBSOCKET.md`](./backend/services/submission-service/docs/WEBSOCKET.md) |
+| Mensajería (RabbitMQ) | [`backend/services/contest-platform/docs/RABBITMQ.md`](./backend/services/contest-platform/docs/RABBITMQ.md) |
+| Notificación en tiempo real (WebSocket) | [`backend/services/contest-platform/docs/WEBSOCKET.md`](./backend/services/contest-platform/docs/WEBSOCKET.md) |
+| API de autenticación | [`backend/services/contest-platform/docs/AUTH_API.md`](./backend/services/contest-platform/docs/AUTH_API.md) |
+| Sandbox del juez | [`BWRAP.md`](./backend/services/judge-service/docs/BWRAP.md) · [`CGROUPS.md`](./backend/services/judge-service/docs/CGROUPS.md) · [`REQUIREMENTS.md`](./backend/services/judge-service/docs/REQUIREMENTS.md) · [`WORKERS.md`](./backend/services/judge-service/docs/WORKERS.md) |
 | Probador manual del WebSocket | [`testing/ws-judge-simulator/README.md`](./testing/ws-judge-simulator/README.md) |
 
 ---
@@ -78,9 +77,9 @@ goslint_judge/
 | Tecnología     | Rol                                                  |
 |----------------|------------------------------------------------------|
 | Java 17        | Lenguaje de desarrollo                               |
-| Spring Boot 3.2| Framework de microservicios                          |
+| Spring Boot 3.2| Framework (monolito modular + juez)                  |
 | Gradle 8.x     | Build system multi-proyecto                          |
-| PostgreSQL     | Persistencia relacional (una BD por servicio)        |
+| PostgreSQL     | Persistencia relacional (`goslint_judge_db`)         |
 | RabbitMQ       | Cola de mensajes (pipeline de evaluación asíncrono)  |
 | Redis          | Caché (scoreboard, rate-limiting)                    |
 | Docker SDK     | Sandboxing de código fuente del estudiante           |
@@ -118,8 +117,8 @@ goslint_judge/
 
 ```bash
 # 1. Levantar la infraestructura (PostgreSQL + Redis + RabbitMQ).
-#    Requiere infrastructure/docker/.env (copiar de .env.example). Para levantar también
-#    los servicios en contenedores: `docker compose up -d --build` — ver infrastructure/docker/README.md
+#    Requiere infrastructure/docker/.env (copiar de .env.example). Los servicios de aplicación del
+#    compose están desactualizados (ver nota más abajo): levanta solo la infraestructura.
 docker compose -f infrastructure/docker/docker-compose.yml up -d postgres redis rabbitmq
 
 cd backend
@@ -127,23 +126,29 @@ cd backend
 # 2. Compilar todos los módulos
 ./gradlew build
 
-# 3. Correr un microservicio específico
-./gradlew :services:auth-service:bootRun
-./gradlew :services:problem-service:bootRun
-./gradlew :services:submission-service:bootRun
+# 3. Correr la plataforma (auth, problemas, concursos y envíos) en el puerto 8080
+./gradlew :services:contest-platform:bootRun
 ```
 
-> `submission-service` **no arranca sin `JWT_SECRET`** (mínimo 32 bytes): la clave
+> `contest-platform` **no arranca sin `JWT_SECRET`** (mínimo 32 bytes): la clave
 > no tiene valor por defecto a propósito, para que un secreto de ejemplo no acabe
 > heredado en un entorno real. Las variables van en `backend/.env`:
 >
 > ```bash
 > set -a && source backend/.env && set +a
-> ./gradlew :services:submission-service:bootRun
+> ./gradlew :services:contest-platform:bootRun
 > ```
 >
 > Sin RabbitMQ el servicio arranca igualmente: los envíos quedan en `PENDING` y se
 > reintentan solos cuando el broker vuelva.
+>
+> `judge-service` se levanta aparte (Docker, solo Linux): ver
+> [`REQUIREMENTS.md`](./backend/services/judge-service/docs/REQUIREMENTS.md). Debe poder
+> llamar a `contest-platform`: `PROBLEM_SERVICE_URL=http://host.docker.internal:8080`.
+>
+> ⚠️ `infrastructure/docker/docker-compose.yml` y `backend/scripts/start-services.sh` aún
+> describen los antiguos `auth/problem/submission/contest-service` (puertos 8081–8086);
+> para `contest-platform` usa Gradle o `testing/teams-tester/start.sh`.
 
 ---
 
@@ -168,22 +173,21 @@ pnpm dev:admin
 
 | Componente          | Estado                | Notas                                              |
 |---------------------|-----------------------|----------------------------------------------------|
-| `auth-service`      | 🟢 Funcional          | Registro y login implementados. Emite JWT (access 15 min + refresh 8 h). Bloqueo de cuenta por intentos fallidos en Redis. Sin Flyway aún |
-| `problem-service`   | 🟢 Funcional          | CRUD de problemas y casos de prueba, con roles declarados. Falta su migración de Flyway |
-| `submission-service`| 🟢 Funcional          | Envío → RabbitMQ → veredicto → WebSocket, con reintentos y colas de fallidos |
-| `judge-service`     | 🟡 Parcial            | Evalúa Python en sandbox (`bwrap` + cgroups v2). Validado en Manjaro x86_64 y OCI A1-flex ARM. C, C++ y Java pendientes |
-| `feedback-service`  | 🔴 Esqueleto          | Sin implementar                                    |
-| `contest-service`   | 🔴 Esqueleto          | Sin implementar; los equipos se tratan como individuales mientras tanto |
-| `student-app`       | 🟢 UI base lista      | Landing, Login, Register, Contests migrados. Perfil (`/profile`) con avatar DiceBear listo; datos completos pendientes de `GET /api/v1/auth/me` en `auth-service` |
+| `contest-platform`  | 🟢 Funcional          | Monolito modular en :8080. `auth` (registro, login, refresh, perfil, administración, JWT 15 min / 8 h, bloqueo por intentos en Redis), `problem` (CRUD de problemas y casos de prueba), `contest` (maratones, equipos, invitaciones por correo, aclaraciones, scoreboard) y `submission` (envío con regla de elegibilidad → RabbitMQ → veredicto → WebSocket, con reintentos y DLQ). Esquema con Flyway `V1`–`V11` |
+| `judge-service`     | 🟢 Funcional          | Evalúa Python, C, C++ y Java en sandbox (`bwrap` + cgroups v2) con pool de workers. Validado en Manjaro x86_64 y OCI A1-flex ARM |
+| módulo `feedback`   | 🔴 Esqueleto          | En `contest-platform`; solo carpetas vacías, sin implementar |
+| `student-app`       | 🟢 UI base lista      | Landing, Login, Register, Contests migrados. Perfil (`/profile`) con avatar DiceBear listo; `GET /api/v1/auth/me` ya existe en `contest-platform`, falta conectar el front |
 | `admin-app`         | 🔴 Pendiente          | Placeholder - en construcción                      |
-| `docker-compose`    | 🟢 Listo              | Levanta PostgreSQL, Redis, RabbitMQ y auth, problem y submission; perfil `sandbox` (solo Linux) agrega `judge-service` |
+| `docker-compose`    | 🟡 Desactualizado     | Infraestructura (PostgreSQL, Redis, RabbitMQ) y perfil `sandbox` OK; los servicios `auth/problem/submission/contest` ya no existen y falta `contest-platform` |
 | `traefik`           | 🔴 Pendiente          | `traefik.yml` aún vacío                            |
 | `Gradle Wrapper`    | 🟢 Listo              | `./gradlew` disponible en `backend/`               |
 
-### Lo que falta para cerrar el flujo de extremo a extremo
+### Pendientes principales
 
-1. **Lenguajes en `judge-service`** — Python funciona; C, C++ y Java requieren el compilador (`Compiler`), que va en otra HU.
-2. **Detección de MLE** — en kernels modernos el OOM killer sale con EXIT=0; `TestCaseRunner` debe usar `oom_kill` de `memory.events` en lugar de comparar `memory.peak > memory.max`.
+1. **Infraestructura de ejecución** — actualizar `docker-compose.yml`, `start-services.sh`/`stop-services.sh` y los `rewrites` de `student-app` para apuntar a `contest-platform` (:8080).
+2. **`PROBLEM_SERVICE_URL`** — el juez aún usa `localhost:8082` por defecto (y `APP_PUBLIC_URL` apunta a `:8086`).
+3. **Detección de MLE** — en kernels modernos el OOM killer sale con EXIT=0; `TestCaseRunner` debe usar `oom_kill` de `memory.events` en lugar de comparar `memory.peak > memory.max`.
+4. **Módulo `feedback`** — retroalimentación con LLM sin implementar.
 
 ---
 
@@ -240,12 +244,12 @@ Los scopes identifican **qué parte del sistema** fue modificada:
 
 | Scope             | Corresponde a                         |
 |-------------------|---------------------------------------|
-| `auth`            | `auth-service`                        |
-| `problem`         | `problem-service`                     |
-| `submission`      | `submission-service`                  |
+| `auth`            | módulo `auth` de `contest-platform`   |
+| `problem`         | módulo `problem` de `contest-platform` |
+| `submission`      | módulo `submission` de `contest-platform` |
 | `judge`           | `judge-service`                       |
-| `feedback`        | `feedback-service`                    |
-| `contest`         | `contest-service`                     |
+| `feedback`        | módulo `feedback` de `contest-platform` |
+| `contest`         | módulo `contest` de `contest-platform` |
 | `common`          | `shared/common-domain` o `common-infra` |
 | `student-app`     | Frontend app de estudiantes           |
 | `admin-app`       | Frontend panel administrativo         |

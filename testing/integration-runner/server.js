@@ -9,10 +9,11 @@ const fetch   = require("node-fetch");
 
 const HTTP_PORT       = process.env.INTEGRATION_PORT   || 4200;
 const SERVICES_HOST   = process.env.SERVICES_HOST      || "localhost";
-const SUBMISSION_PORT = process.env.SUBMISSION_PORT    || 8083;
-const AUTH_URL       = `http://${SERVICES_HOST}:${process.env.AUTH_PORT    || 8081}`;
-const PROBLEM_URL    = `http://${SERVICES_HOST}:${process.env.PROBLEM_PORT || 8082}`;
-const SUBMISSION_URL = `http://${SERVICES_HOST}:${SUBMISSION_PORT}`;
+// Un solo servicio: contest-platform expone auth, problemas, concursos y envios.
+const CONTEST_PORT   = process.env.CONTEST_PORT       || 8080;
+const AUTH_URL       = `http://${SERVICES_HOST}:${CONTEST_PORT}`;
+const PROBLEM_URL    = AUTH_URL;
+const SUBMISSION_URL = AUTH_URL;
 const JUDGE_URL      = `http://${SERVICES_HOST}:${process.env.JUDGE_PORT   || 8084}`;
 
 // Configuracion que el panel necesita en el navegador. Sale del .env cargado
@@ -23,7 +24,7 @@ const PANEL_CONFIG = {
   jwtSecret:       process.env.JWT_SECRET || "",
   jwtIssuer:       process.env.JWT_ISSUER || "goslint-judge",
   jwtTtlSeconds:   Number(process.env.JWT_TTL_SECONDS || 3600),
-  wsUrl:           process.env.WS_URL || `ws://${SERVICES_HOST}:${SUBMISSION_PORT}/ws/submissions`,
+  wsUrl:           process.env.WS_URL || `ws://${SERVICES_HOST}:${CONTEST_PORT}/ws/submissions`,
   wsSubprotocol:   process.env.WS_SUBPROTOCOL || "goslint-judge",
 };
 

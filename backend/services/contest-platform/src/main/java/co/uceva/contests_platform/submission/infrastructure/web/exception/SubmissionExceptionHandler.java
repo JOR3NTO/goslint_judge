@@ -1,0 +1,47 @@
+package co.uceva.contests_platform.submission.infrastructure.web.exception;
+
+import co.uceva.contests_platform.submission.domain.exception.DuplicateSubmissionException;
+import co.uceva.contests_platform.submission.domain.exception.SubmissionNotFoundException;
+import co.uceva.contests_platform.submission.infrastructure.web.dto.ErrorResponseDTO;
+import co.uceva.contests_platform.submission.application.exception.ContestServiceUnavailableException;
+import co.uceva.contests_platform.submission.domain.exception.SubmissionNotAllowedException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+/**
+ * Interceptor global de excepciones para el módulo de Envíos.
+ * Traduce las excepciones de dominio en respuestas HTTP con mensajes
+ * de error claros y consistentes para el cliente.
+ */
+@RestControllerAdvice
+public class SubmissionExceptionHandler {
+
+    @ExceptionHandler(SubmissionNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleSubmissionNotFound(SubmissionNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(DuplicateSubmissionException.class)
+    public ResponseEntity<ErrorResponseDTO> handleDuplicateSubmission(DuplicateSubmissionException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
+    /** El envío incumple la regla de elegibilidad: 403. */
+    @ExceptionHandler(SubmissionNotAllowedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleNotAllowed(SubmissionNotAllowedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
+    /** Falló la consulta de datos del concurso y no se pudo decidir: 503 para que el cliente reintente. */
+    @ExceptionHandler(ContestServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponseDTO> handleContestServiceUnavailable(ContestServiceUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ErrorResponseDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponseDTO> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponseDTO(ex.getMessage()));
+    }
+}

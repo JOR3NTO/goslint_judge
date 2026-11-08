@@ -1,10 +1,10 @@
 #!/bin/bash
 # Arranca lo necesario para probar y abre el probador en http://localhost:4300:
-#   problem-service (:8082), contest-service (:8086) y submission-service (:8083), si no están
-#   ya corriendo, y el probador. Si RabbitMQ (:5672) no está levantado, submission-service arranca
-#   con la mensajería apagada: los envíos se aceptan o rechazan igual, pero no llegan al juez.
-# Solo detiene al salir (Ctrl+C) los servicios que arrancó él. Postgres debe estar corriendo.
-# El correo (MAIL_*) se lee de backend/services/contest-service/.env, que no se versiona.
+#   contest-platform (:8080), que expone auth, problemas, concursos y envios, si no esta
+#   ya corriendo, y el probador. Si RabbitMQ (:5672) no esta levantado, el servicio arranca
+#   con la mensajeria apagada: los envios se aceptan o rechazan igual, pero no llegan al juez.
+# Solo detiene al salir (Ctrl+C) el servicio que arranco el. Postgres debe estar corriendo.
+# El correo (MAIL_*) se lee de backend/services/contest-platform/.env, que no se versiona.
 cd "$(dirname "$0")"
 BACKEND="$(cd ../../backend && pwd)"
 LOGS="$BACKEND/logs"
@@ -12,8 +12,7 @@ mkdir -p "$LOGS"
 
 # DB_*, JWT_SECRET y JWT_ISSUER son los mismos para todos los servicios en local.
 set -a
-. "$BACKEND/services/problem-service/.env"
-[ -f "$BACKEND/services/contest-service/.env" ] && . "$BACKEND/services/contest-service/.env"
+[ -f "$BACKEND/services/contest-platform/.env" ] && . "$BACKEND/services/contest-platform/.env"
 set +a
 
 PIDS=()
@@ -39,13 +38,5 @@ start_service() {
     echo "[tester] $name no respondió en 60 s; revisa backend/logs/$name.log"; exit 1
 }
 
-start_service problem-service 8082
-start_service contest-service 8086
-if listening 5672; then
-    start_service submission-service 8083
-else
-    echo "[tester] RabbitMQ no responde en :5672: submission-service arranca sin mensajería"
-    APP_MESSAGING_ENABLED=false start_service submission-service 8083
-fi
-
+start_service contest-platform 8080
 node server.js

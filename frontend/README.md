@@ -16,6 +16,7 @@ frontend/
 ├── .gitignore                ← Ignores globales (node_modules, .next, etc.)
 │
 └── apps/
+    ├── landing-app/          ← Landing pública (Puerto 3002); enlaza a student-app
     ├── student-app/          ← App pública (estudiantes, maratones, envíos)
     └── admin-app/            ← App administrativa (ADMIN/ORGANIZER)
 ```
@@ -63,11 +64,11 @@ La aplicación principal que usan los estudiantes:
 | Página `/profile` | 🟢 Lista | Cabecera (avatar, nombre, `@username`, rol), detalle de cuenta, skeleton y error con reintento |
 | Avatar DiceBear | 🟢 Lista | Semilla = `username` (o `id` si el perfil es parcial). Determinístico, no se guarda en BD. Se renderiza como `<img>` con data URI, sin `dangerouslySetInnerHTML` |
 | Navbar con sesión | 🟢 Lista | Con token muestra "Mi perfil"; sin token, Login/Registro |
-| Datos completos de la cuenta | 🟡 Depende del backend | Requiere `GET /api/v1/auth/me` en `auth-service` (**no existe aún**). Contrato en `features/profile/types/profile.types.ts` |
+| Datos completos de la cuenta | 🟡 Depende del backend | El endpoint `GET /api/v1/auth/me` ya existe en `contest-platform`. Contrato en `features/profile/types/profile.types.ts` |
 | Fallback sin `/me` | 🟢 Lista | Si responde 404/405 o no hay conexión, se muestra un perfil parcial con los claims del JWT (id, correo, rol) y un aviso |
 | Cierre de sesión en el front | 🟢 Lista | Botón "Cerrar sesión" en el navbar (escritorio y móvil). Llama a `POST /api/v1/auth/logout`, borra los tokens de `localStorage` y redirige a `/login`, aunque la llamada falle |
 
-**Enrutamiento del API (`student-app`):** `next.config.mjs` reenvía `/api/v1/*` por prefijo a cada microservicio: contests, contest-problems, teams, invitations y clarifications a contest-service (8086); problems a problem-service (8082); submissions a submission-service (8083); el resto (auth, users, admin) a auth-service (8081). Los destinos se pueden cambiar con `CONTEST_SERVICE_URL`, `PROBLEM_SERVICE_URL`, `SUBMISSION_SERVICE_URL` y `AUTH_SERVICE_URL`.
+**Enrutamiento del API (`student-app`):** `next.config.mjs` reenvía `/api/v1/*` por prefijo a cada servicio. **Está desactualizado:** todavía apunta a los antiguos `contest-service` (8086), `problem-service` (8082), `submission-service` (8083) y `auth-service` (8081), que desde la migración a monolito modular son un único `contest-platform` en `:8080`. Mientras no se actualice `next.config.mjs`, hay que definir `CONTEST_SERVICE_URL`, `PROBLEM_SERVICE_URL`, `SUBMISSION_SERVICE_URL` y `AUTH_SERVICE_URL` apuntando a `http://localhost:8080`.
 
 Cómo probarlo sin backend: `NEXT_PUBLIC_USE_MOCK=true pnpm dev:student`, guardar un `auth_token` de prueba en `localStorage` y abrir `/profile`.
 
@@ -105,9 +106,12 @@ NEXT_PUBLIC_USE_MOCK=false
 
 ### 3. Correr en modo de desarrollo (Dev Server)
 
-Puedes ejecutar ambas aplicaciones desde la raíz usando los scripts predefinidos:
+Puedes ejecutar las aplicaciones desde la raíz usando los scripts predefinidos:
 
 ```bash
+# Correr landing-app (Puerto 3002)
+pnpm dev:landing
+
 # Correr student-app (Puerto 3000)
 pnpm dev:student
 
@@ -128,6 +132,7 @@ Para verificar que todo compila correctamente:
 pnpm build
 
 # O compilar aplicaciones individualmente
+pnpm --filter @uceva-judge/landing-app build
 pnpm --filter @uceva-judge/student-app build
 pnpm --filter @uceva-judge/admin-app build
 ```
@@ -177,7 +182,7 @@ el botón **"Reiniciar datos demo"**. En `/login` aparece además **"Entrar como
 ### Qué cubre
 
 - **Auth**: login (400 por campo, 401 con contraseña incorrecta, 423 tras 5 intentos fallidos durante 15 min),
-  registro con las mismas validaciones que auth-service (400 y 409 por correo o usuario repetido),
+  registro con las mismas validaciones que el módulo `auth` del backend (400 y 409 por correo o usuario repetido),
   `me`, `refresh`, `logout` y `check-username`. El token es un **JWT falso** (`header.payload.mock-signature`)
   con expiración de 15 min, así que caduca igual que el real. Un verificador real lo rechaza.
 - **Maratones**: `C1` ACTIVE con 5 problemas (el estudiante ya está inscrito con «Los Algoritmos»),

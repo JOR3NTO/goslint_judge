@@ -348,8 +348,9 @@ wsAdapter.simulateEvent("SUBMISSION_VERDICT", {
 ### Qué queda pendiente (próxima etapa)
 
 - Implementar las pantallas de `admin-app` (dashboard, gestión de problemas, maratones, usuarios)
+- Actualizar los `rewrites` de `next.config.mjs` (student-app) para apuntar al único `contest-platform` (`:8080`)
 - Implementar features pendientes en `student-app`: `submissions`, `ranking` (standalone), `clarifications`, `teams`
-- `profile`: falta el endpoint `GET /api/v1/auth/me` en `auth-service`; mientras tanto el perfil degrada a los claims del JWT. Falta también el cierre de sesión en el front
+- `profile`: `GET /api/v1/auth/me` ya existe en `contest-platform`; si falla, el perfil degrada a los claims del JWT
 - Conectar `ContestsService`, `AuthService`, etc. con el backend real via `HttpApiAdapter`
 - Conectar `WebSocketAdapter` al endpoint WS del backend
 - Extraer `core/api` y `core/events` a `packages/api-client` y `packages/event-bus` cuando haya duplicación real entre las dos apps

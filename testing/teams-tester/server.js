@@ -11,9 +11,9 @@ try {
 } catch { /* sin .env: el secreto se pega a mano en el panel */ }
 
 const PORT        = Number(process.env.TEAMS_TESTER_PORT || 4300);
-const CONTEST_URL = (process.env.CONTEST_URL || "http://localhost:8086").replace(/\/+$/, "");
-const PROBLEM_URL = (process.env.PROBLEM_URL || "http://localhost:8082").replace(/\/+$/, "");
-const SUBMISSION_URL = (process.env.SUBMISSION_URL || "http://localhost:8083").replace(/\/+$/, "");
+const CONTEST_URL = (process.env.CONTEST_URL || "http://localhost:8080").replace(/\/+$/, "");
+const PROBLEM_URL = (process.env.PROBLEM_URL || "http://localhost:8080").replace(/\/+$/, "");
+const SUBMISSION_URL = (process.env.SUBMISSION_URL || "http://localhost:8080").replace(/\/+$/, "");
 const PUBLIC_DIR  = path.join(__dirname, "public");
 
 // Sirve el JWT_SECRET al navegador para firmar tokens de prueba: solo en local.
