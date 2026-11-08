@@ -33,12 +33,10 @@ goslint_judge/
 │   │   ├── common-domain/         ← Entidades y eventos compartidos (sin Spring)
 │   │   └── common-infrastructure/ ← Config transversal (excepciones, JWT base)
 │   └── services/
-│       ├── contest-platform/      (puerto 8080) ← monolito modular: auth, problem, contest y submission
+│       ├── contest-platform/      (puerto 8080) ← monolito modular: auth, problem, contest, submission y feedback (esqueleto)
 │       │   └── docs/              ← 📖 AUTH_API.md · RABBITMQ.md · WEBSOCKET.md
-│       ├── judge-service/         (puerto 8084) ← sandbox bwrap + cgroups v2
-│       │   └── docs/              ← 📖 BWRAP.md · CGROUPS.md · REQUIREMENTS.md · WORKERS.md
-│       ├── feedback-service/      (puerto 8085) ← esqueleto
-│       └── submission-service/    ← residual (su código vive en contest-platform)
+│       └── judge-service/         (puerto 8084) ← sandbox bwrap + cgroups v2
+│           └── docs/              ← 📖 BWRAP.md · CGROUPS.md · REQUIREMENTS.md · WORKERS.md
 │
 ├── frontend/                 ← Apps Next.js (pnpm Workspaces)
 │   ├── README.md             ← 📖 Guía técnica del frontend
@@ -177,7 +175,7 @@ pnpm dev:admin
 |---------------------|-----------------------|----------------------------------------------------|
 | `contest-platform`  | 🟢 Funcional          | Monolito modular en :8080. `auth` (registro, login, refresh, perfil, administración, JWT 15 min / 8 h, bloqueo por intentos en Redis), `problem` (CRUD de problemas y casos de prueba), `contest` (maratones, equipos, invitaciones por correo, aclaraciones, scoreboard) y `submission` (envío con regla de elegibilidad → RabbitMQ → veredicto → WebSocket, con reintentos y DLQ). Esquema con Flyway `V1`–`V11` |
 | `judge-service`     | 🟢 Funcional          | Evalúa Python, C, C++ y Java en sandbox (`bwrap` + cgroups v2) con pool de workers. Validado en Manjaro x86_64 y OCI A1-flex ARM |
-| `feedback-service`  | 🔴 Esqueleto          | Sin implementar                                    |
+| módulo `feedback`   | 🔴 Esqueleto          | En `contest-platform`; solo carpetas vacías, sin implementar |
 | `student-app`       | 🟢 UI base lista      | Landing, Login, Register, Contests migrados. Perfil (`/profile`) con avatar DiceBear listo; `GET /api/v1/auth/me` ya existe en `contest-platform`, falta conectar el front |
 | `admin-app`         | 🔴 Pendiente          | Placeholder - en construcción                      |
 | `docker-compose`    | 🟡 Desactualizado     | Infraestructura (PostgreSQL, Redis, RabbitMQ) y perfil `sandbox` OK; los servicios `auth/problem/submission/contest` ya no existen y falta `contest-platform` |
@@ -189,7 +187,7 @@ pnpm dev:admin
 1. **Infraestructura de ejecución** — actualizar `docker-compose.yml`, `start-services.sh`/`stop-services.sh` y los `rewrites` de `student-app` para apuntar a `contest-platform` (:8080).
 2. **`PROBLEM_SERVICE_URL`** — el juez aún usa `localhost:8082` por defecto (y `APP_PUBLIC_URL` apunta a `:8086`).
 3. **Detección de MLE** — en kernels modernos el OOM killer sale con EXIT=0; `TestCaseRunner` debe usar `oom_kill` de `memory.events` en lugar de comparar `memory.peak > memory.max`.
-4. **`feedback-service`** — retroalimentación con LLM sin implementar.
+4. **Módulo `feedback`** — retroalimentación con LLM sin implementar.
 
 ---
 
@@ -250,7 +248,7 @@ Los scopes identifican **qué parte del sistema** fue modificada:
 | `problem`         | módulo `problem` de `contest-platform` |
 | `submission`      | módulo `submission` de `contest-platform` |
 | `judge`           | `judge-service`                       |
-| `feedback`        | `feedback-service`                    |
+| `feedback`        | módulo `feedback` de `contest-platform` |
 | `contest`         | módulo `contest` de `contest-platform` |
 | `common`          | `shared/common-domain` o `common-infra` |
 | `student-app`     | Frontend app de estudiantes           |

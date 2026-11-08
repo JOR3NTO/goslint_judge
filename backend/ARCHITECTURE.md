@@ -50,7 +50,7 @@ El **Goslint Judge** es un juez en línea (Online Judge System) institucional di
 ```
 backend/
 ├── build.gradle                  ← BOM Spring Boot 3.2.4, Lombok, JaCoCo, tests comunes
-├── settings.gradle               ← Declara 2 módulos shared y 4 servicios
+├── settings.gradle               ← Declara 2 módulos shared y 2 servicios
 ├── gradle.properties             ← Variables globales
 ├── .env                          ← Variables de entorno locales (no commitear)
 │
@@ -66,17 +66,14 @@ backend/
     │   ├── problem/              ←   problemas y casos de prueba
     │   ├── contest/              ←   maratones, equipos, invitaciones, aclaraciones, scoreboard
     │   ├── submission/           ←   envíos, RabbitMQ, WebSocket
+    │   ├── feedback/             ←   retroalimentación con LLM (esqueleto: solo carpetas vacías)
     │   └── docs/                 ←   AUTH_API.md · RABBITMQ.md · WEBSOCKET.md
-    ├── judge-service/            ← Puerto 8084. Sandbox (bwrap + cgroups v2), sin BD
-    ├── feedback-service/         ← Puerto 8085 (esqueleto)
-    ├── submission-service/       ← RESIDUAL: solo `build.gradle`, la clase de arranque y `application.properties`.
-    │                               Su código se movió al módulo `submission` de contest-platform.
-    └── users-service/            ← OBSOLETO — fuera de `settings.gradle`, solo `.gitkeep` y esqueleto
+    └── judge-service/            ← Puerto 8084. Sandbox (bwrap + cgroups v2), sin BD
 ```
 
-> `auth-service`, `problem-service` y `contest-service` **ya no existen como servicios**: se integraron en `contest-platform` (rama `refactor/migrar-la-arquitectura-del-sistema-a-un-monolito-modular`). Los módulos se llaman entre sí por inyección de casos de uso, sin HTTP.
+> `auth-service`, `problem-service`, `submission-service`, `contest-service` y `feedback-service` **ya no existen como servicios**: se integraron en `contest-platform` (rama `refactor/migrar-la-arquitectura-del-sistema-a-un-monolito-modular`). Los módulos se llaman entre sí por inyección de casos de uso, sin HTTP.
 
-`judge-service` y `feedback-service` tienen la siguiente forma interna (`contest-platform` repite la misma estructura de capas dentro de cada módulo, bajo `co.uceva.contests_platform.<módulo>`; `auth` usa capas planas):
+`judge-service` tiene la siguiente forma interna (`contest-platform` repite la misma estructura de capas dentro de cada módulo, bajo `co.uceva.contests_platform.<módulo>`; `auth` usa capas planas):
 
 ```
 services/<nombre>-service/
@@ -184,7 +181,7 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 | `contest-platform` · módulo `contest` | 8080 | 🟢 Funcional | Maratones, problemas de maratón (puntos, penalización, globo), equipos con capitán, invitaciones por correo (SMTP), aclaraciones y scoreboard. Flyway `V1`–`V6` |
 | `contest-platform` · módulo `submission` | 8080 | 🟢 Funcional | Recepción del envío con regla de elegibilidad (integrante del equipo, concurso activo, problema del concurso), encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Flyway `V8`–`V10` |
 | `judge-service` | 8084 | 🟢 Funcional | Consume `submission.evaluate`, obtiene casos de prueba y límites del módulo `problem` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) con un pool de workers (`JUDGE_WORKERS`) y publica el veredicto en `submission.judged`. Evalúa **Python, C, C++ y Java**. El JWT `SERVICE` hacia `contest-platform` lo firma el propio juez con el secreto compartido. Validado end-to-end en Manjaro x86_64 y en Ubuntu OCI A1-flex aarch64. Se despliega en su propia imagen con `bubblewrap` y seccomp (perfil `sandbox` del compose) |
-| `feedback-service` | 8085 | 🔴 Esqueleto | Solo la clase de arranque |
+| `contest-platform` · módulo `feedback` | 8080 | 🔴 Esqueleto | Solo la estructura de carpetas vacía (`application`, `domain`, `infrastructure`); sin clases |
 
 **Documentación detallada por subsistema:**
 
@@ -466,10 +463,10 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 ---
 
-### `feedback-service` — Puerto `8085`
+### Módulo `feedback` (`contest-platform`, puerto `8080`)
 **Responsabilidad:** Generar retroalimentación educativa inteligente usando un LLM externo (OpenAI / Gemini) tras un veredicto de evaluación.
 
-> 🔴 **Estado actual:** Solo clase de arranque `FeedbackServiceApplication`. Sin dominio, aplicación ni infraestructura implementados.
+> 🔴 **Estado actual:** Paquete `co.uceva.contests_platform.feedback` con las carpetas de capas vacías (`.gitkeep`). Sin dominio, aplicación ni infraestructura implementados.
 
 | Entidad de dominio | Descripción |
 |--------------------|-------------|
@@ -482,7 +479,7 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 **Restricciones de negocio:**
 - El LLM **no debe revelar** la solución del problema, solo orientar al estudiante.
 - Solo se genera feedback cuando el veredicto **no** es `ACCEPTED`.
-- El servicio consumirá `SubmissionJudgedEvent` desde RabbitMQ (mismo exchange `submission.exchange`).
+- El módulo consumirá `SubmissionJudgedEvent` desde RabbitMQ (mismo exchange `submission.exchange`).
 - Depende de un EIF externo (API LLM) — su disponibilidad está sujeta al proveedor.
 
 **Tablas BD planeadas:** `feedback`
@@ -663,7 +660,7 @@ const ws = new WebSocket(
     │     13. UpdateSubmissionVerdictUseCase: actualiza veredicto + métricas (status: JUDGED)
     │     14. NotifySubmissionStatusUseCase: empuja estado por WebSocket al usuario
     │
-    └─▶ [feedback-service] ← PENDIENTE DE IMPLEMENTAR
+    └─▶ [contest-platform, módulo feedback] ← PENDIENTE DE IMPLEMENTAR
            15. Llamada API LLM (si veredicto ≠ ACCEPTED)
            16. Persistir Feedback
 ```
@@ -732,13 +729,11 @@ Gestiona el BOM de Spring Boot 3.2.4 y configuración común a todos los sub-pro
 - Lee el archivo `.env` del proyecto raíz para inyectarlo como variables de entorno al ejecutar `bootRun`
 
 ### `settings.gradle`
-Declara los 2 módulos shared y 4 servicios (`users-service` ya no está registrado):
+Declara los 2 módulos shared y 2 servicios:
 ```gradle
 include 'shared:common-domain'
 include 'shared:common-infrastructure'
-include 'services:submission-service'   // residual: su código vive ahora en contest-platform
 include 'services:judge-service'
-include 'services:feedback-service'
 include 'services:contest-platform'
 ```
 
@@ -748,8 +743,6 @@ include 'services:contest-platform'
 |---------|--------------------------|
 | `contest-platform` | `common-domain`, `common-infrastructure`, `spring-boot-starter-data-jpa`, `-security`, `-amqp`, `-websocket`, `-mail`, `flyway-core`, `postgresql`, H2 (tests), `spring-rabbit-test`, Lombok explícito |
 | `judge-service` | `common-domain`, `common-infrastructure`, `spring-boot-starter-amqp`, `spring-boot-starter-actuator`, `spring-rabbit-test` |
-| `feedback-service` | Solo `spring-boot-starter` base |
-| `submission-service` (residual) | `common-domain`, `common-infrastructure`, JPA, security, amqp, websocket, `flyway-core`; sin código de negocio |
 
 > `common-infrastructure/build.gradle` usa `api` (no `implementation`) para exponer Spring Security, Redis, JJWT y Spring Web a todos los servicios que lo dependan.
 
@@ -767,8 +760,8 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 | 3 | **Propiedades JWT duplicadas** | 🟡 Parcial | `contest-platform` define `jwt.secret`/`jwt.issuer` (emisión) y `app.security.jwt.*` (validación) a la vez. Unificar en `app.security.jwt.*` |
 | 4 | ~~El sandbox de `judge-service` no soporta C, C++ y Java~~ | ✅ Resuelto | HU-34: el juez evalúa Python, C, C++ y Java |
 | 5 | ~~`JwtTokenValidator` sin lista negra~~ | ✅ Resuelto | Constructor opcional con `TokenBlacklist`; el módulo `auth` la implementa con `AuthCache` |
-| 6 | **`feedback-service` es un esqueleto** — Toda su lógica está pendiente | 🔴 Alta | Implementar según roadmap del proyecto |
-| 7 | **Residuos de la migración al monolito** — `services/submission-service/` (solo `build.gradle`, clase de arranque y properties) sigue en `settings.gradle`; `users-service/` es un esqueleto obsoleto | 🟡 Media | Borrar ambos directorios y quitar `submission-service` de `settings.gradle` |
+| 6 | **El módulo `feedback` es un esqueleto** — Toda su lógica está pendiente | 🔴 Alta | Implementar según roadmap del proyecto |
+| 7 | ~~Residuos de la migración al monolito~~ | ✅ Resuelto | `submission-service/` y `users-service/` eliminados |
 | 8 | **Registro de sesiones WebSocket es local a la instancia** — No escala horizontalmente | 🟡 Media | Compartir el registro vía Redis cuando se requiera más de una réplica |
 | 9 | **`traefik.yml` está vacío** — Sin API Gateway cada servicio se expone por su puerto | 🟡 Media | Configurar Traefik con reenvío de `Upgrade`/`Sec-WebSocket-Protocol` |
 | 10 | **`app.websocket.allowed-origins=*`** en `contest-platform` | 🟡 Media | Restringir a los orígenes del frontend antes de exponer |
