@@ -117,7 +117,7 @@ Dentro de una página, usa `dynamic()` de Next.js para componentes pesados (edit
 import dynamic from "next/dynamic"
 
 const CodeEditor = dynamic(
-  () => import("@/features/ai-feedback/components/code-editor"),
+  () => import("@/features/arena/components/code-editor"),
   { loading: () => <Skeleton className="h-96" />, ssr: false }
 )
 ```
@@ -131,7 +131,6 @@ Route (app)                    Size     First Load JS
 ┌ ○ /                          3.2 kB   87.4 kB
 ├ ○ /contests                  4.1 kB   91.2 kB
 ├ ○ /contests/[id]             8.3 kB   95.4 kB
-├ ○ /ai-feedback               12.1 kB  99.2 kB
 ```
 
 Si ves un bundle único muy grande, revisar que no haya imports circulares ni re-exports masivos desde `shared/`.
@@ -336,7 +335,6 @@ wsAdapter.simulateEvent("SUBMISSION_VERDICT", {
 - `auth` — login y registro
 - `contests` — listado, detalle con countdown + ranking, historial
 - `profile` — perfil del usuario autenticado (`/profile`) con avatar DiceBear derivado del `username`
-- `ai-feedback` — análisis de código con IA
 
 ### `admin-app`
 

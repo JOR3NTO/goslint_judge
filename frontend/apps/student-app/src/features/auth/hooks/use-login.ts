@@ -83,7 +83,7 @@ const POST_LOGIN_REDIRECT = "/contests"
 /**
  * Regex para validación básica de email.
  * No pretende cubrir el RFC 5322 completo — eso lo valida el backend con @Email.
- * Su propósito es dar feedback instantáneo al usuario antes de enviar.
+ * Su propósito es avisar al usuario de forma instantánea antes de enviar.
  */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 

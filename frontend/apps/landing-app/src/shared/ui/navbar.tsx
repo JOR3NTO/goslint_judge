@@ -8,7 +8,7 @@ import { Code2, LogIn, User, Menu, X } from "lucide-react"
 /**
  * Navbar pública de landing-app.
  * Solo muestra logo + links de auth (login/register) apuntando a student-app.
- * No incluye links del judge (contests, ai-feedback, etc.).
+ * No incluye links del judge (contests, past-contests, etc.).
  */
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)

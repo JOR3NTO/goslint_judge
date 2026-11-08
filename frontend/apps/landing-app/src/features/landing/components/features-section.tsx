@@ -1,8 +1,7 @@
 import { Card, CardContent, CardHeader } from "@/shared/ui/primitives/card"
 import { 
-  Trophy, 
-  Sparkles, 
-  Clock, 
+  Trophy,
+  Clock,
   Users, 
   Code2, 
   Zap,
@@ -15,11 +14,6 @@ const features = [
     icon: Trophy,
     title: "Maratones en Vivo",
     description: "Compite en tiempo real contra programadores de todo el mundo en emocionantes competencias de algoritmos."
-  },
-  {
-    icon: Sparkles,
-    title: "AI Feedback",
-    description: "Recibe retroalimentación inteligente sobre tu código, sugiriendo optimizaciones y mejores prácticas."
   },
   {
     icon: Clock,

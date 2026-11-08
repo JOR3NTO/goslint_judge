@@ -14,7 +14,6 @@ El **Goslint Judge** es una plataforma de juez en línea (*Online Judge*) instit
 - Diseñar y ejecutar maratones de programación internas.
 - Evaluar código automáticamente en entornos Docker aislados (sandboxing).
 - Emitir veredictos oficiales: `Accepted`, `Wrong Answer`, `Time Limit Exceeded`, `Runtime Error`, `Compilation Error`.
-- Entregar retroalimentación inteligente mediante un modelo de lenguaje (LLM).
 
 ---
 
