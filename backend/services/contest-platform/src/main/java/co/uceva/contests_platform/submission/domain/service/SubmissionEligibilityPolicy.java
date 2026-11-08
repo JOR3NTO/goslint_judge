@@ -26,7 +26,7 @@ import java.util.UUID;
  * Las reglas se evalúan en orden y la política consulta los datos a través de
  * {@link ContestDataSource} <em>solo cuando la regla siguiente los necesita</em>.
  * Así, el primer fallo corta la evaluación sin hacer llamadas innecesarias a
- * {@code contest-service} (por ejemplo, un no integrante nunca provoca la consulta
+ * el módulo {@code contest} (por ejemplo, un no integrante nunca provoca la consulta
  * del concurso).
  * </p>
  */

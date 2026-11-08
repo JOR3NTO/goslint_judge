@@ -22,8 +22,6 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ContestServiceDataAdapterTest {
 
-    private static final String BASE = "http://contest-service";
-
     private final UUID teamId = UUID.randomUUID();
     private final UUID contestId = UUID.randomUUID();
     private final UUID userA = UUID.randomUUID();

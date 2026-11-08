@@ -9,7 +9,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 /**
- * Entidad de Dominio que representa la asignación de un problema (de problem-service)
+ * Entidad de Dominio que representa la asignación de un problema (del módulo {@code problem})
  * a un concurso, con su alias visible (A, B, C...), su posición, sus puntos y el
  * color del globo que recibe el equipo al resolverlo.
  * <p>
@@ -31,7 +31,7 @@ public class ContestProblem {
     private final UUID id;
     /** Identificador del concurso. */
     private final UUID contestId;
-    /** Identificador del problema en problem-service. */
+    /** Identificador del problema en el módulo {@code problem}. */
     private final UUID problemId;
     /** Alias visible del problema dentro del concurso, en mayúsculas (ej. "A"). */
     private String alias;

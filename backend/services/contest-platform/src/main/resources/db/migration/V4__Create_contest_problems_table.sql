@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS contest_problems (
     id             UUID         PRIMARY KEY,
     contest_id     UUID         NOT NULL REFERENCES contests (id) ON DELETE CASCADE,
-    -- Identificador en problem-service; sin FK porque vive en otro servicio.
+    -- Identificador del problema (módulo problem); sin FK para no acoplar las tablas de ambos módulos.
     problem_id     UUID         NOT NULL,
     alias          VARCHAR(10)  NOT NULL,
     order_index    INTEGER      NOT NULL,

@@ -1,5 +1,5 @@
 -- =============================================================================
--- V1 — Tablas base para problem-service: problems y test_cases
+-- V11 — Tablas base del módulo problem: problems y test_cases
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS problems (

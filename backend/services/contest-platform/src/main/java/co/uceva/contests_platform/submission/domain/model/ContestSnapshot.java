@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Instantánea de solo lectura de un concurso, tal como la conoce {@code contest-service}.
+ * Instantánea de solo lectura de un concurso, tal como la conoce el módulo {@code contest}.
  *
  * @param contestId Identificador del concurso.
  * @param startTime Instante de inicio (inclusivo).

@@ -66,7 +66,7 @@ class SubmissionVerdictNotificationIntegrationTest extends AbstractIntegrationTe
     @MockBean
     private TeamMembershipPort teamMembershipPort;
 
-    /** Se simula contest-service: cada equipo de estas pruebas es elegible para su envío. */
+    /** Se simula el módulo contest: cada equipo de estas pruebas es elegible para su envío. */
     @MockBean
     private ContestDataPort contestDataPort;
 

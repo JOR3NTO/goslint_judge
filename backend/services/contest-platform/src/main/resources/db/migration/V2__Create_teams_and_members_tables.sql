@@ -1,5 +1,5 @@
 -- =============================================================================
--- V2 — Equipos y miembros de equipo para contest-service
+-- V2 — Equipos y miembros de equipo (módulo contest)
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS teams (

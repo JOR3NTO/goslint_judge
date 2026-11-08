@@ -13,10 +13,8 @@ import co.uceva.contests_platform.contest.domain.exception.ProblemCatalogUnavail
 import co.uceva.contests_platform.contest.domain.service.ProblemCatalog;
 
 /**
- * Adaptador de {@link ProblemCatalog} que consulta {@code problem-service} por HTTP.
- * <p>
- * Usa {@code GET /api/v1/problems/{id}}, que es público, por lo que no necesita token.
- * </p>
+ * Adaptador de {@link ProblemCatalog} que consulta el módulo {@code problem} llamando
+ * directamente a su caso de uso, dentro del mismo proceso (sin HTTP).
  */
 @Component
 public class ProblemServiceCatalogAdapter implements ProblemCatalog {

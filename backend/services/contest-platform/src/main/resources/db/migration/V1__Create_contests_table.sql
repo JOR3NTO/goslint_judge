@@ -1,5 +1,5 @@
 -- =============================================================================
--- V1 — Tabla base para contest-service: contests
+-- V1 — Tabla base del módulo contest: contests
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS contests (

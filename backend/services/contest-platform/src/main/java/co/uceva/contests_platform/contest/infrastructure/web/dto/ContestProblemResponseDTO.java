@@ -7,7 +7,7 @@ import java.util.UUID;
  *
  * @param id           Identificador de la asignación.
  * @param contestId    Identificador del concurso.
- * @param problemId    Identificador del problema en problem-service.
+ * @param problemId    Identificador del problema en el módulo {@code problem}.
  * @param alias        Alias visible del problema.
  * @param orderIndex   Posición del problema en el concurso.
  * @param points       Puntos del problema.

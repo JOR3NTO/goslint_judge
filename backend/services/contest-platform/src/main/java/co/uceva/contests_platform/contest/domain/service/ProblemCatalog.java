@@ -8,8 +8,8 @@ import co.uceva.contests_platform.contest.domain.exception.ProblemCatalogUnavail
  * Puerto de salida hacia el catálogo de problemas de la plataforma.
  * <p>
  * El dominio solo necesita saber si un problema existe, sin conocer cómo se consulta:
- * hoy es una llamada HTTP a {@code problem-service}, pero si la plataforma pasa a ser un
- * monolito basta con otro adaptador que use directamente el caso de uso de problemas.
+ * hoy es una llamada directa al caso de uso del módulo {@code problem}, pero un adaptador
+ * distinto podría consultarlo por red sin tocar el dominio.
  * </p>
  */
 public interface ProblemCatalog {

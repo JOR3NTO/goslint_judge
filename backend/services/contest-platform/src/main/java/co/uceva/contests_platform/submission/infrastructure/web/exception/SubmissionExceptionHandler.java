@@ -34,7 +34,7 @@ public class SubmissionExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponseDTO(ex.getMessage()));
     }
 
-    /** contest-service no respondió y no se pudo decidir: 503 para que el cliente reintente. */
+    /** Falló la consulta de datos del concurso y no se pudo decidir: 503 para que el cliente reintente. */
     @ExceptionHandler(ContestServiceUnavailableException.class)
     public ResponseEntity<ErrorResponseDTO> handleContestServiceUnavailable(ContestServiceUnavailableException ex) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ErrorResponseDTO(ex.getMessage()));

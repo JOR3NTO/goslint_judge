@@ -1,13 +1,13 @@
 -- =============================================================================
 -- V1 — Tabla base de envios (submissions)
 --
--- Linea base del esquema del submission-service. Hasta ahora la tabla se venia
+-- Linea base del esquema del modulo submission. Hasta ahora la tabla se venia
 -- creando de forma implicita (ddl-auto), sin ninguna definicion versionada en el
 -- repositorio; esta migracion la fija tal y como existia antes de introducir el
 -- ciclo de vida del envio (columna status, que llega en V2).
 --
 -- Se escribe de forma idempotente (IF NOT EXISTS) porque la base de datos es
--- compartida por todos los microservicios y la tabla puede existir ya en los
+-- compartida por todos los modulos y la tabla puede existir ya en los
 -- entornos que estuvieron corriendo con ddl-auto. En ese caso esta migracion no
 -- toca nada y el trabajo real lo hace V2.
 --

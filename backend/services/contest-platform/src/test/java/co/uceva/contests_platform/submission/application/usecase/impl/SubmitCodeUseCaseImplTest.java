@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * Cubre el caso de uso de envío junto con la política de elegibilidad que aplica:
- * el puerto de {@code contest-service} se simula y el reloj está fijo.
+ * el puerto de datos del módulo {@code contest} se simula y el reloj está fijo.
  */
 @ExtendWith(MockitoExtension.class)
 class SubmitCodeUseCaseImplTest {

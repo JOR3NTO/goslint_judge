@@ -5,7 +5,7 @@ import java.util.UUID;
 /**
  * DTO de solicitud para asignar un problema a un concurso.
  *
- * @param problemId    Identificador del problema en problem-service.
+ * @param problemId    Identificador del problema en el módulo {@code problem}.
  * @param alias        Alias visible del problema (A, B, C...).
  * @param orderIndex   Posición del problema en el concurso.
  * @param points       Puntos del problema; si se omite, 1.

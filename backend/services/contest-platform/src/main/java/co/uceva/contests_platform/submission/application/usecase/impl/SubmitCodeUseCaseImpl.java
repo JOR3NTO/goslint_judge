@@ -35,7 +35,7 @@ public class SubmitCodeUseCaseImpl implements SubmitCodeUseCase {
      *
      * @param submissionRepository      Puerto de salida para persistir envíos.
      * @param applicationEventPublisher Publicador de eventos internos de la aplicación.
-     * @param contestDataPort           Puerto de lectura de equipos y concursos de {@code contest-service}.
+     * @param contestDataPort           Puerto de lectura de equipos y concursos del módulo {@code contest}.
      * @param clock                     Reloj con el que se decide si el concurso está activo.
      */
     public SubmitCodeUseCaseImpl(SubmissionRepository submissionRepository,
@@ -64,7 +64,7 @@ public class SubmitCodeUseCaseImpl implements SubmitCodeUseCase {
      * @return El envío creado y persistido.
      * @throws co.uceva.contests_platform.submission.domain.exception.SubmissionNotAllowedException Si el envío no es elegible.
      * @throws co.uceva.contests_platform.submission.application.exception.ContestServiceUnavailableException Si no se pudo
-     *         consultar {@code contest-service}.
+     *         consultar los datos del concurso.
      * @throws DuplicateSubmissionException Si ya existe un envío idéntico.
      */
     @Override

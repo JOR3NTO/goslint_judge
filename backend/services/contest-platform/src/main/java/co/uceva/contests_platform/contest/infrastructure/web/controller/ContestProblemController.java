@@ -45,7 +45,7 @@ public class ContestProblemController {
     }
 
     /**
-     * Asigna un problema existente en problem-service al concurso.
+     * Asigna un problema existente en el módulo {@code problem} al concurso.
      * <p>
      * Solo {@code ADMIN} u {@code ORGANIZER}. Se verifica que el concurso y el problema existan, y que
      * el problema y el alias no estén ya en uso en ese concurso.
@@ -56,7 +56,7 @@ public class ContestProblemController {
      *                  intento fallido en minutos (20 si se omite) y color del globo.
      * @return 201 CREATED con la asignación creada; 400 si algún valor es inválido; 404 si el concurso o el
      *         problema no existen; 409 si el problema o el alias ya están en el concurso; 503 si no se pudo
-     *         consultar problem-service.
+     *         consultar el catálogo de problemas.
      */
     @PostMapping("/contests/{contestId}/problems")
     @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
@@ -89,7 +89,7 @@ public class ContestProblemController {
      * Solo {@code ADMIN} u {@code ORGANIZER}. No cambia el problema asignado ni el concurso.
      * </p>
      *
-     * @param id      Identificador de la asignación (no el del problema en problem-service).
+     * @param id      Identificador de la asignación (no el del problema en el módulo {@code problem}).
      * @param request Nuevos valores; todos son obligatorios salvo la penalización, que si se omite se conserva.
      * @return 200 OK con la asignación actualizada; 400 si algún valor es inválido; 404 si la asignación
      *         no existe; 409 si el nuevo alias ya lo usa otro problema del concurso.
@@ -104,12 +104,12 @@ public class ContestProblemController {
     }
 
     /**
-     * Retira un problema del concurso. El problema sigue existiendo en problem-service.
+     * Retira un problema del concurso. El problema sigue existiendo en el módulo {@code problem}.
      * <p>
      * Solo {@code ADMIN} u {@code ORGANIZER}.
      * </p>
      *
-     * @param id Identificador de la asignación (no el del problema en problem-service).
+     * @param id Identificador de la asignación (no el del problema en el módulo {@code problem}).
      * @return 204 No Content si se retiró; 404 si la asignación no existe.
      */
     @DeleteMapping("/contest-problems/{id}")

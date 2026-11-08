@@ -43,6 +43,6 @@ public class ContestProblemExceptionHandler {
     @ExceptionHandler(ProblemCatalogUnavailableException.class)
     public ResponseEntity<ErrorResponseDTO> handleCatalogUnavailable(ProblemCatalogUnavailableException ex) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                .body(new ErrorResponseDTO("No se pudo verificar el problema: problem-service no está disponible."));
+                .body(new ErrorResponseDTO("No se pudo verificar el problema: el catálogo de problemas no está disponible."));
     }
 }

@@ -7,8 +7,8 @@ import java.util.UUID;
  * <p>
  * Un envío se registra a nombre de un equipo, pero la notificación de su
  * veredicto se entrega a personas concretas. Este puerto es el único punto donde
- * se traduce lo uno en lo otro, y aísla al servicio de dónde vive esa
- * información: hoy la fuente será {@code contest-service}, que aún no existe.
+ * se traduce lo uno en lo otro, y aísla al módulo de dónde vive esa
+ * información: hoy la fuente es el módulo {@code contest} (ver {@code TeamMembershipPortImpl}).
  * </p>
  */
 public interface TeamMembershipPort {

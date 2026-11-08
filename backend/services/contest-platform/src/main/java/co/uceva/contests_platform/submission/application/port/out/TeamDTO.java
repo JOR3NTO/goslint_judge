@@ -4,11 +4,11 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Datos de un equipo tal y como los necesita este servicio: quién lo compone.
+ * Datos de un equipo tal y como los necesita el módulo {@code submission}: quién lo compone.
  * <p>
  * Es deliberadamente mínimo. Un envío se registra a nombre de un equipo, pero la
  * notificación se entrega a personas, así que lo único que hace falta importar
- * desde {@code contest-service} es la lista de sus integrantes. El nombre del
+ * desde el módulo {@code contest} es la lista de sus integrantes. El nombre del
  * equipo, su concurso o su contraseña no intervienen aquí y por tanto no se
  * copian.
  * </p>

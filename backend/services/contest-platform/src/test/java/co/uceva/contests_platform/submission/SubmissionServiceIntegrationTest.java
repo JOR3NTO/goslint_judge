@@ -36,7 +36,7 @@ import co.uceva.shared.domain.ProgrammingLanguage;
 @AutoConfigureMockMvc
 class SubmissionServiceIntegrationTest extends AbstractIntegrationTest {
 
-    /** Se simula contest-service para que el envío sea elegible sin salir a la red. */
+    /** Se simula el módulo contest para que el envío sea elegible sin salir a la red. */
     @MockBean
     private ContestDataPort contestDataPort;
 

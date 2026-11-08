@@ -1,8 +1,8 @@
 package co.uceva.contests_platform.submission.application.exception;
 
 /**
- * Excepción lanzada cuando no se pudo obtener información de {@code contest-service}
- * por un fallo de comunicación (caída, tiempo agotado o respuesta inesperada).
+ * Excepción lanzada cuando no se pudo obtener información de los datos de {@code contest}
+ * por un fallo inesperado al consultarlos.
  * <p>
  * Es distinta de un 404: un recurso inexistente es una respuesta válida, mientras
  * que esta excepción significa que no se pudo decidir si el envío es elegible. Se
@@ -16,6 +16,6 @@ public class ContestServiceUnavailableException extends RuntimeException {
      * @param cause  Excepción original.
      */
     public ContestServiceUnavailableException(String reason, Throwable cause) {
-        super("No se pudo consultar contest-service: " + reason, cause);
+        super("No se pudo consultar los datos del concurso: " + reason, cause);
     }
 }

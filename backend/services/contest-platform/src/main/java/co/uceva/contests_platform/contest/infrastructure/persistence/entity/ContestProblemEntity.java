@@ -33,7 +33,7 @@ public class ContestProblemEntity {
     @Column(name = "contest_id", nullable = false, updatable = false)
     private UUID contestId;
 
-    /** Identificador del problema en problem-service. */
+    /** Identificador del problema en el módulo {@code problem}. */
     @Column(name = "problem_id", nullable = false, updatable = false)
     private UUID problemId;
 

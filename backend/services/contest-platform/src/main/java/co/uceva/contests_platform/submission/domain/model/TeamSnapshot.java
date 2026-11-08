@@ -4,9 +4,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Instantánea de solo lectura de un equipo, tal como la conoce {@code contest-service}.
+ * Instantánea de solo lectura de un equipo, tal como la conoce el módulo {@code contest}.
  * <p>
- * {@code submission-service} no es dueño de los equipos: solo necesita saber a qué
+ * El módulo {@code submission} no es dueño de los equipos: solo necesita saber a qué
  * concurso pertenecen y quiénes los integran para decidir si un envío es legítimo.
  * Por eso se modela como un valor inmutable y no como una entidad.
  * </p>

@@ -8,18 +8,22 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
-/** Configuración del cliente HTTP hacia {@code problem-service}. */
+/**
+ * Configuración del cliente HTTP hacia el módulo {@code problem}. Ningún componente lo
+ * inyecta hoy: el catálogo de problemas se consulta in-process y este bean quedó de la
+ * época en que el módulo {@code problem} era un servicio aparte.
+ */
 @Configuration
 public class ProblemServiceClientConfig {
 
     /**
-     * Cliente con la URL base y los tiempos de espera hacia {@code problem-service}.
+     * Cliente con la URL base y los tiempos de espera hacia el módulo {@code problem}.
      *
      * @param builder          Builder autoconfigurado por Spring Boot.
-     * @param baseUrl          URL base de {@code problem-service}.
+     * @param baseUrl          URL base de el módulo {@code problem}.
      * @param connectTimeoutMs Tiempo máximo para conectar.
      * @param readTimeoutMs    Tiempo máximo de espera de la respuesta.
-     * @return Cliente HTTP listo para consultar {@code problem-service}.
+     * @return Cliente HTTP listo para consultar el módulo {@code problem}.
      */
     @Bean
     public RestClient problemServiceRestClient(RestClient.Builder builder,
