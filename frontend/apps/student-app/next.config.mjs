@@ -15,10 +15,10 @@ const nextConfig = {
   // Rewrites por prefijo: Next.js aplica la PRIMERA regla que coincide, así que
   // el orden va de lo más específico a lo más general.
   async rewrites() {
-    const AUTH_SERVICE = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8081'
-    const PROBLEM_SERVICE = process.env.PROBLEM_SERVICE_URL ?? 'http://localhost:8082'
-    const SUBMISSION_SERVICE = process.env.SUBMISSION_SERVICE_URL ?? 'http://localhost:8083'
-    const CONTEST_SERVICE = process.env.CONTEST_SERVICE_URL ?? 'http://localhost:8086'
+    const AUTH_SERVICE = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8080'
+    const PROBLEM_SERVICE = process.env.PROBLEM_SERVICE_URL ?? 'http://localhost:8080'
+    const SUBMISSION_SERVICE = process.env.SUBMISSION_SERVICE_URL ?? 'http://localhost:8080'
+    const CONTEST_SERVICE = process.env.CONTEST_SERVICE_URL ?? 'http://localhost:8080'
 
     return [
       // contest-service (8086): maratones, equipos, invitaciones y problemas de maratón.
