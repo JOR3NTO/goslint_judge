@@ -3,6 +3,7 @@ package co.uceva.contests_platform.contest.application.usecase.impl;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import co.uceva.contests_platform.contest.infrastructure.web.service.ContestSchedulerService;
 import co.uceva.contests_platform.contest.application.usecase.CreateContestUseCase;
 import co.uceva.contests_platform.contest.domain.model.Contest;
 import co.uceva.contests_platform.contest.domain.repository.ContestRepository;
@@ -17,6 +18,7 @@ public class CreateContestUseCaseImpl implements CreateContestUseCase {
 
     private final ContestRepository contestRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ContestSchedulerService scheduler;
 
     /**
      * Inyección de dependencias mediante constructor.
@@ -24,7 +26,9 @@ public class CreateContestUseCaseImpl implements CreateContestUseCase {
      * @param contestRepository Puerto de salida para persistir concursos.
      * @param passwordEncoder   Servicio de dominio para cifrar contraseñas.
      */
-    public CreateContestUseCaseImpl(ContestRepository contestRepository, PasswordEncoder passwordEncoder) {
+    public CreateContestUseCaseImpl(ContestRepository contestRepository, PasswordEncoder passwordEncoder,
+                                    ContestSchedulerService scheduler) {
+        this.scheduler = scheduler;
         this.contestRepository = contestRepository;
         this.passwordEncoder = passwordEncoder;
     }
@@ -52,6 +56,8 @@ public class CreateContestUseCaseImpl implements CreateContestUseCase {
             command.endTime()
         );
 
-        return contestRepository.save(contest);
+        Contest saved = contestRepository.save(contest);
+        scheduler.scheduleContest(saved);
+        return saved;
     }
 }
