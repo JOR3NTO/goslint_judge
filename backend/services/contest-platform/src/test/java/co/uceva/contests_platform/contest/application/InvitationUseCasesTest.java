@@ -18,6 +18,7 @@ import co.uceva.contests_platform.contest.application.usecase.impl.AcceptInvitat
 import co.uceva.contests_platform.contest.application.usecase.impl.InviteMemberUseCaseImpl;
 import co.uceva.contests_platform.contest.domain.exception.InvalidInvitationException;
 import co.uceva.contests_platform.contest.domain.exception.InvitationAccessDeniedException;
+import co.uceva.contests_platform.contest.domain.exception.InvitedUserNotFoundException;
 import co.uceva.contests_platform.contest.domain.exception.MaxTeamMembersReachedException;
 import co.uceva.contests_platform.contest.domain.exception.RegistrationClosedException;
 import co.uceva.contests_platform.contest.domain.model.Contest;
@@ -29,6 +30,7 @@ import co.uceva.contests_platform.contest.domain.repository.ContestRepository;
 import co.uceva.contests_platform.contest.domain.repository.InvitationRepository;
 import co.uceva.contests_platform.contest.domain.repository.TeamRepository;
 import co.uceva.contests_platform.contest.domain.service.EmailSender;
+import co.uceva.contests_platform.contest.infrastructure.client.UserRepositoryAdapter;
 import co.uceva.contests_platform.contest.domain.valueobject.ContestPeriod;
 import co.uceva.contests_platform.contest.domain.valueobject.TeamName;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +44,7 @@ class InvitationUseCasesTest {
     private final ContestRepository contests = mock(ContestRepository.class);
     private final InvitationRepository invitations = mock(InvitationRepository.class);
     private final EmailSender email = mock(EmailSender.class);
+    private final UserRepositoryAdapter users = mock(UserRepositoryAdapter.class);
 
     private final UUID captain = UUID.randomUUID();
     private final UUID guest = UUID.randomUUID();
@@ -67,10 +70,11 @@ class InvitationUseCasesTest {
         team = Team.create(UUID.randomUUID(), TeamName.of("Los Capitanes"), captain);
         when(invitations.save(any())).thenAnswer(i -> i.getArgument(0));
         when(teams.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(users.findEmailByUserId(guest)).thenReturn(Optional.of("a@b.co"));
     }
 
     private InviteMemberUseCaseImpl inviter() {
-        return new InviteMemberUseCaseImpl(teams, contests, invitations, email);
+        return new InviteMemberUseCaseImpl(teams, contests, invitations, email, users);
     }
 
     private AcceptInvitationUseCaseImpl accepter() {
@@ -82,10 +86,23 @@ class InvitationUseCasesTest {
     void captainInvites() {
         givenContest(inOneHour());
 
-        Invitation inv = inviter().execute(new InviteMemberCommand(team.getId(), captain, guest, "a@b.co"));
+        Invitation inv = inviter().execute(new InviteMemberCommand(team.getId(), captain, guest));
 
         assertThat(inv.getStatus()).isEqualTo(InvitationStatus.PENDING);
         verify(email).sendInvitation("a@b.co", "Los Capitanes", "Maratón", inv.getId());
+    }
+
+    @Test
+    @DisplayName("Si el usuario invitado no existe no se crea la invitación ni se envía correo")
+    void unknownUserCannotBeInvited() {
+        givenContest(inOneHour());
+        UUID unknown = UUID.randomUUID();
+        when(users.findEmailByUserId(unknown)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> inviter().execute(new InviteMemberCommand(team.getId(), captain, unknown)))
+                .isInstanceOf(InvitedUserNotFoundException.class);
+        verify(invitations, never()).save(any());
+        verify(email, never()).sendInvitation(any(), any(), any(), any());
     }
 
     @Test
@@ -93,7 +110,7 @@ class InvitationUseCasesTest {
     void nonCaptainCannotInvite() {
         givenContest(inOneHour());
 
-        assertThatThrownBy(() -> inviter().execute(new InviteMemberCommand(team.getId(), guest, guest, "a@b.co")))
+        assertThatThrownBy(() -> inviter().execute(new InviteMemberCommand(team.getId(), guest, guest)))
                 .isInstanceOf(InvitationAccessDeniedException.class);
         verify(email, never()).sendInvitation(any(), any(), any(), any());
     }
@@ -105,7 +122,7 @@ class InvitationUseCasesTest {
         team.addMember(UUID.randomUUID());
         givenContest(inOneHour());
 
-        assertThatThrownBy(() -> inviter().execute(new InviteMemberCommand(team.getId(), captain, guest, "a@b.co")))
+        assertThatThrownBy(() -> inviter().execute(new InviteMemberCommand(team.getId(), captain, guest)))
                 .isInstanceOf(MaxTeamMembersReachedException.class);
     }
 
@@ -114,7 +131,7 @@ class InvitationUseCasesTest {
     void startedContestCannotInvite() {
         givenContest(Instant.now().minus(1, ChronoUnit.MINUTES));
 
-        assertThatThrownBy(() -> inviter().execute(new InviteMemberCommand(team.getId(), captain, guest, "a@b.co")))
+        assertThatThrownBy(() -> inviter().execute(new InviteMemberCommand(team.getId(), captain, guest)))
                 .isInstanceOf(RegistrationClosedException.class);
     }
 

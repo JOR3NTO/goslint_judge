@@ -5,6 +5,7 @@ import co.uceva.contests_platform.contest.domain.exception.InvalidContestPasswor
 import co.uceva.contests_platform.contest.domain.exception.InvalidInvitationException;
 import co.uceva.contests_platform.contest.domain.exception.InvitationAccessDeniedException;
 import co.uceva.contests_platform.contest.domain.exception.InvitationNotFoundException;
+import co.uceva.contests_platform.contest.domain.exception.InvitedUserNotFoundException;
 import co.uceva.contests_platform.contest.domain.exception.InvalidTeamException;
 import co.uceva.contests_platform.contest.domain.exception.MaxTeamMembersReachedException;
 import co.uceva.contests_platform.contest.domain.exception.MemberAlreadyInTeamException;
@@ -24,7 +25,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class TeamExceptionHandler {
 
-    @ExceptionHandler({TeamNotFoundException.class, MemberNotFoundException.class, InvitationNotFoundException.class})
+    @ExceptionHandler({TeamNotFoundException.class, MemberNotFoundException.class, InvitationNotFoundException.class,
+            InvitedUserNotFoundException.class})
     public ResponseEntity<ErrorResponseDTO> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponseDTO(ex.getMessage()));
     }

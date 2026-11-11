@@ -12,7 +12,6 @@ public interface InviteMemberUseCase {
     record InviteMemberCommand(
         UUID teamId,
         UUID captainUserId,
-        UUID invitedUserId,
-        String invitedEmail
+        UUID invitedUserId
     ){}
 }

@@ -3,6 +3,7 @@ package co.uceva.contests_platform.contest.application.usecase.impl;
 import co.uceva.contests_platform.contest.application.usecase.InviteMemberUseCase;
 import co.uceva.contests_platform.contest.domain.exception.ContestNotFoundException;
 import co.uceva.contests_platform.contest.domain.exception.InvalidInvitationException;
+import co.uceva.contests_platform.contest.domain.exception.InvitedUserNotFoundException;
 import co.uceva.contests_platform.contest.domain.exception.InvitationAccessDeniedException;
 import co.uceva.contests_platform.contest.domain.exception.MaxTeamMembersReachedException;
 import co.uceva.contests_platform.contest.domain.exception.MemberAlreadyInTeamException;
@@ -14,6 +15,7 @@ import co.uceva.contests_platform.contest.domain.repository.ContestRepository;
 import co.uceva.contests_platform.contest.domain.repository.InvitationRepository;
 import co.uceva.contests_platform.contest.domain.repository.TeamRepository;
 import co.uceva.contests_platform.contest.domain.service.EmailSender;
+import co.uceva.contests_platform.contest.infrastructure.client.UserRepositoryAdapter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,13 +30,16 @@ public class InviteMemberUseCaseImpl implements InviteMemberUseCase {
     private final ContestRepository contestRepository;
     private final InvitationRepository invitationRepository;
     private final EmailSender emailSender;
+    private final UserRepositoryAdapter userRepositoryAdapter;
 
     public InviteMemberUseCaseImpl(TeamRepository teamRepository, ContestRepository contestRepository,
-                                   InvitationRepository invitationRepository, EmailSender emailSender) {
+                                   InvitationRepository invitationRepository, EmailSender emailSender,
+                                   UserRepositoryAdapter userRepositoryAdapter) {
         this.teamRepository = teamRepository;
         this.contestRepository = contestRepository;
         this.invitationRepository = invitationRepository;
         this.emailSender = emailSender;
+        this.userRepositoryAdapter = userRepositoryAdapter;
     }
 
     @Override
@@ -60,8 +65,10 @@ public class InviteMemberUseCaseImpl implements InviteMemberUseCase {
             throw new InvalidInvitationException("El usuario ya tiene una invitación pendiente para este equipo.");
         }
 
+        String invitedEmail = userRepositoryAdapter.findEmailByUserId(command.invitedUserId())
+                .orElseThrow(() -> new InvitedUserNotFoundException(command.invitedUserId()));
         Invitation invitation = invitationRepository.save(
-                Invitation.create(team.getId(), command.invitedUserId(), command.invitedEmail()));
+                Invitation.create(team.getId(), command.invitedUserId(), invitedEmail));
         // shortcut: el envío SMTP ocurre dentro de la transacción, mover a un evento si el correo se vuelve lento.
         emailSender.sendInvitation(invitation.getInvitedEmail(), team.getTeamName().value(),
                 contest.getTitle(), invitation.getId());
