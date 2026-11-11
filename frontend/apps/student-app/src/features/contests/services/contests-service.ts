@@ -21,6 +21,7 @@ import type {
   ProblemDTO,
   TeamDTO,
   UpdateTeamRequest,
+  UserSummaryDTO,
 } from "../types/contest.types"
 
 /** Error tipado de la feature. `status` es el HTTP status del backend (0 si no hubo respuesta). */
@@ -137,6 +138,11 @@ export class ContestsService {
    */
   async invite(teamId: string, input: InviteMemberRequest): Promise<InvitationDTO> {
     return this.unwrap(await this.api.post<InvitationDTO>(`/v1/teams/${teamId}/invitations`, input))
+  }
+
+  /** `GET /v1/users/search?q=` — hasta 20 usuarios activos cuyo username contiene `q` (sin incluir al propio). */
+  async searchUsers(query: string): Promise<UserSummaryDTO[]> {
+    return this.unwrap(await this.api.get<UserSummaryDTO[]>(`/v1/users/search?q=${encodeURIComponent(query)}`))
   }
 
   /** `GET /v1/invitations/me` — invitaciones recibidas por el usuario autenticado (todos los estados). */

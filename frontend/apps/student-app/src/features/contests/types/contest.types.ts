@@ -76,12 +76,16 @@ export interface InvitationDTO {
 
 /**
  * Body de `POST /v1/teams/{teamId}/invitations`.
- * El backend exige `userId` Y `email` (Invitation.create rechaza el nulo con 400),
- * aunque el DTO los declare opcionales.
+ * Solo lleva `userId`: el backend toma el correo del usuario invitado.
  */
 export interface InviteMemberRequest {
   userId: string
-  email: string
+}
+
+/** Elemento de `GET /v1/users/search?q=` — datos mínimos para elegir a quién invitar. */
+export interface UserSummaryDTO {
+  id: string
+  username: string
 }
 
 /** Body de `PUT /v1/teams/{id}`. */

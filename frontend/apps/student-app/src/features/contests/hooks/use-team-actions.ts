@@ -20,7 +20,7 @@ export interface UseTeamActionsReturn {
   /** Último error del backend (o de red), ya en español; `null` si no hay. */
   error: string | null
   clearError: () => void
-  invite: (teamId: string, userId: string, email: string) => Promise<InvitationDTO>
+  invite: (teamId: string, userId: string) => Promise<InvitationDTO>
   rename: (teamId: string, teamName: string) => Promise<void>
   /** Quita a un integrante. Tras el éxito vuelve a pedir el equipo para tener la lista fresca. */
   removeMember: (teamId: string, userId: string) => Promise<void>
@@ -69,8 +69,8 @@ export function useTeamActions({ onTeamChanged, onTeamLeft }: UseTeamActionsOpti
   }, [])
 
   const invite = useCallback(
-    (teamId: string, userId: string, email: string) =>
-      run("invite", () => createContestsService().invite(teamId, { userId, email })),
+    (teamId: string, userId: string) =>
+      run("invite", () => createContestsService().invite(teamId, { userId })),
     [run]
   )
 
