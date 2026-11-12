@@ -51,15 +51,6 @@ public interface TeamRepository {
     List<Team> findAllByContestId(UUID contestId);
 
     /**
-     * Recupera los equipos de un concurso ordenados para la tabla de posiciones (scoreboard):
-     * mayor puntaje primero (descendente) y menor tiempo de penalización (ascendente).
-     *
-     * @param contestId Identificador del concurso.
-     * @return Lista de equipos clasificados para el scoreboard.
-     */
-    List<Team> findAllByContestIdOrderByScoreDescPenaltyTimeAsc(UUID contestId);
-
-    /**
      * Busca equipos dentro de un concurso cuyo nombre contenga el fragmento dado,
      * sin distinguir mayúsculas de minúsculas.
      *

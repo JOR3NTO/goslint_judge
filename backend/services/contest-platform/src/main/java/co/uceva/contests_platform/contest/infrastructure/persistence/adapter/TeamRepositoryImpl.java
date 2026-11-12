@@ -55,12 +55,6 @@ public class TeamRepositoryImpl implements TeamRepository {
 
     /** {@inheritDoc} */
     @Override
-    public List<Team> findAllByContestIdOrderByScoreDescPenaltyTimeAsc(UUID contestId) {
-        return toDomain(springDataRepository.findByContestIdOrderByScoreDescPenaltyTimeAsc(contestId));
-    }
-
-    /** {@inheritDoc} */
-    @Override
     public List<Team> findAllByContestIdAndNameTeamContaining(UUID contestId, String nameTeam) {
         return toDomain(springDataRepository.findByContestIdAndTeamNameContainingIgnoreCase(contestId, nameTeam));
     }
