@@ -86,10 +86,22 @@ public class ContestServiceDataAdapter implements ContestDataPort {
         try {
             problems = getProblemsByContestUseCase.execute(contestId)
                     .stream()
-                    .map(ContestProblem::getProblemId).toList();
+                    .map(ContestProblem::getId).toList();
         }catch (ContestNotFoundException e) {
             return List.of();
         }
         return problems;
+    }
+
+    @Override
+    public Optional<UUID> findCatalogProblemId(UUID contestId, UUID contestProblemId) {
+        try {
+            return getProblemsByContestUseCase.execute(contestId).stream()
+                    .filter(p -> p.getId().equals(contestProblemId))
+                    .map(ContestProblem::getProblemId)
+                    .findFirst();
+        } catch (ContestNotFoundException e) {
+            return Optional.empty();
+        }
     }
 }

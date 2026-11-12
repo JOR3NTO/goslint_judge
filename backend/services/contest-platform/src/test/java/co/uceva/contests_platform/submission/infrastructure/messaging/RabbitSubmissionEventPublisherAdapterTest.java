@@ -2,8 +2,11 @@ package co.uceva.contests_platform.submission.infrastructure.messaging;
 
 import co.uceva.shared.domain.event.SubmissionReceivedEvent;
 import co.uceva.contests_platform.submission.application.exception.EventPublishingException;
+import co.uceva.contests_platform.submission.application.port.out.ContestDataPort;
 import co.uceva.contests_platform.submission.domain.model.Submission;
+import co.uceva.contests_platform.submission.domain.model.TeamSnapshot;
 import co.uceva.contests_platform.submission.fixtures.SubmissionFixtures;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -18,6 +21,10 @@ import org.springframework.amqp.core.ReturnedMessage;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -25,7 +32,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class RabbitSubmissionEventPublisherAdapterTest {
@@ -34,12 +43,26 @@ class RabbitSubmissionEventPublisherAdapterTest {
     private static final String ROUTING_KEY = "submission.evaluate";
     private static final long CONFIRM_TIMEOUT_MS = 200L;
 
+    private final UUID contestId = UUID.randomUUID();
+    private final UUID catalogProblemId = UUID.randomUUID();
+
     @Mock
     private RabbitTemplate rabbitTemplate;
+    @Mock
+    private ContestDataPort contestDataPort;
 
     private RabbitSubmissionEventPublisherAdapter adapter() {
         return new RabbitSubmissionEventPublisherAdapter(
-                rabbitTemplate, EXCHANGE, ROUTING_KEY, CONFIRM_TIMEOUT_MS);
+                rabbitTemplate, contestDataPort, EXCHANGE, ROUTING_KEY, CONFIRM_TIMEOUT_MS);
+    }
+
+    /** El envío guarda el problema del concurso; el juez necesita el del catálogo. */
+    @BeforeEach
+    void stubContestProblem() {
+        lenient().when(contestDataPort.findTeam(any()))
+                .thenAnswer(inv -> Optional.of(new TeamSnapshot(inv.getArgument(0), contestId, List.of())));
+        lenient().when(contestDataPort.findCatalogProblemId(eq(contestId), any()))
+                .thenReturn(Optional.of(catalogProblemId));
     }
 
     /** Simula la respuesta del broker completando la confirmación pendiente. */
@@ -67,7 +90,7 @@ class RabbitSubmissionEventPublisherAdapterTest {
 
         assertThat(event.getValue().submissionId()).isEqualTo(submission.getId());
         assertThat(event.getValue().teamId()).isEqualTo(submission.getTeamId());
-        assertThat(event.getValue().problemId()).isEqualTo(submission.getProblemId());
+        assertThat(event.getValue().problemId()).isEqualTo(catalogProblemId);
         assertThat(event.getValue().sourceCode()).isEqualTo(submission.getSourceCode());
     }
 
@@ -132,5 +155,16 @@ class RabbitSubmissionEventPublisherAdapterTest {
 
         assertThatThrownBy(() -> adapter().publishSubmissionReceived(submission))
                 .isInstanceOf(EventPublishingException.class);
+    }
+
+    @Test
+    void shouldFailWithoutPublishingWhenTheProblemIsNotInTheTeamContest() {
+        Submission submission = SubmissionFixtures.aSubmission();
+        lenient().when(contestDataPort.findCatalogProblemId(eq(contestId), any())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> adapter().publishSubmissionReceived(submission))
+                .isInstanceOf(EventPublishingException.class)
+                .hasMessageContaining(submission.getProblemId().toString());
+        verifyNoInteractions(rabbitTemplate);
     }
 }

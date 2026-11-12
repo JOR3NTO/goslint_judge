@@ -33,7 +33,7 @@ public interface ContestDataSource {
 
     /**
      * @param contestId Identificador del concurso.
-     * @return Identificadores de los problemas del concurso (vacía si no tiene o no existe).
+     * @return Identificadores de los problemas del concurso ({@code contest_problems.id}); vacía si no tiene o no existe.
      */
     List<UUID> findContestProblemIds(UUID contestId);
 }

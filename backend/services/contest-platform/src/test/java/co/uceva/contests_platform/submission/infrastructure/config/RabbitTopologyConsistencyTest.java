@@ -1,7 +1,9 @@
 package co.uceva.contests_platform.submission.infrastructure.config;
 
 import co.uceva.shared.domain.event.SubmissionReceivedEvent;
+import co.uceva.contests_platform.submission.application.port.out.ContestDataPort;
 import co.uceva.contests_platform.submission.domain.model.Submission;
+import co.uceva.contests_platform.submission.domain.model.TeamSnapshot;
 import co.uceva.contests_platform.submission.fixtures.SubmissionFixtures;
 import co.uceva.contests_platform.submission.infrastructure.messaging.RabbitSubmissionEventPublisherAdapter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,12 +20,17 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Comprueba que la topología que {@link RabbitConfig} declara y la dirección a la
@@ -88,7 +95,18 @@ class RabbitTopologyConsistencyTest {
             "app.messaging.submission.judged-queue=" + JUDGED_QUEUE,
             "app.messaging.submission.judged-dead-letter-queue=" + JUDGED_DEAD_LETTER_QUEUE,
             "app.messaging.confirm-timeout-ms=200")
+            .withBean(ContestDataPort.class, RabbitTopologyConsistencyTest::contestDataPort)
             .withBean(RabbitSubmissionEventPublisherAdapter.class);
+
+    /** El publicador traduce el problema del concurso al del catálogo antes de encolar. */
+    private static ContestDataPort contestDataPort() {
+        ContestDataPort port = mock(ContestDataPort.class);
+        UUID contestId = UUID.randomUUID();
+        when(port.findTeam(any()))
+                .thenAnswer(inv -> Optional.of(new TeamSnapshot(inv.getArgument(0), contestId, List.of())));
+        when(port.findCatalogProblemId(any(), any())).thenReturn(Optional.of(UUID.randomUUID()));
+        return port;
+    }
 
     /**
      * La comprobación central: lo que el publicador envía tiene que coincidir con lo
