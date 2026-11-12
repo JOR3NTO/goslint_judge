@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 import co.uceva.contests_platform.contest.application.usecase.*;
+import co.uceva.contests_platform.contest.domain.exception.ContestNotFoundException;
 import co.uceva.contests_platform.contest.infrastructure.web.dto.*;
 import co.uceva.contests_platform.contest.infrastructure.scoreboard.ScoreboardCache;
 import co.uceva.contests_platform.contest.infrastructure.web.mapper.TeamWebMapper;
@@ -103,8 +104,15 @@ public class TeamController {
      * y después un evento {@code team} por cada equipo que cambia de puntaje.
      */
     @GetMapping(value = "/contests/{contestId}/scoreboard/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamScoreboard(@PathVariable("contestId") UUID contestId) {
-        return scoreboardCache.subscribe(contestId, () -> getScoreboardUseCase.execute(contestId));
+    public ResponseEntity<SseEmitter> streamScoreboard(@PathVariable("contestId") UUID contestId) {
+        // Se comprueba antes de abrir el stream: con text/event-stream el manejador de errores no puede
+        // responder su JSON y un concurso inexistente acabaría en un 500.
+        try {
+            getScoreboardUseCase.execute(contestId);
+        } catch (ContestNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(scoreboardCache.subscribe(contestId, () -> getScoreboardUseCase.execute(contestId)));
     }
 
     @GetMapping("/teams")

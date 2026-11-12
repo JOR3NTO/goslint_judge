@@ -84,7 +84,12 @@ public class ScoreboardCache {
         emitter.onCompletion(() -> emitters.remove(emitter));
         emitter.onTimeout(() -> emitters.remove(emitter));
         emitter.onError(e -> emitters.remove(emitter));
-        send(contestId, emitter, "scoreboard", current.get().stream().map(TeamWebMapper::toResponse).toList());
+        try {
+            send(contestId, emitter, "scoreboard", current.get().stream().map(TeamWebMapper::toResponse).toList());
+        } catch (RuntimeException e) {
+            emitters.remove(emitter);
+            throw e;
+        }
         return emitter;
     }
 
