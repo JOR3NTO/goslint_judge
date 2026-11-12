@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulador de concurso</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1><span class="logo">GS</span> Simulador de concurso</h1>
+    <p class="subtitle">Equipos simulados envían código real al juez y el scoreboard se compara con el calculado aquí.</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>1. Parámetros</h2>
+      <div class="grid">
+        <label>Equipos <input id="p-teams" type="number" min="20" max="100" value="20"></label>
+        <label>Problemas <input id="p-problems" type="number" min="10" max="26" value="10"></label>
+        <label>Duración (min) <input id="p-duration" type="number" min="1" value="15"></label>
+        <label>Inicia en (s) <input id="p-lead" type="number" min="15" value="40"></label>
+        <label>Puntos por problema <input id="p-points" type="number" min="1" value="1"></label>
+        <label>Penalización por intento (min) <input id="p-penalty" type="number" min="0" value="20"></label>
+        <label>Pensar mín. (s) <input id="p-think-min" type="number" min="0" value="5"></label>
+        <label>Pensar máx. (s) <input id="p-think-max" type="number" min="1" value="20"></label>
+      </div>
+      <h3>Resultado de cada intento (%)</h3>
+      <div class="grid">
+        <label>AC <input id="w-ACCEPTED" type="number" min="0" value="35"></label>
+        <label>WA <input id="w-WRONG_ANSWER" type="number" min="0" value="35"></label>
+        <label>TLE <input id="w-TIME_LIMIT_EXCEEDED" type="number" min="0" value="10"></label>
+        <label>RTE <input id="w-RUNTIME_ERROR" type="number" min="0" value="10"></label>
+        <label>CE <input id="w-COMPILATION_ERROR" type="number" min="0" value="10"></label>
+        <label>Reenvío de resuelto <input id="p-resend" type="number" min="0" max="100" value="5"></label>
+      </div>
+      <p class="hint">Cada equipo tiene una habilidad aleatoria (×0,5–1,5 sobre el % de AC). Tras un AC pasa a otro problema;
+        si falla, vuelve a intentar el mismo.</p>
+      <div class="actions">
+        <button id="btn-prepare">Preparar concurso</button>
+        <button id="btn-start" disabled>Iniciar simulación</button>
+        <button id="btn-stop" class="secondary" disabled>Detener</button>
+      </div>
+      <p id="status" class="status">Sin concurso.</p>
+    </section>
+
+    <section class="panel">
+      <h2>2. Envíos</h2>
+      <div id="stats" class="stats"></div>
+      <table>
+        <thead><tr><th>Hora</th><th>Equipo</th><th>Prob.</th><th>Intento</th><th>Veredicto</th></tr></thead>
+        <tbody id="submissions"></tbody>
+      </table>
+    </section>
+
+    <section class="panel boards">
+      <div>
+        <h2>3. Scoreboard del backend <span id="sse-status" class="badge">SSE desconectado</span></h2>
+        <table>
+          <thead><tr><th>#</th><th>Equipo</th><th>Puntos</th><th>Penal.</th></tr></thead>
+          <tbody id="board-backend"></tbody>
+        </table>
+      </div>
+      <div>
+        <h2>4. Esperado (calculado aquí)</h2>
+        <table>
+          <thead><tr><th>#</th><th>Equipo</th><th>Puntos</th><th>Penal.</th><th>Resueltos</th></tr></thead>
+          <tbody id="board-expected"></tbody>
+        </table>
+        <p class="hint">Mismas reglas ICPC con los veredictos que devolvió el juez. Una fila en rojo no coincide con el backend.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Registro</h2>
+      <div id="log" class="log"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
