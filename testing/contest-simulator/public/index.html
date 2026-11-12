@@ -20,6 +20,7 @@
         <label>Problemas <input id="p-problems" type="number" min="10" max="26" value="10"></label>
         <label>Duración (min) <input id="p-duration" type="number" min="1" value="15"></label>
         <label>Inicia en (s) <input id="p-lead" type="number" min="15" value="40"></label>
+        <label>Congelar últimos (min) <input id="p-freeze" type="number" min="0" value="5"></label>
         <label>Puntos por problema <input id="p-points" type="number" min="1" value="1"></label>
         <label>Penalización por intento (min) <input id="p-penalty" type="number" min="0" value="20"></label>
         <label>Pensar mín. (s) <input id="p-think-min" type="number" min="0" value="5"></label>
@@ -40,6 +41,7 @@
         <button id="btn-prepare">Preparar concurso</button>
         <button id="btn-start" disabled>Iniciar simulación</button>
         <button id="btn-stop" class="secondary" disabled>Detener</button>
+        <button id="btn-unfreeze" class="secondary" disabled>Liberar scoreboard</button>
       </div>
       <p id="status" class="status">Sin concurso.</p>
     </section>
@@ -55,7 +57,8 @@
 
     <section class="panel boards">
       <div>
-        <h2>3. Scoreboard del backend <span id="sse-status" class="badge">SSE desconectado</span></h2>
+        <h2>3. Scoreboard del backend <span id="sse-status" class="badge">SSE desconectado</span>
+          <span id="frozen-status" class="badge" hidden>Congelado</span></h2>
         <table>
           <thead><tr><th>#</th><th>Equipo</th><th>Puntos</th><th>Penal.</th></tr></thead>
           <tbody id="board-backend"></tbody>
@@ -67,7 +70,8 @@
           <thead><tr><th>#</th><th>Equipo</th><th>Puntos</th><th>Penal.</th><th>Resueltos</th></tr></thead>
           <tbody id="board-expected"></tbody>
         </table>
-        <p class="hint">Mismas reglas ICPC con los veredictos que devolvió el juez. Una fila en rojo no coincide con el backend.</p>
+        <p class="hint">Mismas reglas ICPC con los veredictos que devolvió el juez; con la tabla congelada, solo los envíos
+          anteriores al congelamiento. Una fila en rojo no coincide con el backend.</p>
       </div>
     </section>
 

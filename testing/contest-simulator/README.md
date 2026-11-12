@@ -30,6 +30,11 @@ Abre **http://localhost:4400** (no con `file://`: `crypto.subtle` necesita un co
    elige un problema, envía y espera el veredicto antes de seguir: tras un AC pasa a otro problema y, si falla,
    lo vuelve a intentar. A veces reenvía un problema ya resuelto, lo que no debe cambiar el scoreboard.
 
+**Congelamiento:** "Congelar últimos (min)" define cuántos minutos antes del fin se congela la tabla pública
+(0 = nunca). Al llegar esa hora el backend envía por SSE el evento `frozen` y deja de mandar cambios; la tabla
+esperada pasa a contar solo los envíos anteriores al congelamiento. **Liberar scoreboard** hace de organizador
+(`POST /contests/{id}/scoreboard/unfreeze`): el backend recalcula a todos los equipos y envía la tabla real.
+
 **Cómo se consigue cada veredicto:** el problema *k* pide imprimir `a*k + b`, así que el simulador sabe qué
 código Python da AC, WA (`+ 1`), TLE (bucle infinito), RTE (división entre cero) o CE (error de sintaxis).
 La columna "Intento" es lo que se buscó y "Veredicto" lo que respondió el juez; si difieren muchas veces,

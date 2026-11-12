@@ -41,7 +41,8 @@ const tagged = code => `${code}\n# intento ${crypto.randomUUID()}\n`;
 const state = {
   cfg: null,
   org: null,
-  contest: null,     // { id, start, end }
+  contest: null,     // { id, start, end, freezeAt }
+  frozen: false,
   problems: [],      // { alias, k, catalogId, contestProblemId }
   teams: [],         // { id, name, user, skill, solved: Set, current }
   submissions: [],   // { id, teamId, alias, intended, verdict, submittedAt }
@@ -130,7 +131,7 @@ async function prepare() {
     const end = new Date(start.getTime() + num("p-duration") * 60_000);
     const c = await api("POST", "/contests", {
       createdBy: org.id, title: `Simulación ${tag}`, description: "Creado por el simulador de concurso",
-      password: "sim", startTime: start.toISOString(), endTime: end.toISOString(),
+      password: "sim", startTime: start.toISOString(), endTime: end.toISOString(), freezeMinutes: num("p-freeze"),
     }, org);
     if (!c.ok) return;
 
@@ -152,13 +153,19 @@ async function prepare() {
       teams.push({ id: t.data.id, name: t.data.teamName, user, skill: rand(0.5, 1.5), solved: new Set(), current: null });
     }
 
+    const endAt = new Date(c.data.endTime);
     Object.assign(state, {
-      org, problems, teams, submissions: [], rejected: 0, board: [],
-      contest: { id: c.data.id, start: new Date(c.data.startTime), end: new Date(c.data.endTime) },
+      org, problems, teams, submissions: [], rejected: 0, board: [], frozen: false,
+      contest: {
+        id: c.data.id, start: new Date(c.data.startTime), end: endAt,
+        freezeAt: c.data.freezeMinutes > 0 ? new Date(endAt - c.data.freezeMinutes * 60_000) : null,
+      },
     });
     connectScoreboard();
     render();
-    log(`Concurso "${c.data.title}" listo: ${problems.length} problemas y ${teams.length} equipos. Empieza a las ${time(c.data.startTime)}.`, "ok");
+    log(`Concurso "${c.data.title}" listo: ${problems.length} problemas y ${teams.length} equipos. Empieza a las ${time(c.data.startTime)}`
+      + (state.contest.freezeAt ? ` y se congela a las ${time(state.contest.freezeAt)}.` : "."), "ok");
+    $("btn-unfreeze").disabled = false;
     setStatus(`Listo. El concurso empieza a las ${time(c.data.startTime)}; pulsa "Iniciar simulación".`);
     $("btn-start").disabled = false;
   } finally {
@@ -270,6 +277,13 @@ function connectScoreboard() {
   const badge = (text, on) => { $("sse-status").textContent = text; $("sse-status").classList.toggle("on", on); };
   es.onopen = () => badge("SSE conectado", true);
   es.onerror = () => badge("SSE reconectando…", false);
+  es.addEventListener("frozen", e => {
+    const frozen = JSON.parse(e.data);
+    if (frozen !== state.frozen) log(frozen ? "SSE: scoreboard congelado." : "SSE: scoreboard liberado.", "ok");
+    state.frozen = frozen;
+    $("frozen-status").hidden = !frozen;
+    render();
+  });
   es.addEventListener("scoreboard", e => {
     state.board = JSON.parse(e.data);
     log(`SSE: tabla completa (${state.board.length} equipos).`);
@@ -286,9 +300,12 @@ function connectScoreboard() {
 }
 
 // Mismas reglas que TeamStanding del backend, con los veredictos que devolvió el juez.
+// Con la tabla congelada solo cuentan los envíos anteriores al congelamiento.
 function expectedBoard() {
+  const cutoff = state.frozen ? state.contest.freezeAt : null;
   return state.teams.map(team => {
-    const subs = state.submissions.filter(s => s.teamId === team.id && s.verdict !== "PENDING")
+    const subs = state.submissions
+      .filter(s => s.teamId === team.id && s.verdict !== "PENDING" && (!cutoff || new Date(s.submittedAt) < cutoff))
       .sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt));
     const solved = new Set(), fails = {};
     let score = 0, penalty = 0, last = null;
@@ -347,6 +364,10 @@ function render() {
 $("btn-prepare").onclick = prepare;
 $("btn-start").onclick = start;
 $("btn-stop").onclick = stop;
+$("btn-unfreeze").onclick = async () => {
+  const r = await api("POST", `/contests/${state.contest.id}/scoreboard/unfreeze`, undefined, state.org);
+  if (r.ok) log(`Liberar scoreboard ⇒ ${r.data.scoreboardStatus}`, "ok");
+};
 
 (async () => {
   state.cfg = await (await fetch("/config")).json();
