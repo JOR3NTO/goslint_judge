@@ -26,6 +26,7 @@ public interface CreateContestUseCase {
      * @param password    Contraseña en texto plano para la inscripción de equipos.
      * @param startTime   Fecha y hora de inicio.
      * @param endTime     Fecha y hora de finalización.
+     * @param freezeMinutes Minutos finales con la tabla pública congelada; nulo o 0 para no congelar.
      */
     record CreateContestCommand(
         UUID createdBy,
@@ -33,6 +34,7 @@ public interface CreateContestUseCase {
         String description,
         String password,
         Instant startTime,
-        Instant endTime
+        Instant endTime,
+        Integer freezeMinutes
     ){}
 }

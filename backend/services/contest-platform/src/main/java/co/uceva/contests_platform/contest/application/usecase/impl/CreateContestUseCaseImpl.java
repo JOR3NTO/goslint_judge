@@ -55,6 +55,9 @@ public class CreateContestUseCaseImpl implements CreateContestUseCase {
             command.startTime(),
             command.endTime()
         );
+        if (command.freezeMinutes() != null) {
+            contest.changeFreezeMinutes(command.freezeMinutes());
+        }
 
         Contest saved = contestRepository.save(contest);
         scheduler.scheduleContest(saved);

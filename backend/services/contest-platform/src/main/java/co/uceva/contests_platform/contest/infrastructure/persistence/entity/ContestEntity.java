@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import co.uceva.contests_platform.contest.domain.model.ContestStatus;
+import co.uceva.contests_platform.contest.domain.model.ScoreboardStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -65,4 +66,11 @@ public class ContestEntity {
     /** Fecha y hora de creación del concurso. */
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+    /** Minutos finales en los que la tabla pública se congela; 0 si no se congela. */
+    @Column(name = "freeze_minutes", nullable = false)
+    private int freezeMinutes;
+    /** Estado de la tabla de posiciones pública. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scoreboard_status", nullable = false)
+    private ScoreboardStatus scoreboardStatus;
 }

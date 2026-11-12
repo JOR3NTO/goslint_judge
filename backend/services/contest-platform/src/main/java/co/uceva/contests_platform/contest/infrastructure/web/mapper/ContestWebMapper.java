@@ -28,7 +28,8 @@ public class ContestWebMapper {
                 request.description(),
                 request.password(),
                 request.startTime(),
-                request.endTime()
+                request.endTime(),
+                request.freezeMinutes()
         );
     }
 
@@ -47,7 +48,8 @@ public class ContestWebMapper {
                 request.password(),
                 request.startTime(),
                 request.endTime(),
-                request.status()
+                request.status(),
+                request.freezeMinutes()
         );
     }
 
@@ -66,7 +68,9 @@ public class ContestWebMapper {
                 domain.getStartTime(),
                 domain.getEndTime(),
                 domain.getStatus(),
-                domain.getCreatedAt()
+                domain.getCreatedAt(),
+                domain.getFreezeMinutes(),
+                domain.getScoreboardStatus()
         );
     }
 }
