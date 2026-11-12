@@ -29,6 +29,7 @@ public class ContestController {
     private final GetAllContestsUseCase getAllContestsUseCase;
     private final UpdateContestUseCase updateContestUseCase;
     private final DeleteContestUseCase deleteContestUseCase;
+    private final UnfreezeScoreboardUseCase unfreezeScoreboardUseCase;
 
     /**
      * Inyección de dependencias para obtener los orquestadores de cada caso de uso.
@@ -48,7 +49,8 @@ public class ContestController {
             GetAllContestsByCreatorUseCase getAllContestsByCreatorUseCase,
             GetAllContestsUseCase getAllContestsUseCase,
             UpdateContestUseCase updateContestUseCase,
-            DeleteContestUseCase deleteContestUseCase) {
+            DeleteContestUseCase deleteContestUseCase,
+            UnfreezeScoreboardUseCase unfreezeScoreboardUseCase) {
         this.createContestUseCase = createContestUseCase;
         this.getContestByIdUseCase = getContestByIdUseCase;
         this.getAllContestsByTitleUseCase = getAllContestsByTitleUseCase;
@@ -56,6 +58,14 @@ public class ContestController {
         this.getAllContestsUseCase = getAllContestsUseCase;
         this.updateContestUseCase = updateContestUseCase;
         this.deleteContestUseCase = deleteContestUseCase;
+        this.unfreezeScoreboardUseCase = unfreezeScoreboardUseCase;
+    }
+
+    /** Libera los resultados reales de un concurso con la tabla congelada. Requiere rol {@code ADMIN} u {@code ORGANIZER}. */
+    @PostMapping("/{id}/scoreboard/unfreeze")
+    @PreAuthorize("hasAnyRole('ADMIN','ORGANIZER')")
+    public ResponseEntity<ContestResponseDTO> unfreezeScoreboard(@PathVariable("id") UUID id) {
+        return ResponseEntity.ok(ContestWebMapper.toResponse(unfreezeScoreboardUseCase.execute(id)));
     }
 
     /**
