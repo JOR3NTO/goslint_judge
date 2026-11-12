@@ -27,22 +27,80 @@ import co.uceva.contests_platform.contest.infrastructure.web.mapper.TeamWebMappe
  * se reconstruye completo desde ella. Después, cada cambio solo reposiciona al equipo afectado
  * y se envía a los suscriptores únicamente esa fila.
  * </p>
+ * <p>
+ * Con la tabla congelada se sirve la del momento del congelamiento: solo cambia por envíos hechos antes
+ * de congelar que se califican después, hasta que el organizador la libere.
+ * </p>
  */
 @Component
 public class ScoreboardCache {
 
+    /**
+     * Tabla calculada desde la base de datos.
+     *
+     * @param rows   Filas ordenadas.
+     * @param frozen {@code true} si es la tabla congelada.
+     */
+    public record Board(List<ScoreboardRow> rows, boolean frozen) {
+    }
+
     private final Map<UUID, List<ScoreboardRow>> boards = new HashMap<>();
+    private final Map<UUID, List<ScoreboardRow>> frozenBoards = new HashMap<>();
     private final Map<UUID, List<SseEmitter>> subscribers = new ConcurrentHashMap<>();
 
     /**
-     * Tabla de posiciones del concurso; la construye con {@code builder} si no está en caché.
+     * Tabla de posiciones del concurso (la congelada si lo está); la construye con {@code builder} si no está en caché.
      *
      * @param contestId Identificador del concurso.
      * @param builder   Cálculo completo desde la base de datos.
      * @return Copia de la tabla ordenada.
      */
-    public synchronized List<ScoreboardRow> getOrBuild(UUID contestId, Function<UUID, List<ScoreboardRow>> builder) {
-        return List.copyOf(boards.computeIfAbsent(contestId, id -> new ArrayList<>(builder.apply(id))));
+    public synchronized List<ScoreboardRow> getOrBuild(UUID contestId, Function<UUID, Board> builder) {
+        List<ScoreboardRow> rows = frozenBoards.containsKey(contestId) ? frozenBoards.get(contestId) : boards.get(contestId);
+        if (rows == null) {
+            Board board = builder.apply(contestId);
+            rows = new ArrayList<>(board.rows());
+            (board.frozen() ? frozenBoards : boards).put(contestId, rows);
+        }
+        return List.copyOf(rows);
+    }
+
+    /**
+     * Congela la tabla del concurso y la envía completa a los suscriptores.
+     *
+     * @param contestId Identificador del concurso.
+     * @param rows      Tabla al momento del congelamiento.
+     */
+    public void freeze(UUID contestId, List<ScoreboardRow> rows) {
+        List<ScoreboardRow> frozen = new ArrayList<>(rows);
+        synchronized (this) {
+            frozenBoards.put(contestId, frozen);
+            boards.remove(contestId);
+        }
+        broadcastBoard(contestId, true, List.copyOf(frozen));
+    }
+
+    /**
+     * Libera la tabla del concurso y envía la real completa a los suscriptores.
+     *
+     * @param contestId Identificador del concurso.
+     * @param rows      Tabla real, ya calculada con todos los envíos.
+     */
+    public void unfreeze(UUID contestId, List<ScoreboardRow> rows) {
+        List<ScoreboardRow> live = new ArrayList<>(rows);
+        synchronized (this) {
+            frozenBoards.remove(contestId);
+            boards.put(contestId, live);
+        }
+        broadcastBoard(contestId, false, List.copyOf(live));
+    }
+
+    private void broadcastBoard(UUID contestId, boolean frozen, List<ScoreboardRow> rows) {
+        List<Object> table = rows.stream().map(r -> (Object) TeamWebMapper.toResponse(r.team())).toList();
+        subscribers.getOrDefault(contestId, List.of()).forEach(emitter -> {
+            send(contestId, emitter, "frozen", frozen);
+            send(contestId, emitter, "scoreboard", table);
+        });
     }
 
     /**
@@ -55,7 +113,8 @@ public class ScoreboardCache {
         UUID contestId = row.team().getContestId();
         int position;
         synchronized (this) {
-            List<ScoreboardRow> board = boards.get(contestId);
+            // Congelada, solo llegan cambios de envíos anteriores al congelamiento (ver UpdateTeamScoreUseCaseImpl).
+            List<ScoreboardRow> board = frozenBoards.containsKey(contestId) ? frozenBoards.get(contestId) : boards.get(contestId);
             if (board == null) {
                 return;
             }
@@ -69,7 +128,7 @@ public class ScoreboardCache {
     }
 
     /**
-     * Suscribe un cliente al concurso y le envía la tabla completa; después solo recibe cambios.
+     * Suscribe un cliente al concurso y le envía si está congelada y la tabla completa; después solo recibe cambios.
      * Se registra antes de leer la tabla para no perder un cambio que llegue entre ambos pasos.
      *
      * @param contestId Identificador del concurso.
@@ -85,7 +144,13 @@ public class ScoreboardCache {
         emitter.onTimeout(() -> emitters.remove(emitter));
         emitter.onError(e -> emitters.remove(emitter));
         try {
-            send(contestId, emitter, "scoreboard", current.get().stream().map(TeamWebMapper::toResponse).toList());
+            List<Team> table = current.get();
+            boolean frozen;
+            synchronized (this) {
+                frozen = frozenBoards.containsKey(contestId);
+            }
+            send(contestId, emitter, "frozen", frozen);
+            send(contestId, emitter, "scoreboard", table.stream().map(TeamWebMapper::toResponse).toList());
         } catch (RuntimeException e) {
             emitters.remove(emitter);
             throw e;

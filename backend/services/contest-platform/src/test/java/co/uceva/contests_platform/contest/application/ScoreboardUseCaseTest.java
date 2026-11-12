@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import co.uceva.contests_platform.contest.application.event.TeamScoreChangedEvent;
+import co.uceva.contests_platform.contest.application.service.ScoreboardCalculator;
 import co.uceva.contests_platform.contest.application.usecase.impl.GetScoreboardUseCaseImpl;
 import co.uceva.contests_platform.contest.application.usecase.impl.UpdateTeamScoreUseCaseImpl;
 import co.uceva.contests_platform.contest.domain.model.Contest;
@@ -54,8 +55,8 @@ class ScoreboardUseCaseTest {
     private final ApplicationEventPublisher publisher = mock(ApplicationEventPublisher.class);
     private final ScoreboardCache cache = new ScoreboardCache();
 
-    private final GetScoreboardUseCaseImpl getScoreboard = new GetScoreboardUseCaseImpl(
-            teamRepository, contestRepository, contestProblemRepository, submissionAdapter, cache);
+    private final GetScoreboardUseCaseImpl getScoreboard = new GetScoreboardUseCaseImpl(contestRepository,
+            new ScoreboardCalculator(teamRepository, contestProblemRepository, submissionAdapter), cache);
     private final UpdateTeamScoreUseCaseImpl updateTeamScore = new UpdateTeamScoreUseCaseImpl(
             teamRepository, contestRepository, contestProblemRepository, submissionAdapter, publisher);
 

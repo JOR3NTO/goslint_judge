@@ -1,5 +1,6 @@
 package co.uceva.contests_platform.contest.application.usecase.impl;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.context.ApplicationEventPublisher;
@@ -13,6 +14,7 @@ import co.uceva.contests_platform.contest.domain.model.Contest;
 import co.uceva.contests_platform.contest.domain.model.ScoreboardRow;
 import co.uceva.contests_platform.contest.domain.model.Team;
 import co.uceva.contests_platform.contest.domain.model.TeamStanding;
+import co.uceva.contests_platform.contest.domain.model.TeamSubmission;
 import co.uceva.contests_platform.contest.domain.repository.ContestProblemRepository;
 import co.uceva.contests_platform.contest.domain.repository.ContestRepository;
 import co.uceva.contests_platform.contest.domain.repository.TeamRepository;
@@ -69,8 +71,14 @@ public class UpdateTeamScoreUseCaseImpl implements UpdateTeamScoreUseCase {
         }
         Contest contest = contestRepository.findById(team.getContestId())
                 .orElseThrow(() -> new ContestNotFoundException(team.getContestId()));
+        List<TeamSubmission> submissions = submissionAdapter.findByTeamId(teamId);
+        // Con la tabla congelada solo cuentan los envíos anteriores al congelamiento, aunque se califiquen
+        // después: los posteriores no la mueven hasta liberarla, y el resultado es el mismo que tras un reinicio.
+        if (contest.isScoreboardFrozen()) {
+            submissions = submissions.stream().filter(s -> s.submittedAt().isBefore(contest.getFreezeTime())).toList();
+        }
 
-        TeamStanding standing = TeamStanding.calculate(submissionAdapter.findByTeamId(teamId),
+        TeamStanding standing = TeamStanding.calculate(submissions,
                 contestProblemRepository.findAllByContestIdOrderByOrderIndexAsc(contest.getId()),
                 contest.getStartTime());
         if (standing.teamScore().equals(team.getTeamScore())) {
