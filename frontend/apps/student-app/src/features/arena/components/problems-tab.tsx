@@ -47,7 +47,7 @@ export function ProblemsTab({
       />
 
       {selected ? (
-        <SubmitPanel problemId={selected.problemId} letter={selected.letter} {...submit} />
+        <SubmitPanel problemId={selected.id} letter={selected.letter} {...submit} />
       ) : (
         <div className="rounded-lg border border-border bg-card p-6 text-muted-foreground">
           No hay problemas disponibles para enviar.

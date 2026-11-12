@@ -19,7 +19,7 @@ export function ProblemList({ problems, selectedProblemId, statusOf, onSelect }:
         {problems.map((problem) => {
           const isSelected = problem.problemId === selectedProblemId
           const difficulty = difficultyLabel(problem.difficulty)
-          const state = teamProblemStatusView(statusOf(problem.problemId))
+          const state = teamProblemStatusView(statusOf(problem.id))
           return (
             <li key={problem.id}>
               <button
