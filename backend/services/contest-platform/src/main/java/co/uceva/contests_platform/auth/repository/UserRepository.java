@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,7 +28,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Page<User> findByUsernameContainingIgnoreCaseOrEmailContainingIgnoreCase(
             String username, String email, Pageable pageable);
 
-    /** Usuarios activos cuyo username contiene el texto (sin distinguir mayúsculas), excluyendo a {@code excludedId}. */
-    List<User> findByActiveTrueAndIdNotAndUsernameContainingIgnoreCase(
-            UUID excludedId, String username, Pageable pageable);
+    /**
+     * Usuarios activos cuyo username contiene el texto (sin distinguir mayúsculas), excluyendo a {@code excludedId}
+     * y a los que tengan alguno de los {@code excludedRoles}.
+     */
+    List<User> findByActiveTrueAndRoleNotInAndIdNotAndUsernameContainingIgnoreCase(
+            Collection<Role> excludedRoles, UUID excludedId, String username, Pageable pageable);
 }

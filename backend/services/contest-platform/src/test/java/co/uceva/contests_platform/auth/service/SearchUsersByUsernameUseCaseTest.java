@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.UUID;
 
+import co.uceva.contests_platform.auth.model.Role;
 import co.uceva.contests_platform.auth.model.User;
 import co.uceva.contests_platform.auth.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -27,23 +28,33 @@ class SearchUsersByUsernameUseCaseTest {
     void trimsExcludesSelfAndLimits() {
         UUID me = UUID.randomUUID();
         User ana = User.builder().id(UUID.randomUUID()).username("ana_gomez").build();
-        when(users.findByActiveTrueAndIdNotAndUsernameContainingIgnoreCase(eq(me), eq("ana"), any(Pageable.class)))
+        when(users.findByActiveTrueAndRoleNotInAndIdNotAndUsernameContainingIgnoreCase(
+                eq(SearchUsersByUsernameUseCase.EXCLUDED_ROLES), eq(me), eq("ana"), any(Pageable.class)))
                 .thenReturn(List.of(ana));
 
         List<User> result = useCase.execute("  ana ", me);
 
         assertThat(result).containsExactly(ana);
-        verify(users).findByActiveTrueAndIdNotAndUsernameContainingIgnoreCase(
-                eq(me), eq("ana"), org.mockito.ArgumentMatchers.argThat(p -> p.getPageSize() == 20));
+        verify(users).findByActiveTrueAndRoleNotInAndIdNotAndUsernameContainingIgnoreCase(
+                eq(SearchUsersByUsernameUseCase.EXCLUDED_ROLES), eq(me), eq("ana"),
+                org.mockito.ArgumentMatchers.argThat(p -> p.getPageSize() == 20));
     }
 
     @Test
     @DisplayName("Un texto nulo se trata como vacío")
     void nullTermIsEmpty() {
         UUID me = UUID.randomUUID();
-        when(users.findByActiveTrueAndIdNotAndUsernameContainingIgnoreCase(eq(me), eq(""), any(Pageable.class)))
+        when(users.findByActiveTrueAndRoleNotInAndIdNotAndUsernameContainingIgnoreCase(
+                eq(SearchUsersByUsernameUseCase.EXCLUDED_ROLES), eq(me), eq(""), any(Pageable.class)))
                 .thenReturn(List.of());
 
         assertThat(useCase.execute(null, me)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Excluye a administradores, super administradores y organizadores de la búsqueda")
+    void excludesAdminAndOrganizerRoles() {
+        assertThat(SearchUsersByUsernameUseCase.EXCLUDED_ROLES)
+                .containsExactlyInAnyOrder(Role.ADMIN, Role.SUPER_ADMIN, Role.ORGANIZER);
     }
 }
