@@ -73,14 +73,13 @@ function invite(req: MockRequest, ctx: MockContext) {
 
   const body = readBody(req)
   const userId = (textField(body, "userId") ?? "").trim()
-  const email = (textField(body, "email") ?? "").trim()
   if (!userId) throw httpError(400, "El ID del usuario es obligatorio.")
-  if (!email) throw httpError(400, "El correo del invitado no es válido.")
 
   if (team.members.length >= TEAM_MAX_MEMBERS) {
     throw httpError(409, `El equipo ya tiene el máximo de ${TEAM_MAX_MEMBERS} integrantes.`)
   }
-  if (!state.users.some((u) => u.id === userId)) {
+  const invited = state.users.find((u) => u.id === userId)
+  if (!invited) {
     throw httpError(404, "No existe un usuario con ese ID.")
   }
   if (teamOfUserInContest(state, team.contestId, userId)) {
@@ -97,7 +96,7 @@ function invite(req: MockRequest, ctx: MockContext) {
     id: newId(),
     teamId: team.id,
     invitedUserId: userId,
-    invitedEmail: email,
+    invitedEmail: invited.email,
     status: "PENDING",
     createdAt: isoAt(now),
     respondedAt: null,
@@ -177,6 +176,16 @@ export function registerTeamRoutes(router: ApiRouter): void {
       .filter((i) => i.invitedUserId === user.id)
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     return ok(list.map((i) => ({ ...i })))
+  })
+  router.add("GET", "/v1/users/search", (req, ctx) => {
+    const me = authenticate(ctx.state, req.authorization, ctx.now)
+    const term = (req.query.get("q") ?? "").trim().toLowerCase()
+    const users = ctx.state.users
+      .filter((u) => u.isActive && u.id !== me.id && u.username.toLowerCase().includes(term))
+      .sort((a, b) => a.username.localeCompare(b.username))
+      .slice(0, 20)
+      .map((u) => ({ id: u.id, username: u.username }))
+    return ok(users)
   })
   router.add("POST", "/v1/invitations/:id/accept", acceptInvitation)
   router.add("POST", "/v1/invitations/:id/reject", rejectInvitation)

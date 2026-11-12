@@ -185,7 +185,7 @@ async function main() {
   await step("el capitán invita a Carlos y la invitación queda PENDING", async () => {
     const res = await server.post(
       `/v1/teams/${novatosTeam.id}/invitations`,
-      { userId: CARLOS_ID, email: CARLOS_EMAIL },
+      { userId: CARLOS_ID },
       withToken(token)
     )
     assert.equal(res.status, 201)
@@ -193,19 +193,28 @@ async function main() {
     assert.equal(res.data.invitedUserId, CARLOS_ID)
   })
 
+  await step("la búsqueda de usuarios filtra por username y excluye al propio usuario", async () => {
+    const res = await server.get("/v1/users/search?q=CARLOS", withToken(token))
+    assert.equal(res.status, 200)
+    assert.deepEqual(res.data.map((u) => u.username), ["carlos_mendoza"])
+    assert.deepEqual(Object.keys(res.data[0]).sort(), ["id", "username"])
+    const all = await server.get("/v1/users/search?q=", withToken(token))
+    assert.ok(all.data.length > 1 && all.data.every((u) => u.username !== "demo_student"))
+  })
+
   await step("un no capitán no puede invitar (403) y una invitación repetida da 409", async () => {
     const login = await server.post("/v1/auth/login", { email: CARLOS_EMAIL, password: DEMO_STUDENT_PASSWORD })
     const carlosToken = login.data.accessToken
     const forbidden = await server.post(
       `/v1/teams/${novatosTeam.id}/invitations`,
-      { userId: LAURA_ID, email: "laura.restrepo@uceva.edu.co" },
+      { userId: LAURA_ID },
       withToken(carlosToken)
     )
     assert.equal(forbidden.status, 403)
 
     const repeated = await server.post(
       `/v1/teams/${novatosTeam.id}/invitations`,
-      { userId: CARLOS_ID, email: CARLOS_EMAIL },
+      { userId: CARLOS_ID },
       withToken(token)
     )
     assert.equal(repeated.status, 409)

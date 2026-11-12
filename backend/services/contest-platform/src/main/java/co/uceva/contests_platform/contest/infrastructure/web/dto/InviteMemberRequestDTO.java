@@ -5,7 +5,6 @@ import java.util.UUID;
 /**
  * DTO de solicitud para invitar a un estudiante al equipo.
  *
- * @param userId Identificador del usuario invitado.
- * @param email  Correo al que se envía la invitación.
+ * @param userId Identificador del usuario invitado; su correo se toma del usuario registrado.
  */
-public record InviteMemberRequestDTO(UUID userId, String email) {}
+public record InviteMemberRequestDTO(UUID userId) {}

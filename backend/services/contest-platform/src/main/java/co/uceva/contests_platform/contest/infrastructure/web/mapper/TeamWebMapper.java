@@ -36,7 +36,7 @@ public class TeamWebMapper {
     }
 
     public static InviteMemberCommand toCommand(UUID teamId, UUID captainUserId, InviteMemberRequestDTO request) {
-        return new InviteMemberCommand(teamId, captainUserId, request.userId(), request.email());
+        return new InviteMemberCommand(teamId, captainUserId, request.userId());
     }
 
     public static TeamResponseDTO toResponse(Team domain) {

@@ -15,18 +15,17 @@ import {
 import { Badge } from "@/shared/ui/primitives/badge"
 import { Button } from "@/shared/ui/primitives/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
+import { UserCombobox } from "./user-combobox"
 import { Input } from "@/shared/ui/primitives/input"
 import { Label } from "@/shared/ui/primitives/label"
 import { Crown, Loader2, LogOut, Mail, Pencil, UserMinus, Users } from "lucide-react"
 import { useTeamActions } from "../hooks/use-team-actions"
-import type { ContestDTO, InvitationDTO, InvitationStatus, TeamDTO } from "../types/contest.types"
+import type { ContestDTO, InvitationDTO, InvitationStatus, TeamDTO, UserSummaryDTO } from "../types/contest.types"
 import {
   TEAM_MAX_MEMBERS,
   isRegistrationOpen,
   shortId,
-  validateEmail,
   validateTeamName,
-  validateUserId,
 } from "../utils/team-rules"
 
 interface MyTeamPanelProps {
@@ -63,9 +62,8 @@ export function MyTeamPanel({ contest, team, currentUserId, onTeamChanged, onTea
   const canEdit = isCaptain && !ended
 
   // Formulario de invitación
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [inviteUserId, setInviteUserId] = useState("")
-  const [inviteErrors, setInviteErrors] = useState<{ email?: string; userId?: string }>({})
+  const [inviteUser, setInviteUser] = useState<UserSummaryDTO | null>(null)
+  const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSent, setInviteSent] = useState<InvitationDTO | null>(null)
 
   // Renombrar
@@ -83,20 +81,17 @@ export function MyTeamPanel({ contest, team, currentUserId, onTeamChanged, onTea
     e.preventDefault()
     if (!canInvite || busy) return
 
-    const errors: { email?: string; userId?: string } = {}
-    const emailError = validateEmail(inviteEmail)
-    const userIdError = validateUserId(inviteUserId)
-    if (emailError) errors.email = emailError
-    if (userIdError) errors.userId = userIdError
-    setInviteErrors(errors)
     setInviteSent(null)
-    if (Object.keys(errors).length > 0) return
+    if (!inviteUser) {
+      setInviteError("Selecciona al estudiante que quieres invitar.")
+      return
+    }
+    setInviteError(null)
 
     try {
-      const invitation = await actions.invite(team.id, inviteUserId.trim(), inviteEmail.trim())
+      const invitation = await actions.invite(team.id, inviteUser.id)
       setInviteSent(invitation)
-      setInviteEmail("")
-      setInviteUserId("")
+      setInviteUser(null)
     } catch {
       // El error ya queda en `actions.error`.
     }
@@ -229,38 +224,18 @@ export function MyTeamPanel({ contest, team, currentUserId, onTeamChanged, onTea
 
               <form onSubmit={handleInvite} noValidate className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="invite-email">Correo institucional</Label>
-                  <Input
-                    id="invite-email"
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                    placeholder="nombre@uceva.edu.co"
-                    autoComplete="off"
+                  <Label htmlFor="invite-user">Estudiante</Label>
+                  <UserCombobox
+                    id="invite-user"
+                    value={inviteUser}
+                    onChange={(user) => {
+                      setInviteUser(user)
+                      setInviteError(null)
+                    }}
                     disabled={!canInvite || busy}
-                    aria-invalid={Boolean(inviteErrors.email)}
-                    className="bg-input border-border focus:border-primary"
+                    invalid={Boolean(inviteError)}
                   />
-                  {inviteErrors.email && <p className="text-sm text-destructive">{inviteErrors.email}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="invite-user-id">ID de cuenta del estudiante</Label>
-                  <Input
-                    id="invite-user-id"
-                    value={inviteUserId}
-                    onChange={(e) => setInviteUserId(e.target.value)}
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                    autoComplete="off"
-                    spellCheck={false}
-                    disabled={!canInvite || busy}
-                    aria-invalid={Boolean(inviteErrors.userId)}
-                    className="bg-input border-border font-mono text-sm focus:border-primary"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    El sistema exige también el ID de la cuenta del estudiante. Aún no se puede buscar por correo.
-                  </p>
-                  {inviteErrors.userId && <p className="text-sm text-destructive">{inviteErrors.userId}</p>}
+                  {inviteError && <p className="text-sm text-destructive">{inviteError}</p>}
                 </div>
 
                 <Button
