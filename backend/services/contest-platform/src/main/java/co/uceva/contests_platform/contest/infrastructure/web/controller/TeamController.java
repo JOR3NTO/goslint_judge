@@ -5,13 +5,16 @@ import java.util.UUID;
 
 import co.uceva.contests_platform.contest.application.usecase.*;
 import co.uceva.contests_platform.contest.infrastructure.web.dto.*;
+import co.uceva.contests_platform.contest.infrastructure.scoreboard.ScoreboardCache;
 import co.uceva.contests_platform.contest.infrastructure.web.mapper.TeamWebMapper;
 import co.uceva.shared.infrastructure.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Controlador REST de equipos e integrantes. Delega toda la lógica en los casos de uso.
@@ -35,6 +38,7 @@ public class TeamController {
     private final AddMemberUseCase addMemberUseCase;
     private final RemoveMemberUseCase removeMemberUseCase;
     private final GetMembersByTeamUseCase getMembersByTeamUseCase;
+    private final ScoreboardCache scoreboardCache;
 
     public TeamController(
             CreateTeamUseCase createTeamUseCase,
@@ -48,7 +52,8 @@ public class TeamController {
             DeleteTeamUseCase deleteTeamUseCase,
             AddMemberUseCase addMemberUseCase,
             RemoveMemberUseCase removeMemberUseCase,
-            GetMembersByTeamUseCase getMembersByTeamUseCase) {
+            GetMembersByTeamUseCase getMembersByTeamUseCase,
+            ScoreboardCache scoreboardCache) {
         this.createTeamUseCase = createTeamUseCase;
         this.getTeamByIdUseCase = getTeamByIdUseCase;
         this.getAllTeamsUseCase = getAllTeamsUseCase;
@@ -61,6 +66,7 @@ public class TeamController {
         this.addMemberUseCase = addMemberUseCase;
         this.removeMemberUseCase = removeMemberUseCase;
         this.getMembersByTeamUseCase = getMembersByTeamUseCase;
+        this.scoreboardCache = scoreboardCache;
     }
 
     /** Crea un equipo en el concurso; el usuario autenticado queda como capitán y primer integrante. 201 CREATED. */
@@ -90,6 +96,15 @@ public class TeamController {
     public ResponseEntity<List<TeamResponseDTO>> getScoreboard(@PathVariable("contestId") UUID contestId) {
         return ResponseEntity.ok(getScoreboardUseCase.execute(contestId).stream()
                 .map(TeamWebMapper::toResponse).toList());
+    }
+
+    /**
+     * Tabla de posiciones en vivo por SSE: primero el evento {@code scoreboard} con la tabla completa
+     * y después un evento {@code team} por cada equipo que cambia de puntaje.
+     */
+    @GetMapping(value = "/contests/{contestId}/scoreboard/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamScoreboard(@PathVariable("contestId") UUID contestId) {
+        return scoreboardCache.subscribe(contestId, () -> getScoreboardUseCase.execute(contestId));
     }
 
     @GetMapping("/teams")

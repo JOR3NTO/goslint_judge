@@ -1,14 +1,12 @@
 package co.uceva.contests_platform.contest.infrastructure.client;
 
-import java.time.Instant;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
+import co.uceva.contests_platform.contest.domain.model.TeamSubmission;
 import co.uceva.contests_platform.submission.application.usecase.GetSubmissionsByTeamUseCase;
-import co.uceva.contests_platform.submission.domain.model.Submission;
 import co.uceva.shared.domain.VerdictStatus;
 import org.springframework.stereotype.Component;
 
@@ -19,22 +17,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class SubmissionAdapter {
 
+    /** Rechazos que cuentan como intento fallido; compilación y fallos del juez no penalizan. */
+    private static final Set<VerdictStatus> PENALIZED = EnumSet.of(VerdictStatus.WRONG_ANSWER,
+            VerdictStatus.TIME_LIMIT_EXCEEDED, VerdictStatus.MEMORY_LIMIT_EXCEEDED, VerdictStatus.RUNTIME_ERROR);
+
     private final GetSubmissionsByTeamUseCase getSubmissionsByTeamUseCase;
 
     public SubmissionAdapter(GetSubmissionsByTeamUseCase getSubmissionsByTeamUseCase) {
         this.getSubmissionsByTeamUseCase = getSubmissionsByTeamUseCase;
     }
 
-    /**
-     * Momento en que el equipo resolvió su último problema: de cada problema solo cuenta el primer
-     * envío aceptado, y de esos se toma el más reciente. Vacío si el equipo no ha resuelto ninguno.
-     */
-    public Optional<Instant> findLastSolvedAt(UUID teamId) {
-        Map<UUID, Instant> firstAcceptedByProblem = new HashMap<>();
-        getSubmissionsByTeamUseCase.execute(teamId).stream()
-                .filter(s -> s.getVerdict() == VerdictStatus.ACCEPTED)
-                .sorted(Comparator.comparing(Submission::getSubmittedAt))
-                .forEach(s -> firstAcceptedByProblem.putIfAbsent(s.getProblemId(), s.getSubmittedAt()));
-        return firstAcceptedByProblem.values().stream().max(Comparator.naturalOrder());
+    /** Envíos del equipo con lo necesario para puntuarlos. */
+    public List<TeamSubmission> findByTeamId(UUID teamId) {
+        return getSubmissionsByTeamUseCase.execute(teamId).stream()
+                .map(s -> new TeamSubmission(s.getProblemId(), s.getVerdict() == VerdictStatus.ACCEPTED,
+                        PENALIZED.contains(s.getVerdict()), s.getSubmittedAt()))
+                .toList();
     }
 }
