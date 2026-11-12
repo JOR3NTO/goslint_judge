@@ -13,10 +13,10 @@ export function ProfileHeader({ profile }: { profile: ProfileResult["profile"] }
   const RoleIcon = profile.role === "ADMIN" ? ShieldCheck : GraduationCap
 
   return (
-    <Card className="border-border bg-card/50 backdrop-blur overflow-hidden">
-      <div className="h-24 bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
+    <Card className="border-border bg-card shadow-sm overflow-hidden">
+      <div className="h-24 bg-gradient-to-r from-primary/20 via-primary/5 to-transparent" />
       <CardContent className="-mt-12 pb-6 flex flex-col sm:flex-row sm:items-end gap-4">
-        <Avatar className="h-24 w-24 border-4 border-background bg-card">
+        <Avatar className="h-24 w-24 border-4 border-background bg-card shadow-md">
           <AvatarImage src={avatarSrc} alt={`Avatar de ${name}`} />
           <AvatarFallback className="bg-primary/15 text-primary text-3xl font-bold">
             {getInitials(profile)}

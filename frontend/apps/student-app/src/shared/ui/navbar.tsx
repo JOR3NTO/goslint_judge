@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { useLogout } from "@/features/auth"
 import { usePendingInvitationsCount } from "@/features/contests"
@@ -8,6 +9,7 @@ import { env } from "@/core/config/env"
 import { useHasSession } from "@/shared/hooks/use-session"
 import { DemoModeBadge } from "@/shared/ui/demo-mode-badge"
 import { Button } from "@/shared/ui/primitives/button"
+import { cn } from "@/shared/utils/cn"
 import {
   Code2,
   Trophy,
@@ -42,8 +44,20 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
   const hasSession = useHasSession()
   const { logout, isLoggingOut } = useLogout()
+  const pathname = usePathname()
   // Best effort: un fallo al pedir invitaciones no afecta a la navbar.
   const pendingInvitations = usePendingInvitationsCount(hasSession === true)
+
+  /** Enlace de navegación: la ruta activa se resalta con texto oscuro y fondo suave. */
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
+  const navLinkClass = (href: string) =>
+    cn(
+      "gap-2",
+      isActive(href)
+        ? "text-foreground bg-secondary font-semibold"
+        : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+    )
+  const currentPage = (href: string) => (isActive(href) ? "page" : undefined)
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
@@ -61,21 +75,21 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-1">
-            <Link href="/contests">
-              <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground hover:bg-secondary">
+            <Link href="/contests" aria-current={currentPage("/contests")}>
+              <Button variant="ghost" className={navLinkClass("/contests")}>
                 <Trophy className="h-4 w-4" />
                 Maratones
               </Button>
             </Link>
-            <Link href="/past-contests">
-              <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground hover:bg-secondary">
+            <Link href="/past-contests" aria-current={currentPage("/past-contests")}>
+              <Button variant="ghost" className={navLinkClass("/past-contests")}>
                 <History className="h-4 w-4" />
                 Anteriores
               </Button>
             </Link>
             {hasSession === true && (
-              <Link href="/invitations">
-                <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-foreground hover:bg-secondary">
+              <Link href="/invitations" aria-current={currentPage("/invitations")}>
+                <Button variant="ghost" className={navLinkClass("/invitations")}>
                   <Mail className="h-4 w-4" />
                   <InvitationsLabel count={pendingInvitations} />
                 </Button>
@@ -138,21 +152,21 @@ export function Navbar() {
         <div className="md:hidden border-t border-border bg-background/95 backdrop-blur-xl">
           <div className="px-4 py-4 space-y-2">
             <DemoModeBadge />
-            <Link href="/contests" onClick={() => setIsOpen(false)}>
-              <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
+            <Link href="/contests" onClick={() => setIsOpen(false)} aria-current={currentPage("/contests")}>
+              <Button variant="ghost" className={cn("w-full justify-start", navLinkClass("/contests"))}>
                 <Trophy className="h-4 w-4" />
                 Maratones
               </Button>
             </Link>
-            <Link href="/past-contests" onClick={() => setIsOpen(false)}>
-              <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
+            <Link href="/past-contests" onClick={() => setIsOpen(false)} aria-current={currentPage("/past-contests")}>
+              <Button variant="ghost" className={cn("w-full justify-start", navLinkClass("/past-contests"))}>
                 <History className="h-4 w-4" />
                 Maratones Anteriores
               </Button>
             </Link>
             {hasSession === true && (
-              <Link href="/invitations" onClick={() => setIsOpen(false)}>
-                <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
+              <Link href="/invitations" onClick={() => setIsOpen(false)} aria-current={currentPage("/invitations")}>
+                <Button variant="ghost" className={cn("w-full justify-start", navLinkClass("/invitations"))}>
                   <Mail className="h-4 w-4" />
                   <InvitationsLabel count={pendingInvitations} />
                 </Button>

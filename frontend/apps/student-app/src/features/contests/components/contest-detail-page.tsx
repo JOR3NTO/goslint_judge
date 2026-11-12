@@ -40,7 +40,7 @@ import { JoinContestDialog } from "./join-contest-dialog"
 import { MyTeamPanel } from "./my-team-panel"
 
 const statusColors: Record<ContestStatus, string> = {
-  UPCOMING: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  UPCOMING: "bg-info/10 text-info border-info/30",
   ACTIVE: "bg-primary/10 text-primary border-primary/30",
   ENDED: "bg-muted text-muted-foreground border-muted",
 }
@@ -90,7 +90,6 @@ export function ContestDetailPage() {
       <main className="pt-16">
         {/* Header */}
         <section className="relative py-8 border-b border-border">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
           <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <Link
               href="/contests"
@@ -162,7 +161,7 @@ export function ContestDetailPage() {
 
                   {myTeam && contest.status !== "UPCOMING" && (
                     <Link href={`/contests/${contest.id}/arena`}>
-                      <Button className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-green-sm">
+                      <Button className="w-full gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 glow-green-sm">
                         <Swords className="h-4 w-4" />
                         {contest.status === "ACTIVE" ? "Entrar al maratón" : "Ver arena"}
                       </Button>
@@ -340,9 +339,9 @@ function ScoreboardRow({ team, rank }: { team: TeamDTO; rank: number }) {
       <TableCell>
         {rank <= 3 ? (
           <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-            rank === 1 ? "bg-yellow-500/20 text-yellow-400" :
-            rank === 2 ? "bg-gray-400/20 text-gray-400" :
-            "bg-orange-500/20 text-orange-400"
+            rank === 1 ? "bg-warning/15 text-warning" :
+            rank === 2 ? "bg-muted text-muted-foreground" :
+            "bg-info/10 text-info"
           }`}>
             <Medal className="h-4 w-4" />
           </div>

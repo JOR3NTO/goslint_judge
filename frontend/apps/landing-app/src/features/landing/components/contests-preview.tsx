@@ -37,8 +37,8 @@ function PublicContestCard({ contest }: { contest: PublicContest }) {
     },
     upcoming: {
       label: "Próxima",
-      className: "bg-blue-500/10 text-blue-400 border-blue-500/30",
-      dotClass: "bg-blue-400",
+      className: "bg-info/10 text-info border-info/30",
+      dotClass: "bg-info",
     },
     past: {
       label: "Finalizada",
@@ -48,9 +48,9 @@ function PublicContestCard({ contest }: { contest: PublicContest }) {
   }
 
   const difficultyColor: Record<string, string> = {
-    Principiante: "bg-green-500/10 text-green-400 border-green-500/30",
-    Intermedio: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
-    Avanzado: "bg-red-500/10 text-red-400 border-red-500/30",
+    Principiante: "bg-success/10 text-success border-success/30",
+    Intermedio: "bg-warning/10 text-warning border-warning/30",
+    Avanzado: "bg-destructive/10 text-destructive border-destructive/30",
   }
 
   const cfg = statusConfig[contest.status]

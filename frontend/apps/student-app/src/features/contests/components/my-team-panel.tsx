@@ -339,7 +339,7 @@ export function MyTeamPanel({ contest, team, currentUserId, onTeamChanged, onTea
                 void confirmRemove()
               }}
               disabled={busy}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {actions.pending === "remove" && <Loader2 className="h-4 w-4 animate-spin" />}
               Quitar
@@ -365,7 +365,7 @@ export function MyTeamPanel({ contest, team, currentUserId, onTeamChanged, onTea
                 void confirmLeave()
               }}
               disabled={busy}
-              className="bg-destructive text-white hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {actions.pending === "leave" && <Loader2 className="h-4 w-4 animate-spin" />}
               Abandonar

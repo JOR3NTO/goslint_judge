@@ -15,7 +15,7 @@ interface ContestCardProps {
 }
 
 const statusColors: Record<ContestStatus, string> = {
-  UPCOMING: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  UPCOMING: "bg-info/10 text-info border-info/30",
   ACTIVE: "bg-primary/10 text-primary border-primary/30",
   ENDED: "bg-muted text-muted-foreground border-muted",
 }
@@ -31,10 +31,7 @@ export function ContestCard({ contest }: ContestCardProps) {
   const isEnded = contest.status === "ENDED"
 
   return (
-    <Card className="group relative overflow-hidden border-border bg-card hover:border-primary/50 transition-all duration-300 hover:glow-green-sm">
-      {/* Glow effect on hover */}
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
+    <Card className="group relative overflow-hidden border-border bg-card shadow-sm hover:border-primary/50 transition-all duration-300 hover:glow-green-sm">
       <CardHeader className="relative pb-3">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1 flex-1 min-w-0">

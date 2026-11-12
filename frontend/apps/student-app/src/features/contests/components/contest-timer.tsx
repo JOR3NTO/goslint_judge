@@ -39,7 +39,7 @@ export function ContestTimer({ contest }: ContestTimerProps) {
   const elapsedPct = end > start ? Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100)) : 0
 
   return (
-    <Card className="border-primary/30 bg-card glow-green-sm min-w-[280px]">
+    <Card className="border-primary/30 bg-card shadow-sm glow-green-sm min-w-[280px]">
       <CardContent className="pt-6">
         <div className="text-center">
           <p className="text-sm text-muted-foreground mb-2">

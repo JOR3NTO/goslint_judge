@@ -59,7 +59,6 @@ export function ContestsPage() {
       <main className="pt-16">
         {/* Header */}
         <section className="relative py-16 border-b border-border">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
           <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
               <h1 className="text-4xl sm:text-5xl font-bold text-foreground mb-4">

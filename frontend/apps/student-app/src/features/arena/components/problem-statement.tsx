@@ -49,7 +49,7 @@ export function ProblemStatement({
 
   if (error || !problem) {
     return (
-      <section className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-6">
+      <section className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/10 p-6">
         <p className="flex items-center gap-2 text-foreground">
           <FileWarning className="h-5 w-5 text-destructive" />
           No se pudo cargar el enunciado. {error}
@@ -106,7 +106,7 @@ export function ProblemStatement({
         ) : (
           <div className="space-y-4">
             {samples.map((sample, index) => (
-              <div key={sample.id} className="space-y-3 rounded-md border border-border bg-background/40 p-4">
+              <div key={sample.id} className="space-y-3 rounded-md border border-border bg-muted/40 p-4">
                 <p className="text-sm font-medium text-muted-foreground">Ejemplo {index + 1}</p>
                 <SampleBlock label="Entrada" text={sample.input} />
                 <SampleBlock label="Salida" text={sample.expectedOutput} />
@@ -135,7 +135,7 @@ function SampleBlock({ label, text }: { label: string; text: string }) {
         <span className="text-xs font-medium text-muted-foreground">{label}</span>
         <CopyButton text={text} label={label} />
       </div>
-      <pre className="max-h-48 overflow-auto rounded-md border border-border bg-background p-3 font-mono text-sm text-foreground">
+      <pre className="max-h-48 overflow-auto rounded-md border border-border bg-muted p-3 font-mono text-sm text-foreground">
         {text}
       </pre>
     </div>

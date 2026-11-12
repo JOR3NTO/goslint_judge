@@ -6,7 +6,7 @@ import { cn } from "@/shared/utils/cn"
 import { ContestTimer, type ContestDTO, type ContestStatus } from "@/features/contests"
 
 const statusColors: Record<ContestStatus, string> = {
-  UPCOMING: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  UPCOMING: "bg-info/10 text-info border-info/30",
   ACTIVE: "bg-primary/10 text-primary border-primary/30",
   ENDED: "bg-muted text-muted-foreground border-muted",
 }
