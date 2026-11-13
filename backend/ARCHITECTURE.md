@@ -2,7 +2,7 @@
 
 > **Trabajo de Grado** | Sistema de Evaluación Automática de Código Fuente para Maratones de Programación – UCEVA  
 > **Stack**: Java 17 · Spring Boot 3.2.4 · Gradle (Multi-project) · PostgreSQL · RabbitMQ · Redis · Docker  
-> **Patrón**: Monolito modular (`contest-platform`: módulos `auth`, `problem`, `contest` y `submission`) + `judge-service` desacoplado por RabbitMQ. Arquitectura Limpia dentro de cada módulo
+> **Patrón**: Monolito modular (`contest-platform`: módulos `auth`, `problem`, `contest` y `submission`; el módulo `feedback` es solo un esqueleto de carpetas) + `judge-service` desacoplado por RabbitMQ. Arquitectura Limpia dentro de los módulos `problem`, `contest`, `submission` y `judge-service`; `auth` usa capas planas
 
 ---
 
@@ -14,6 +14,8 @@
 4. [Módulos compartidos (shared)](#4-módulos-compartidos-shared)
 5. [Microservicios — Responsabilidades y dominio](#5-microservicios--responsabilidades-y-dominio)
    - [Estado de implementación](#estado-de-implementación)
+   - [Modelo de datos](#modelo-de-datos)
+   - [Configuración y variables de entorno](#configuración-y-variables-de-entorno)
 6. [Seguridad y autorización](#6-seguridad-y-autorización)
 7. [Canal WebSocket (notificaciones en tiempo real)](#7-canal-websocket-notificaciones-en-tiempo-real)
 8. [Flujo de datos principal (envío de código)](#8-flujo-de-datos-principal-envío-de-código)
@@ -36,10 +38,12 @@ El **Goslint Judge** es un juez en línea (Online Judge System) institucional di
 | Spring Boot    | Framework de `contest-platform` y `judge-service`                |
 | PostgreSQL     | Persistencia relacional (BD `goslint_judge_db` para `contest-platform`; `judge-service` no tiene BD) |
 | RabbitMQ       | Cola de mensajes asíncrona para el pipeline de evaluación       |
-| Redis          | Caché: intentos fallidos, bloqueos de cuentas, refresh tokens, blacklist JWT |
-| bubblewrap     | Sandbox de ejecución de código (sin Docker)                     |
+| Redis          | Solo lo usa el módulo `auth`: intentos fallidos, bloqueos de cuentas, refresh tokens, lista negra de JWT |
+| bubblewrap + cgroups v2 | Sandbox de ejecución de código dentro del contenedor del `judge-service` (solo Linux) |
 | API LLM        | Retroalimentación inteligente (pendiente)                       |
-| Traefik        | API Gateway / reverse proxy (configuración pendiente)            |
+| Traefik        | API Gateway / reverse proxy (`infrastructure/traefik/traefik.yml` está vacío) |
+| Spring Mail (SMTP) | Correo de invitaciones a equipos                            |
+| Spring WebSocket | Notificación de estado de los envíos                          |
 | JWT (JJWT 0.12.5) | Autenticación stateless entre clientes y servicios           |
 | Flyway         | Migraciones de esquema de base de datos                         |
 
@@ -52,8 +56,11 @@ backend/
 ├── build.gradle                  ← BOM Spring Boot 3.2.4, Lombok, JaCoCo, tests comunes
 ├── settings.gradle               ← Declara 2 módulos shared y 2 servicios
 ├── gradle.properties             ← Variables globales
-├── .env                          ← Variables de entorno locales (no commitear)
+├── .env.example                  ← Plantilla de variables para correr con Gradle (el `.env` real no se commitea)
+├── docker/spring-service.Dockerfile ← Imagen genérica para servicios Spring (argumento SERVICE)
+├── scripts/                      ← start-services.sh · stop-services.sh · start-judge.sh
 │
+
 ├── shared/                       ← Librerías internas reutilizables
 │   ├── common-domain/            ← Enums y eventos que cruzan más de un servicio
 │   │   └── build.gradle          ← Sin dependencias externas; solo Lombok
@@ -62,40 +69,60 @@ backend/
 │
 └── services/
     ├── contest-platform/         ← Puerto 8080. Monolito modular (paquete co.uceva.contests_platform)
-    │   ├── auth/                 ←   registro, login, perfil, administración de usuarios
+    │   ├── auth/                 ←   registro, login, perfil, administración y búsqueda de usuarios (capas planas)
     │   ├── problem/              ←   problemas y casos de prueba
     │   ├── contest/              ←   maratones, equipos, invitaciones, aclaraciones, scoreboard
     │   ├── submission/           ←   envíos, RabbitMQ, WebSocket
-    │   ├── feedback/             ←   retroalimentación con LLM (esqueleto: solo carpetas vacías)
+    │   ├── feedback/             ←   retroalimentación con LLM (esqueleto: solo carpetas con .gitkeep)
     │   └── docs/                 ←   AUTH_API.md · RABBITMQ.md · WEBSOCKET.md
     └── judge-service/            ← Puerto 8084. Sandbox (bwrap + cgroups v2), sin BD
+        ├── docker/               ←   Dockerfile · entrypoint.sh · gen_seccomp.py · prueba_humo.sh
+        └── docs/                 ←   BWRAP.md · CGROUPS.md · REQUIREMENTS.md · WORKERS.md
 ```
 
 > `auth-service`, `problem-service`, `submission-service`, `contest-service` y `feedback-service` **ya no existen como servicios**: se integraron en `contest-platform` (rama `refactor/migrar-la-arquitectura-del-sistema-a-un-monolito-modular`). Los módulos se llaman entre sí por inyección de casos de uso, sin HTTP.
 
-`judge-service` tiene la siguiente forma interna (`contest-platform` repite la misma estructura de capas dentro de cada módulo, bajo `co.uceva.contests_platform.<módulo>`; `auth` usa capas planas):
+Estructura interna de `contest-platform` (resumen por módulo, bajo `src/main/java/co/uceva/contests_platform/`):
 
 ```
-services/<nombre>-service/
-├── build.gradle
-└── src/
-    ├── main/
-    │   ├── java/co/uceva/<nombre>/
-    │   │   ├── domain/           ← Capa 1: Entidades puras
-    │   │   ├── application/      ← Capa 2: Casos de uso y puertos
-    │   │   └── infrastructure/   ← Capa 3: Spring, BD, HTTP, mensajería
-    │   └── resources/
-    │       ├── application.properties
-    │       └── db/migration/     ← Migraciones Flyway (si aplica)
-    └── test/
-        └── java/co/uceva/<nombre>/
+contests_platform/
+├── ContestsPlatformApplication.java
+├── auth/                     ← capas planas
+│   ├── controller/           ←   AuthController · AdminUserController · UserSearchController · AuthExceptionHandler · BearerTokens
+│   ├── service/              ←   AuthService · ProfileService · AdminUserService · SearchUsersByUsernameUseCase · GetUserByIdUseCase
+│   ├── repository/ model/ dto/ exception/
+│   ├── security/             ←   JwtService
+│   ├── cache/                ←   AuthCache (Redis, implementa TokenBlacklist)
+│   └── config/               ←   SecurityConfig · JwtAuthenticationFilter · SuperAdminInitializer
+├── problem/                  ← domain/{model,exception,repository,valueobject} · application/usecase{,/impl} · infrastructure/{mapper,persistence,web}
+├── contest/                  ← domain/{model,exception,repository,service,valueobject} · application/usecase{,/impl}
+│                               infrastructure/{client,config,email,mapper,persistence,web}
+├── submission/               ← domain/{model,exception,repository,service} · application/{event,exception,port/out,usecase{,/impl}}
+│                               infrastructure/{client,config,mapper,messaging,notification,persistence,web,websocket}
+└── feedback/                 ← solo carpetas vacías (.gitkeep)
 ```
+
+`judge-service` (paquete `co.uceva.judge`) usa las tres capas:
+
+```
+services/judge-service/
+├── build.gradle
+├── docker/                   ← imagen del sandbox
+└── src/main/
+    ├── java/co/uceva/judge/
+    │   ├── domain/           ← model · valueobject · repository · exception
+    │   ├── application/      ← usecase{,/impl} · port/out · exception
+    │   └── infrastructure/   ← client · config · mapper · messaging · persistence · sandbox · security · web
+    └── resources/application.properties   (sin migraciones: no tiene BD)
+```
+
+`contest-platform` guarda su `application.properties` y las migraciones Flyway en `src/main/resources/` (`db/migration/V1`–`V11`).
 
 ---
 
 ## 3. Arquitectura Limpia — La regla de dependencia
 
-Cada microservicio internamente sigue la **Clean Architecture** de Robert C. Martin. La regla fundamental es:
+Los módulos `problem`, `contest` y `submission` de `contest-platform` y el `judge-service` siguen la **Clean Architecture** de Robert C. Martin (el módulo `auth` usa capas planas, ver §5). La regla fundamental es:
 
 > **Las dependencias solo pueden apuntar hacia adentro.** Las capas externas conocen a las internas; las internas nunca conocen a las externas.
 
@@ -165,8 +192,9 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 | `JwtTokenValidator` | Verifica firma HMAC-SHA256, emisor y expiración de un JWT. Constructor `(secret, issuer)`. No emite tokens. Sin anotaciones Spring. |
 | `AuthenticatedUser` | Record: identidad extraída de un token ya validado. Campos: `UUID userId`, `String role`. |
 | `InvalidTokenException` | `RuntimeException` lanzada cuando el token no supera la validación (firma, expiración, claims faltantes). |
+| `TokenBlacklist` | Interfaz con `isBlacklisted(token)`. `JwtTokenValidator` la consulta solo si se le pasa en su constructor de tres argumentos `(secret, issuer, tokenBlacklist)`. La implementa `AuthCache` (módulo `auth`). |
 
-> **Nota:** La dependencia `spring-boot-starter-data-redis` en `common-infrastructure` tiene como objetivo futuro soportar la lista negra de tokens. Actualmente no hay ninguna clase en este módulo que la use.
+> **Nota:** ninguna clase de `common-infrastructure` usa Redis directamente: la dependencia `spring-boot-starter-data-redis` la aprovecha `AuthCache` en `contest-platform`. El `JwtTokenValidator` que registra `SecurityConfig` en `contest-platform` y en `judge-service` se construye sin lista negra (constructor de dos argumentos), de modo que el filtro JWT no consulta Redis (ver §6.3).
 
 ---
 
@@ -176,17 +204,18 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 | Servicio / módulo | Puerto | Estado | Qué hay hoy |
 |-------------------|--------|--------|-------------|
-| `contest-platform` · módulo `auth` | 8080 | 🟢 Funcional | Registro, login, logout, refresh con rotación, perfil (`/me`, cambio de username y de contraseña), administración de usuarios y super administrador inicial. Emite JWT (Access 15 min y Refresh 8 h, distinguidos por el claim `type`). Bloqueo de cuenta por intentos fallidos y lista negra de tokens en Redis. Tabla `users` creada por Flyway `V7` |
+| `contest-platform` · módulo `auth` | 8080 | 🟢 Funcional | Registro, login, logout, refresh con rotación, perfil (`/me`, cambio de username y de contraseña), administración de usuarios y super administrador inicial. Emite JWT (Access 15 min y Refresh 8 h, distinguidos por el claim `type`). Bloqueo de cuenta por intentos fallidos y lista negra de tokens en Redis, búsqueda de usuarios por username para invitar a equipos. Tabla `users` creada por Flyway `V7` |
 | `contest-platform` · módulo `problem` | 8080 | 🟢 Funcional | CRUD de problemas y casos de prueba, restricciones por rol con `@PreAuthorize`, endpoint público de *samples*. Tablas por Flyway `V11` |
-| `contest-platform` · módulo `contest` | 8080 | 🟢 Funcional | Maratones, problemas de maratón (puntos, penalización, globo), equipos con capitán, invitaciones por correo (SMTP), aclaraciones y scoreboard. Flyway `V1`–`V6` |
+| `contest-platform` · módulo `contest` | 8080 | 🟢 Funcional | Maratones con contraseña de inscripción y cambio automático de estado por programador de tareas, problemas de maratón (puntos, penalización, globo), equipos de 1 a 3 integrantes con capitán, invitaciones por correo (SMTP), aclaraciones y scoreboard (ordenado por puntaje y penalización; el puntaje no se actualiza con los veredictos, ver §11). Flyway `V1`–`V6` |
 | `contest-platform` · módulo `submission` | 8080 | 🟢 Funcional | Recepción del envío con regla de elegibilidad (integrante del equipo, concurso activo, problema del concurso), encolamiento en RabbitMQ con confirmación del broker, consumo del veredicto, cierre por error del sistema desde las DLQ, reintento de pendientes y notificación en tiempo real por WebSocket. Flyway `V8`–`V10` |
-| `judge-service` | 8084 | 🟢 Funcional | Consume `submission.evaluate`, obtiene casos de prueba y límites del módulo `problem` por HTTP, ejecuta en el sandbox (`bwrap`/cgroups) con un pool de workers (`JUDGE_WORKERS`) y publica el veredicto en `submission.judged`. Evalúa **Python, C, C++ y Java**. El JWT `SERVICE` hacia `contest-platform` lo firma el propio juez con el secreto compartido. Validado end-to-end en Manjaro x86_64 y en Ubuntu OCI A1-flex aarch64. Se despliega en su propia imagen con `bubblewrap` y seccomp (perfil `sandbox` del compose) |
-| `contest-platform` · módulo `feedback` | 8080 | 🔴 Esqueleto | Solo la estructura de carpetas vacía (`application`, `domain`, `infrastructure`); sin clases |
+| `judge-service` | 8084 | 🟢 Funcional | Consume `submission.evaluate`, avisa el inicio en `submission.judging`, obtiene casos de prueba y límites del módulo `problem` por HTTP, compila y ejecuta en el sandbox (`bwrap`/cgroups) con un pool de workers (`JUDGE_WORKERS`, 2 por defecto) y publica el veredicto en `submission.judged`. Evalúa **Python, C, C++ y Java**. El JWT `SERVICE` hacia `contest-platform` lo firma el propio juez con el secreto compartido. Validado end-to-end en Manjaro x86_64 y en Ubuntu OCI A1-flex aarch64 (según `docs/REQUIREMENTS.md`). Solo corre en Linux: se despliega en su propia imagen con `bubblewrap` y seccomp (perfil `sandbox` del compose) |
+| `contest-platform` · módulo `feedback` | 8080 | 🔴 Esqueleto | Solo la estructura de carpetas vacía (`application`, `domain`, `infrastructure`, con archivos `.gitkeep`); sin clases, sin endpoints, sin tablas |
 
 **Documentación detallada por subsistema:**
 
 | Documento | Contenido |
 |-----------|-----------|
+| [`services/contest-platform/docs/AUTH_API.md`](./services/contest-platform/docs/AUTH_API.md) | Contrato de la API de autenticación, perfil y administración de usuarios |
 | [`services/contest-platform/docs/RABBITMQ.md`](./services/contest-platform/docs/RABBITMQ.md) | Topología, contrato de mensajes con `judge-service`, garantías de entrega, DLQ y reintentos |
 | [`services/contest-platform/docs/WEBSOCKET.md`](./services/contest-platform/docs/WEBSOCKET.md) | Canal `/ws/submissions`: autenticación en el handshake, contrato del mensaje, alcance por equipo y limitaciones |
 | [`services/judge-service/docs/BWRAP.md`](./services/judge-service/docs/BWRAP.md) | Aislamiento de la ejecución con bubblewrap: comando, qué ve el programa, filtro seccomp y códigos de salida |
@@ -207,11 +236,13 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 | Rol | Descripción |
 |-----|-------------|
-| `SUPER_ADMIN` | Dueño de la plataforma. Único que asigna y retira administradores. Se crea al arrancar `contest-platform` con `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD`; no se obtiene por registro ni por la API. Los demás servicios lo tratan como `ADMIN`. |
+| `SUPER_ADMIN` | Dueño de la plataforma. Único que asigna y retira administradores. Se crea al arrancar `contest-platform` con `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD`; no se obtiene por registro ni por la API (`SuperAdminInitializer`; sin esas variables no se crea). Los `@PreAuthorize` de `problem`, `submission` y del juez lo incluyen junto a `ADMIN`; los de `contest` (maratones, problemas de maratón, equipos, aclaraciones) listan solo `ADMIN` y `ORGANIZER` (ver §11). |
 | `ADMIN` | Administrador. Gestiona estudiantes y organizadores (no a otros administradores). |
 | `ORGANIZER` | Organizador. Gestiona problemas y concursos. |
-| `STUDENT` | Estudiante. Solo lectura pública y sus propios envíos. |
+| `STUDENT` | Estudiante. Rol que recibe todo registro público (`User.newStudent`). Lectura pública, equipos, aclaraciones y envíos. |
 | *`SERVICE`* | Rol técnico. **No está en el enum** `Role` del módulo `auth` porque no es un usuario humano. `judge-service` lo firma directamente en sus tokens vía `ServiceTokenProvider`. |
+
+Jerarquía de gestión de usuarios: `SUPER_ADMIN` > `ADMIN` > `ORGANIZER` > `STUDENT`. Un `ADMIN` solo puede cambiar el rol o el estado de `STUDENT` y `ORGANIZER`; solo el `SUPER_ADMIN` asigna o retira `ADMIN`; el rol `SUPER_ADMIN` no se puede asignar y su cuenta no se puede modificar; nadie cambia su propio rol y nadie se desactiva a sí mismo.
 
 **Estructura:** capas planas (`controller`, `service`, `repository`, `model`, `dto`, `exception`, `security`, `cache`, `config`), sin interfaces de casos de uso ni adaptadores. Detalle en [`services/contest-platform/docs/AUTH_API.md`](./services/contest-platform/docs/AUTH_API.md).
 
@@ -222,6 +253,8 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 | `AdminUserService` | Listado paginado con búsqueda, cambio de rol y de estado, con reglas de jerarquía (el rol del actor se lee de la base de datos) |
 | `JwtService` | Emite y lee JWT (JJWT 0.12.5, `jwt.secret` / `jwt.issuer`). Cada token lleva `type` = `access` o `refresh` |
 | `AuthCache` | Redis: `auth:failed_attempts:*`, `auth:lock:*`, `auth:refresh_token:*`, `auth:blacklist:<sha256>`. Implementa `TokenBlacklist` |
+| `SearchUsersByUsernameUseCase` | Búsqueda de hasta 20 usuarios activos cuyo username contiene el texto, ordenados por username; excluye a quien busca y a los roles `ADMIN`, `SUPER_ADMIN` y `ORGANIZER` |
+| `SuperAdminInitializer` | Al arrancar crea el super administrador si no existe ninguno y están definidas `SUPER_ADMIN_EMAIL` y `SUPER_ADMIN_PASSWORD` |
 
 **Endpoints activos:**
 
@@ -230,11 +263,12 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 | POST | `/api/v1/auth/register` | Público | `{firstName, lastName, username, email, password, institution?}` | 201 `{message, userId}` |
 | POST | `/api/v1/auth/login` | Público | `{email, password}` | 200 `{accessToken, refreshToken, expiresIn, type: "Bearer"}` |
 | POST | `/api/v1/auth/refresh` | Público | `{refreshToken}` | 200 igual que login |
-| POST | `/api/v1/auth/logout` | Bearer | — | 200 siempre |
+| POST | `/api/v1/auth/logout` | Público (usa el Bearer si viene) | — | 200 siempre |
 | GET | `/api/v1/auth/me` | Bearer | — | 200 perfil |
 | PATCH | `/api/v1/auth/me/username` | Bearer | `{username}` | 200 perfil · 409 en uso |
 | PATCH | `/api/v1/auth/me/password` | Bearer | `{currentPassword, newPassword}` | 204 · 422 contraseña actual incorrecta |
-| GET | `/api/v1/auth/check-username?username=` | Público | — | 200 `{available}` |
+| GET | `/api/v1/auth/check-username?username=` | Público | — | 200 `{available}` · 400 formato inválido |
+| GET | `/api/v1/users/search?q=` | Autenticado | — | 200 lista `{id, username}` (máx. 20; no incluye correo ni rol) |
 | GET | `/api/v1/admin/users?page&size&search` | ADMIN / SUPER_ADMIN | — | 200 página de usuarios |
 | PATCH | `/api/v1/admin/users/{id}/role` | ADMIN / SUPER_ADMIN | `{role}` | 200 usuario · 403 jerarquía · 404 |
 | PATCH | `/api/v1/admin/users/{id}/status` | ADMIN / SUPER_ADMIN | `{isActive}` | 200 usuario · 403 (incl. autodesactivación) · 404 |
@@ -242,9 +276,9 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 **Validaciones:**
 - `firstName`, `lastName`: obligatorios, 2–50 caracteres.
 - `username`: 3–30 caracteres (letras, dígitos, `_`, `.`).
-- `email`: obligatorio, formato válido.
+- `email`: obligatorio, formato válido, máximo 255 caracteres.
 - `password` / `newPassword`: mínimo 8 caracteres, al menos 1 mayúscula, 1 número y 1 carácter especial.
-- `institution`: opcional.
+- `institution`: opcional, máximo 255 caracteres.
 
 **Comportamiento del login:**
 - Login fallido: incrementa `auth:failed_attempts:<email>` (TTL de 1 hora desde el primer fallo).
@@ -261,22 +295,22 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 | Entidad de dominio | Descripción |
 |--------------------|-------------|
-| `Problem` | `id`, `createdBy`, `title`, `statement`, `timeLimitMs`, `memoryLimitKb`, `difficulty (value object)`, `inputFormat`, `outputFormat` |
-| `TestCase` | `id`, `problemId`, `expectedOutput`, `orderIndex`, `isSample`, `input`, `output` |
+| `Problem` | `id`, `createdBy`, `title`, `statement`, `timeLimitMs`, `memoryLimitKb`, `difficult (value object Difficulty)`, `createdAt`, `inputFormat`, `outputFormat` |
+| `TestCase` | `id`, `problemId`, `expectedOutput`, `orderIndex`, `isSample`, `input`, `output`, `createdAt` |
 
 **Value objects:**
 
 | Value Object | Validación |
 |-------------|-----------|
-| `Difficulty` | Entero entre 1 y 10 |
-| `TimeLimit` | Entero positivo (ms) |
-| `MemoryLimit` | Entero positivo (KB) |
+| `Difficulty` | Entero entre **800 y 3500**, múltiplo de 100 (escala tipo Codeforces) |
+| `TimeLimit` | Entre 100 y 5 000 ms |
+| `MemoryLimit` | Entre 4 096 KB (4 MB) y 262 144 KB (256 MB) |
 
 **Casos de uso implementados:**
 
 | Caso de uso | Descripción |
 |-------------|-------------|
-| `CreateProblemUseCase` | Crea un problema; `createdBy` viene del JWT |
+| `CreateProblemUseCase` | Crea un problema; `createdBy` viaja en el cuerpo de la petición (`CreateProblemRequestDTO`), no se toma del JWT |
 | `UpdateProblemUseCase` | Actualiza campos de un problema existente |
 | `DeleteProblemUseCase` | Elimina problema y sus test cases (CASCADE en BD) |
 | `GetProblemByIdUseCase` | Busca por UUID |
@@ -296,21 +330,21 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 | Método | Endpoint | Acceso | Descripción |
 |--------|----------|--------|-------------|
-| POST | `/api/v1/problems` | ADMIN, ORGANIZER | Crear problema |
-| GET | `/api/v1/problems/{id}` | Público | Obtener problema por ID |
+| POST | `/api/v1/problems` | ADMIN, SUPER_ADMIN, ORGANIZER | Crear problema |
+| GET | `/api/v1/problems/{id}` | Público | Obtener problema por ID (incluye el enunciado) |
 | GET | `/api/v1/problems/all` | Público | Listar todos los problemas |
 | GET | `/api/v1/problems/title/{title}` | Público | Buscar por título |
-| PUT | `/api/v1/problems/{id}` | ADMIN, ORGANIZER | Actualizar problema |
-| DELETE | `/api/v1/problems/{id}` | ADMIN, ORGANIZER | Eliminar problema |
-| POST | `/api/v1/problems/test-cases/{problemId}` | ADMIN, ORGANIZER | Crear test case |
-| POST | `/api/v1/problems/test-cases/{problemId}/batch` | ADMIN, ORGANIZER | Crear test cases en lote |
-| POST | `/api/v1/problems/test-cases/batch-delete` | ADMIN, ORGANIZER | Eliminar test cases en lote |
-| GET | `/api/v1/problems/test-cases/{problemId}/all` | ADMIN, ORGANIZER, SERVICE | Listar todos los test cases (incluye privados) |
+| PUT | `/api/v1/problems/{id}` | ADMIN, SUPER_ADMIN, ORGANIZER | Actualizar problema |
+| DELETE | `/api/v1/problems/{id}` | ADMIN, SUPER_ADMIN, ORGANIZER | Eliminar problema |
+| POST | `/api/v1/problems/test-cases/{problemId}` | ADMIN, SUPER_ADMIN, ORGANIZER | Crear test case |
+| POST | `/api/v1/problems/test-cases/{problemId}/batch` | ADMIN, SUPER_ADMIN, ORGANIZER | Crear test cases en lote |
+| POST | `/api/v1/problems/test-cases/batch-delete` | ADMIN, SUPER_ADMIN, ORGANIZER | Eliminar test cases en lote |
+| GET | `/api/v1/problems/test-cases/{problemId}/all` | ADMIN, SUPER_ADMIN, ORGANIZER, SERVICE | Listar todos los test cases (incluye privados) |
 | GET | `/api/v1/problems/test-cases/{problemId}/samples` | Público | Listar solo los test cases de ejemplo |
-| GET | `/api/v1/problems/test-cases/{id}` | ADMIN, ORGANIZER, SERVICE | Obtener test case por ID |
-| PUT | `/api/v1/problems/test-cases/{problemId}/{testCaseId}` | ADMIN, ORGANIZER | Actualizar test case |
-| PUT | `/api/v1/problems/test-cases/{problemId}/reorder` | ADMIN, ORGANIZER | Reordenar test cases |
-| DELETE | `/api/v1/problems/test-cases/{problemId}/{testCaseId}` | ADMIN, ORGANIZER | Eliminar test case |
+| GET | `/api/v1/problems/test-cases/{id}` | ADMIN, SUPER_ADMIN, ORGANIZER, SERVICE | Obtener test case por ID |
+| PUT | `/api/v1/problems/test-cases/{problemId}/{testCaseId}` | ADMIN, SUPER_ADMIN, ORGANIZER | Actualizar test case |
+| PUT | `/api/v1/problems/test-cases/{problemId}/reorder` | ADMIN, SUPER_ADMIN, ORGANIZER | Reordenar test cases |
+| DELETE | `/api/v1/problems/test-cases/{problemId}/{testCaseId}` | ADMIN, SUPER_ADMIN, ORGANIZER | Eliminar test case |
 
 > El rol `SERVICE` en los endpoints de test cases permite a `judge-service` leer los casos de prueba privados durante la evaluación.
 
@@ -327,7 +361,7 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 |--------------------|-------------|
 | `Submission` | `id`, `teamId`, `problemId`, `language (ProgrammingLanguage)`, `sourceCode (SourceCode)`, `verdict (VerdictStatus)`, `status (SubmissionStatus)`, `executionTimeMs`, `memoryUsedKb`, `codeSizeBytes`, `submittedAt` |
 
-**Casos de uso implementados (12 total):**
+**Casos de uso implementados (13 en total):**
 - `SubmitCodeUseCase` — Valida, detecta duplicados y persiste
 - `EnqueueSubmissionUseCase` — Publica `SubmissionReceivedEvent` → RabbitMQ, publisher confirms
 - `UpdateSubmissionVerdictUseCase` — Actualiza veredicto y métricas al recibir `SubmissionJudgedEvent`
@@ -381,20 +415,22 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 | Método | Endpoint | Acceso | Descripción |
 |--------|----------|--------|-------------|
-| POST | `/api/v1/submissions` | STUDENT, ADMIN, ORGANIZER | Enviar solución |
-| GET | `/api/v1/submissions/{id}` | STUDENT, ADMIN, ORGANIZER, SERVICE | Obtener envío por ID |
-| GET | `/api/v1/submissions` | ADMIN, ORGANIZER | Listar todos los envíos |
-| GET | `/api/v1/submissions/problem/{problemId}` | ADMIN, ORGANIZER, SERVICE | Envíos de un problema |
-| GET | `/api/v1/submissions/team/{teamId}` | STUDENT, ADMIN, ORGANIZER | Envíos de un equipo |
-| GET | `/api/v1/submissions/history` | STUDENT, ADMIN, ORGANIZER | Historial equipo+problema (`?problemId=&teamId=`) |
-| GET | `/api/v1/submissions/{id}/metrics` | STUDENT, ADMIN, ORGANIZER, SERVICE | Métricas de un envío |
-| DELETE | `/api/v1/submissions/{id}` | ADMIN, ORGANIZER | Eliminar envío |
+| POST | `/api/v1/submissions` | STUDENT, ADMIN, SUPER_ADMIN, ORGANIZER | Enviar solución. Cuerpo: `{teamId, problemId, language, sourceCode}` → 201 |
+| GET | `/api/v1/submissions/{id}` | STUDENT, ADMIN, SUPER_ADMIN, ORGANIZER, SERVICE | Obtener envío por ID (incluye el código fuente) |
+| GET | `/api/v1/submissions` | ADMIN, SUPER_ADMIN, ORGANIZER | Listar todos los envíos |
+| GET | `/api/v1/submissions/problem/{problemId}` | ADMIN, SUPER_ADMIN, ORGANIZER, SERVICE | Envíos de un problema |
+| GET | `/api/v1/submissions/team/{teamId}` | STUDENT, ADMIN, SUPER_ADMIN, ORGANIZER | Envíos de un equipo |
+| GET | `/api/v1/submissions/history` | STUDENT, ADMIN, SUPER_ADMIN, ORGANIZER | Historial equipo+problema (`?problemId=&teamId=`) |
+| GET | `/api/v1/submissions/{id}/metrics` | STUDENT, ADMIN, SUPER_ADMIN, ORGANIZER, SERVICE | Métricas de un envío |
+| DELETE | `/api/v1/submissions/{id}` | ADMIN, SUPER_ADMIN, ORGANIZER | Eliminar envío |
+
+Solo `POST /api/v1/submissions` valida la pertenencia del usuario al equipo (elegibilidad). Las consultas `GET` exigen rol pero no comprueban que el envío o el equipo consultado pertenezcan al usuario autenticado (ver §11).
 
 **BD:** Tabla `submissions`, con tres migraciones Flyway dentro de la numeración global del servicio:  
 - `V8` — Tabla base con check constraints de `language` y `verdict`  
 - `V9` — Columna `status` con ciclo de vida `PENDING/QUEUED/JUDGING/JUDGED`  
 - `V10` — Amplió el check constraint de `status` para incluir `ENQUEUE_ERROR`  
-`JPA_DDL_AUTO` vale `update` por defecto (ver §11). Historial Flyway: `flyway_schema_history_contest`, compartido por todos los módulos.
+La restricción `ck_submissions_verdict` creada en `V8` enumera siete veredictos y no incluye `JUDGE_ERROR` (ver §11). `JPA_DDL_AUTO` vale `update` por defecto (ver §11). Historial Flyway: `flyway_schema_history_contest`, compartido por todos los módulos.
 
 ---
 
@@ -416,21 +452,36 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 **Caso de uso:**
 - `EvaluateSubmissionUseCase` — recibe el `SubmissionReceivedEvent`, obtiene casos de prueba y límites, ensambla el `JudgeTask`, lo ejecuta en el sandbox y publica el `JudgeResult`. Los fallos del sistema se propagan sin publicar, para que la mensajería reintente y, agotados los reintentos, lo cierre la DLQ.
 
-**Puertos de salida (`application/port/out`):** `ProblemLimitsPort` (límites de tiempo y memoria del problema), `SandboxExecutor` (ejecuta la tarea y devuelve el `JudgeResult`) y `JudgeResultPublisher` (publica el resultado hacia `submission-service`).
+**Puertos de salida (`application/port/out`):** `ProblemLimitsPort` (límites de tiempo y memoria del problema), `SandboxExecutor` (ejecuta la tarea y devuelve el `JudgeResult`), `JudgeResultPublisher` (publica el resultado hacia `contest-platform`) y `SubmissionJudgingNotifier` (avisa que el envío entró a evaluación, `submission.judging`).
 
-> La compilación (`Compiler`) está pendiente y se abordará en otra historia de usuario.
+**Casos de uso de administración del sandbox:** `GetMonitorLimitsUseCase` y `UpdateMonitorLimitsUseCase`.
+
+**Lenguajes y comandos** (`CompilationCommandFactory` / `RunCommandFactory`):
+
+| Lenguaje | Compilación | Ejecución |
+|----------|-------------|-----------|
+| `C` | `gcc -std=c17 ... -lm` | `/solution/solution` |
+| `CPP` | `g++ -std=gnu++20` | `/solution/solution` |
+| `JAVA` | `javac -encoding UTF-8` | `java -Dfile.encoding=UTF-8 -cp /solution <Clase>` |
+| `PYTHON` | `python3 -m py_compile` | `python3 /solution/solution.py` |
+
+Si la compilación falla, el resultado es `COMPILATION_ERROR` sin ejecutar casos de prueba. La compilación corre en el contenedor del juez; la ejecución, dentro de `bwrap`.
+
+**Veredictos que puede emitir:** `ACCEPTED`, `WRONG_ANSWER`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED`, `RUNTIME_ERROR`, `COMPILATION_ERROR` y `JUDGE_ERROR` (fallo del propio sandbox, no del estudiante; ver `docs/WORKERS.md`).
 
 **Infraestructura (`infrastructure/`):**
 
 | Pieza | Rol |
 |-------|-----|
 | `messaging/SubmissionEvaluationListener` | Consume `submission.evaluate`. Un fallo transitorio se propaga para el reintento (3 intentos, luego DLQ); uno permanente (`TestCasesNotFoundException`, `IllegalArgumentException`) se rechaza sin reintentar |
+| `messaging/RabbitSubmissionJudgingNotifierAdapter` | Publica `SubmissionJudgingStartedEvent` con routing key `submission.judging` |
 | `messaging/RabbitJudgeResultPublisherAdapter` | Publica `SubmissionJudgedEvent` en `submission.exchange` con routing key `submission.judged`, persistente y esperando la confirmación del broker |
 | `security/ServiceTokenProvider` | Emite el JWT `role=SERVICE` del juez (HS256, secreto y emisor compartidos, `sub` = `app.security.jwt.service-id`, vigencia 5 min) y lo reutiliza hasta 30 s antes de expirar. Exige `JWT_SECRET` (mín. 32 bytes, sin valor por defecto) |
 | `client/ProblemServiceTestCaseRepositoryAdapter` | `TestCaseRepository` sobre `GET /api/v1/problems/test-cases/{id}/all` (JWT `SERVICE` en cada petición); un `404` o lista vacía es `TestCasesNotFoundException` |
 | `client/ProblemServiceLimitsAdapter` | `ProblemLimitsPort` sobre `GET /api/v1/problems/{id}` |
 | `sandbox/RunnerSandboxExecutor` | `SandboxExecutor` sobre `Runner`: escribe el fuente a un temporal, ejecuta y traduce el mapa de resultados a `JudgeResult` |
-| `web/MonitorLimitsController` | Consulta y modificación de los límites de los monitores del sandbox (solo `ADMIN`) |
+| `web/MonitorLimitsController` | `GET`/`PUT /api/v1/judge/monitor-limits`: consulta y modifica los límites de los monitores del sandbox (`ADMIN` o `SUPER_ADMIN`) |
+| `sandbox/worker/JudgeWorkerPool` · `JudgeWorker` · `WorkerEnvironment` | Pool de evaluaciones en paralelo (`app.sandbox.workers.count`): cada worker tiene su hilo, su rama de cgroups (`<cgroup-root>/worker-<n>`) y su directorio (`<work-root>/worker-<n>`); un worker que falla o supera el tiempo máximo (`evaluation-timeout-seconds`, 300 s) se reinicia |
 | `security/JwtAuthenticationFilter` + `config/SecurityConfig` | Autentica el HTTP con el JWT y el mismo `JwtTokenValidator` que el resto; el rol pasa a `ROLE_<rol>` para `@PreAuthorize` |
 | `persistence/InMemoryMonitorLimitsRepository` | Guarda los límites vigentes en memoria (el juez no tiene BD) |
 | `config/` | Convertidor JSON de RabbitMQ, bean del `Runner` y `RestClient` hacia `contest-platform` (`app.problem-service.base-url`, variable `PROBLEM_SERVICE_URL`) |
@@ -438,8 +489,9 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 **Componentes del sandbox:**
 - `BwrapCommandFactory` — construye el comando `bwrap` con namespaces, bind mounts y límites de cgroups
 - `Runner` — lanza el proceso en el sandbox, captura stdout/stderr con monitores
-- `Compiler` — compila el código antes de ejecutar (pendiente para C/C++/Java)
-- `RunnerSandboxExecutor` — adaptador que orquesta `Compiler` + `Runner` por cada test case
+- `Compiler` — compila el código antes de ejecutar (C, C++, Java y Python)
+- `TestCaseRunner` — ejecuta cada caso de prueba y decide el veredicto
+- `RunnerSandboxExecutor` — adaptador (`TaskEvaluator`) que orquesta `Compiler` + `Runner` y traduce el resultado a `JudgeResult`
 - `TimeWatchdog` — termina el proceso si supera `timeLimitMs`
 - `OutputHandle` / `ErrorsHandle` — capturan y limitan stdout/stderr
 - `CgroupKiller` — mata el proceso y sus hijos vía cgroups v2
@@ -455,7 +507,9 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 | `watchIntervalMs` | `app.sandbox.monitor.watch-interval-ms` | 500 ms |
 | `absoluteTimeMs` | `app.sandbox.monitor.absolute-time-ms` | 10 000 ms |
 
-**Seguridad:** `JwtAuthenticationFilter` activo. `judge-service` tiene su propia `SecurityConfig` que exige autenticación en todas las rutas excepto `/actuator/health`.
+**Seguridad:** `JwtAuthenticationFilter` activo. `judge-service` tiene su propia `SecurityConfig` con `anyRequest().authenticated()`: todas las rutas exigen un JWT válido (sin excepción explícita para `/actuator/health`, el único endpoint de actuator expuesto).
+
+**Ejecución:** el juez solo funciona en Linux (kernel 5.19 o superior por `memory.peak`, cgroups v2, `bubblewrap`, `seccomp`). No corre en Docker Desktop de Windows/macOS. Requisitos del host en `docs/REQUIREMENTS.md`.
 
 **Autenticación S2S:** `ServiceTokenProvider` auto-genera tokens `role=SERVICE` firmados con la misma clave compartida. El token se renueva automáticamente 30 s antes de expirar. `TTL` configurable con `app.security.jwt.service-token-ttl-seconds` (default 300 s).
 
@@ -491,42 +545,125 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 | Entidad de dominio | Descripción |
 |--------------------|-------------|
-| `Contest`          | `id`, `createdBy`, `password`, `title`, `startTime`, `endTime`, `status`, `description` |
-| `Team`             | `id`, `contestId`, `captainId`, `score`, `penaltyTime`, `nameTeam`, integrantes (`memberUserIds`) |
+| `Contest`          | `id`, `createdBy`, `title`, `description`, `passwordHash` (BCrypt), `period (ContestPeriod: startTime/endTime)`, `status (UPCOMING/ACTIVE/ENDED)`, `createdAt` |
+| `Team`             | `id`, `contestId`, `captainId`, `teamName (TeamName)`, `teamScore (score, penaltyTime)`, `createdAt`, integrantes (`members`) |
 | `Member`           | `teamId`, `userId`, `registeredAt` |
-| `Invitation`       | Invitación de un capitán a un usuario para unirse al equipo, con `InvitationStatus` |
-| `ContestProblem`   | `contestId`, `problemId`, `points`, `penalty`, `orderIndex`, `alias`, `balloonColor` |
-| `Clarification`    | `id`, `problemId`, `teamId`, `question`, `answer`, `status`, `createdAt`, `answeredAt` |
+| `Invitation`       | `id`, `teamId`, `invitedUserId`, `invitedEmail`, `status (PENDING/ACCEPTED/REJECTED/EXPIRED)`, `createdAt`, `respondedAt` |
+| `ContestProblem`   | `id`, `contestId`, `problemId`, `alias`, `orderIndex`, `points`, `penalty`, `balloonColor` |
+| `Clarification`    | `id`, `problemId` (**id del `ContestProblem`**, no del problema del catálogo), `teamId`, `question`, `answer`, `status (PENDING/ANSWERED)`, `createdAt`, `answeredAt` |
 
-**Endpoints activos** (prefijo `/api/v1`; `*` = `ADMIN`, `SUPER_ADMIN` u `ORGANIZER` salvo que se indique otro acceso):
+**Reglas de negocio visibles en el código:**
 
-| Método | Endpoint | Acceso |
-|--------|----------|--------|
-| POST / PUT / DELETE | `/contests`, `/contests/{id}` | ADMIN, ORGANIZER |
-| GET | `/contests`, `/contests/{id}`, `/contests/title/{title}`, `/contests/creator/{createdBy}` | Público |
-| POST / PUT / DELETE | `/contests/{contestId}/problems`, `/contest-problems/{id}` | ADMIN, ORGANIZER |
-| GET | `/contests/{contestId}/problems` | Público |
-| POST | `/contests/{contestId}/teams` | Autenticado |
-| GET | `/contests/{contestId}/teams`, `/contests/{contestId}/scoreboard`, `/teams`, `/teams/{id}`, `/teams/user/{userId}`, `/teams/{id}/members` | Público |
-| PUT | `/teams/{id}` | Autenticado |
-| DELETE | `/teams/{id}` | ADMIN, ORGANIZER |
-| POST | `/teams/{id}/members` | ADMIN, ORGANIZER |
-| DELETE | `/teams/{id}/members/{userId}` | Autenticado |
-| POST | `/teams/{teamId}/invitations` | Autenticado |
-| GET | `/invitations/me` | Autenticado |
-| POST | `/invitations/{id}/accept`, `/invitations/{id}/reject` | Autenticado |
-| GET / POST | `/invitations/{id}/respond` | Público (enlace del correo; responde HTML) |
-| POST | `/contest-problems/{problemId}/clarifications` | Autenticado |
-| GET | `/contests/{contestId}/clarifications` | Público |
-| POST | `/clarifications/{id}/answer` | ADMIN, ORGANIZER |
+| Regla | Detalle |
+|-------|---------|
+| Ventana del concurso | `endTime` debe ser posterior a `startTime`; al crear el concurso, o al cambiar su inicio, `startTime` no puede estar en el pasado. Se crea en estado `UPCOMING` |
+| Cambio de estado | `ContestSchedulerService` programa (en memoria, hilos `contest-status-*`, pool de 2) el paso a `ACTIVE` en `startTime` y a `ENDED` en `endTime`. Se reprograma al crear o actualizar un concurso y, al arrancar, para todos los no terminados (`ContestSchedulerInitializer`) |
+| Inscripción | Unirse es crear un equipo: `POST /contests/{contestId}/teams` con `{teamName, contestPassword}`. Solo antes de `startTime` (después responde `RegistrationClosedException`) y con la contraseña del concurso correcta |
+| Equipo | Nombre de 3 a 50 caracteres, único dentro del concurso. Un usuario solo puede estar en un equipo por concurso. El creador queda como capitán e integrante. Entre 1 y 3 integrantes (`Team.DEFAULT_MAX_MEMBERS = 3`) |
+| Invitaciones | Solo las crea el capitán, con las inscripciones abiertas, equipo no lleno, invitado sin equipo en ese concurso y sin otra invitación pendiente para el mismo equipo. Se envía un correo (SMTP) con enlaces a `/api/v1/invitations/{id}/respond?action=accept` o `reject` más `token`; el token es un HMAC-SHA256 del id de la invitación firmado con el secreto JWT. Solo el invitado puede aceptar o rechazar; si al aceptar el equipo ya está lleno, la invitación pasa a `EXPIRED` |
+| Problemas del concurso | Alias normalizado a mayúsculas, máximo 10 caracteres, único por concurso; un mismo problema no se repite en el concurso; `orderIndex` ≥ 0; `points` > 0 (1 por defecto); `penalty` ≥ 0, minutos por intento fallido (20 por defecto); `balloonColor` en formato `#RRGGBB`. El problema debe existir en el módulo `problem` |
+| Aclaraciones | La pregunta cualquier usuario autenticado que pertenezca a un equipo del concurso del problema; máximo 2 000 caracteres (pregunta y respuesta). Cada una se responde una sola vez |
+| Scoreboard | Equipos del concurso ordenados por `score` descendente y `penaltyTime` ascendente. Ver §11: ningún flujo actualiza esos campos hoy |
 
-**Casos de uso** (`contest/application/usecase`): Create/Update/Delete/Get de concursos, de equipos y de problemas de concurso; `InviteMember`, `AcceptInvitation`, `RejectInvitation`, `GetInvitationsByUser`; `AddMember`, `RemoveMember`; `AskClarification`, `AnswerClarification`, `GetClarificationsByContest`; `GetScoreboard`.
+**Endpoints activos** (prefijo `/api/v1`):
 
-**Infraestructura propia:** `SmtpEmailSender` y `InvitationLinks` (correo de invitación con enlace a `/invitations/{id}/respond`, usa `MAIL_*` y `APP_PUBLIC_URL`) y `ProblemServiceCatalogAdapter` (comprueba que un problema exista al asignarlo a un maratón, llamando al caso de uso del módulo `problem` in-process).
+| Método | Endpoint | Acceso | Descripción |
+|--------|----------|--------|-------------|
+| POST | `/contests` | ADMIN, ORGANIZER | Crear maratón `{createdBy, title, description, password, startTime, endTime}` |
+| GET | `/contests` | Público | Listar maratones |
+| GET | `/contests/{id}` | Público | Obtener maratón (la respuesta incluye `status`; no expone la contraseña) |
+| GET | `/contests/title/{title}` | Público | Buscar por título |
+| GET | `/contests/creator/{createdBy}` | Público | Maratones de un creador |
+| PUT | `/contests/{id}` | ADMIN, ORGANIZER | Actualizar maratón (una contraseña vacía conserva la actual) |
+| DELETE | `/contests/{id}` | ADMIN, ORGANIZER | Eliminar maratón |
+| POST | `/contests/{contestId}/problems` | ADMIN, ORGANIZER | Asignar un problema `{problemId, alias, orderIndex, points?, penalty?, balloonColor}` |
+| GET | `/contests/{contestId}/problems` | Público | Problemas del maratón por `orderIndex` |
+| PUT | `/contest-problems/{id}` | ADMIN, ORGANIZER | Editar alias, posición, puntos, penalización y color |
+| DELETE | `/contest-problems/{id}` | ADMIN, ORGANIZER | Retirar el problema del maratón |
+| POST | `/contests/{contestId}/teams` | Autenticado | Crear equipo e inscribirse `{teamName, contestPassword}` |
+| GET | `/contests/{contestId}/teams` | Público | Equipos del maratón (`?name=` filtra por nombre) |
+| GET | `/contests/{contestId}/scoreboard` | Público | Equipos ordenados por puntaje y penalización |
+| GET | `/teams`, `/teams/{id}`, `/teams/user/{userId}`, `/teams/{id}/members` | Público | Consultas de equipos e integrantes |
+| PUT | `/teams/{id}` | Autenticado | Renombrar equipo |
+| DELETE | `/teams/{id}` | ADMIN, ORGANIZER | Eliminar equipo |
+| POST | `/teams/{id}/members` | ADMIN, ORGANIZER | Agregar integrante directamente |
+| DELETE | `/teams/{id}/members/{userId}` | Autenticado | Quitar integrante |
+| POST | `/teams/{teamId}/invitations` | Autenticado (capitán) | Invitar a un usuario `{userId}` |
+| GET | `/invitations/me` | Autenticado | Invitaciones del usuario |
+| POST | `/invitations/{id}/accept`, `/invitations/{id}/reject` | Autenticado (invitado) | Responder una invitación (aceptar devuelve el equipo) |
+| GET / POST | `/invitations/{id}/respond` | Público (con token del correo) | GET muestra la confirmación en HTML; POST aplica la respuesta |
+| POST | `/contest-problems/{problemId}/clarifications` | Autenticado | Preguntar `{question}`; `{problemId}` es el id del `ContestProblem` |
+| GET | `/contests/{contestId}/clarifications` | Público | Aclaraciones del maratón |
+| POST | `/clarifications/{id}/answer` | ADMIN, ORGANIZER | Responder una aclaración |
+
+> No hay endpoints propios para iniciar o terminar un maratón ni para consultar solo su estado: el `status` va en la respuesta del maratón y lo cambian el programador de tareas o un `PUT /contests/{id}`.
+
+**Casos de uso** (`contest/application/usecase`): Create/Update/Delete/Get de concursos (por id, título y creador), `StartContest`, `FinishContest`; Create/Update/Delete/Get de equipos (por id, concurso, nombre y usuario); `AddMember`, `RemoveMember`, `GetMembersByTeam`; `AddProblemToContest`, `UpdateContestProblem`, `RemoveProblemFromContest`, `GetProblemsByContest`; `InviteMember`, `AcceptInvitation`, `RejectInvitation`, `GetInvitationById`, `GetInvitationsByUser`; `AskClarification`, `AnswerClarification`, `GetClarificationsByContest`; `GetScoreboard`.
+
+**Infraestructura propia:** `SmtpEmailSender` e `InvitationLinks` (correo de invitación; usan `MAIL_*`, `APP_PUBLIC_URL` y `FRONTEND_URL`), `ProblemServiceCatalogAdapter` (comprueba que un problema exista al asignarlo a un maratón, llamando al caso de uso del módulo `problem` in-process), `UserRepositoryAdapter` (correo del usuario invitado, desde el módulo `auth`), `ContestPasswordEncoderConfig` (BCrypt) y `ContestSchedulerService` / `ContestSchedulerInitializer` / `SchedulerAutoUpdateConfig` (cambio de estado programado).
 
 **Integración con `submission`:** el módulo `submission` lee equipos, horarios del concurso y problemas del concurso llamando directamente a `GetTeamByIdUseCase`, `GetContestByIdUseCase` y `GetProblemsByContestUseCase`.
 
-**Tablas BD:** `contests`, `teams`, `members`, `invitations`, `contest_problems`, `clarifications` (Flyway `V1`–`V6`).
+**Tablas BD:** `contests`, `teams`, `team_members`, `team_invitations`, `contest_problems`, `clarifications` (Flyway `V1`–`V6`).
+
+---
+
+### Modelo de datos
+
+Un único esquema PostgreSQL (`goslint_judge_db`) compartido por todos los módulos. Las migraciones `V1`–`V11` están en `contest-platform/src/main/resources/db/migration/` y usan una numeración global (no sigue el orden de los módulos).
+
+| Tabla | Módulo | Migración | Columnas principales |
+|-------|--------|-----------|----------------------|
+| `users` | auth | `V7` | `id`, `first_name`, `last_name`, `username` (único), `email` (único), `password_hash`, `role`, `institution`, `is_active`, `created_at` |
+| `problems` | problem | `V11` | `id`, `created_by`, `title`, `statement`, `time_limit_ms`, `memory_limit_kb`, `difficulty`, `input_format`, `output_format`, `created_at` |
+| `test_cases` | problem | `V11` | `id`, `problem_id`, `expected_output`, `order_index`, `is_sample`, `input`, `output`, `created_at` |
+| `contests` | contest | `V1` | `id`, `created_by`, `title`, `description`, `password_hash`, `start_time`, `end_time`, `status`, `created_at` |
+| `teams` | contest | `V2`, `V3` | `id`, `contest_id`, `captain_id`, `team_name` (único por concurso), `score`, `penalty_time`, `created_at` |
+| `team_members` | contest | `V2` | `id`, `team_id`, `user_id` (único por equipo), `registered_at` |
+| `team_invitations` | contest | `V3` | `id`, `team_id`, `invited_user_id`, `invited_email`, `status`, `created_at`, `responded_at` (índice único parcial: una invitación `PENDING` por equipo y usuario) |
+| `contest_problems` | contest | `V4`, `V5` | `id`, `contest_id`, `problem_id`, `alias`, `order_index`, `points`, `penalty`, `balloon_color` |
+| `clarifications` | contest | `V6` | `id`, `problem_id` (→ `contest_problems.id`), `team_id`, `question`, `answer`, `status`, `created_at`, `answered_at` |
+| `submissions` | submission | `V8`–`V10` | `id`, `team_id`, `problem_id`, `language`, `source_code`, `verdict`, `status`, `execution_time_ms`, `memory_used_kb`, `code_size_bytes`, `submitted_at` |
+
+**Relaciones:**
+
+```
+contests 1 ──< teams 1 ──< team_members
+   │             ├────────< team_invitations
+   │             └────────< clarifications >── 1 contest_problems
+   └────────────< contest_problems
+problems 1 ──< test_cases
+```
+
+- Con clave foránea (y `ON DELETE CASCADE`): `teams.contest_id`, `team_members.team_id`, `team_invitations.team_id`, `contest_problems.contest_id`, `clarifications.problem_id` y `.team_id`, `test_cases.problem_id`.
+- Referencias lógicas **sin** clave foránea: `contests.created_by`, `problems.created_by`, `teams.captain_id`, `team_members.user_id`, `team_invitations.invited_user_id` → `users.id`; `contest_problems.problem_id` → `problems.id`; `submissions.team_id` → `teams.id` y `submissions.problem_id` → `problems.id`.
+- Flyway usa la tabla de historial `flyway_schema_history_contest` con `baseline-on-migrate=true` y `baseline-version=0`.
+
+---
+
+### Configuración y variables de entorno
+
+`contest-platform` se configura en `src/main/resources/application.properties` (no hay perfiles `application-*.yml`; solo `application-local.properties` ignorado por git). Variables principales (el valor tras `:` es el predeterminado):
+
+| Variable | Predeterminado | Uso |
+|----------|----------------|-----|
+| `SERVER_PORT` | `8080` | Puerto HTTP |
+| `DB_URL` · `DB_USERNAME` · `DB_PASSWORD` | `jdbc:postgresql://localhost:5432/goslint_judge_db` · `postgres` · (sin valor) | PostgreSQL |
+| `JWT_SECRET` | **obligatoria** (mín. 32 bytes) | Clave HMAC. `app.security.jwt.secret` no tiene valor por defecto; sin la variable el servicio no arranca |
+| `JWT_ISSUER` | `goslint-judge` | Emisor de los tokens |
+| `JWT_EXPIRATION_ACCESS` · `JWT_EXPIRATION_REFRESH` | `900000` (15 min) · `28800000` (8 h) | Vigencia en ms |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://192.168.18.51:3000,http://127.0.2.2:3000` | Orígenes permitidos por CORS (separados por coma) |
+| `SUPER_ADMIN_EMAIL` · `SUPER_ADMIN_PASSWORD` · `SUPER_ADMIN_USERNAME` | vacío · vacío · `superadmin` | Super administrador inicial |
+| `REDIS_HOST` · `REDIS_PORT` | `localhost` · `6379` | Redis (módulo `auth`) |
+| `RABBITMQ_HOST` · `RABBITMQ_PORT` · `RABBITMQ_USERNAME` · `RABBITMQ_PASSWORD` | `localhost` · `5672` · `guest` · `guest` | RabbitMQ |
+| `MAIL_HOST` · `MAIL_PORT` · `MAIL_USERNAME` · `MAIL_PASSWORD` · `MAIL_SMTP_AUTH` · `MAIL_STARTTLS` · `MAIL_FROM` | `localhost` · `25` · vacío · vacío · `false` · `false` · `no-reply@goslint.local` | Correo de invitaciones |
+| `APP_PUBLIC_URL` · `FRONTEND_URL` | `http://localhost:8080` · `http://localhost:3000` | URLs para los enlaces del correo |
+| `FLYWAY_ENABLED` · `FLYWAY_TABLE` · `FLYWAY_BASELINE_ON_MIGRATE` | `true` · `flyway_schema_history_contest` · `true` | Flyway |
+| `JPA_DDL_AUTO` · `JPA_DIALECT` · `JPA_SHOW_SQL` | `update` · `PostgreSQLDialect` · `false` | Hibernate |
+
+Las claves `app.messaging.*` (exchange, colas, routing keys y DLQ), `app.submission.retry.*` y `app.websocket.*` van fijas en `application.properties`; `app.messaging.enabled=true` activa el publicador RabbitMQ (con `false`, los envíos se guardan en `PENDING` y no se publican). `app.websocket.allowed-origins` vale `*`.
+
+`judge-service` (`application.properties`): `JWT_SECRET` (obligatoria, igual que en `contest-platform`), `JWT_ISSUER`, `JUDGE_SERVICE_ID`, `RABBITMQ_*`, `PROBLEM_SERVICE_URL` (`http://localhost:8080`), `JUDGE_WORKERS` (`2`), `JUDGE_EVALUATION_TIMEOUT_SECONDS` (`300`), `CG_DIR` (`/cg`), `WORK_DIR` (`/work`) y `JUDGE_SANDBOX_LOG_LEVEL` (`INFO`).
 
 ---
 
@@ -536,20 +673,21 @@ Contiene la pieza de seguridad JWT compartida por todos los servicios que valida
 
 | Rol | Tipo de actor | Permisos principales |
 |-----|---------------|----------------------|
-| `ADMIN` | Usuario humano | Acceso total. |
-| `ORGANIZER` | Usuario humano | Gestión de problemas y concursos. |
-| `STUDENT` | Usuario humano | Lectura pública, envío de soluciones, consulta de sus propios envíos. |
-| `SERVICE` | Microservicio | Rol técnico S2S. `judge-service` lo usa para leer test cases privados del módulo `problem`. No existe en el enum `Role` de `auth-service`. |
+| `SUPER_ADMIN` | Usuario humano | Gestión de administradores y de todos los usuarios. Acepta `problem`, `submission`, `/api/v1/admin/**` y el juez; en los endpoints de `contest` no figura en `@PreAuthorize` (ver §11). |
+| `ADMIN` | Usuario humano | Administración de usuarios (estudiantes y organizadores), problemas, concursos y envíos. |
+| `ORGANIZER` | Usuario humano | Gestión de problemas, concursos y aclaraciones. |
+| `STUDENT` | Usuario humano | Lectura pública, equipos, aclaraciones y envío de soluciones. |
+| `SERVICE` | Microservicio | Rol técnico S2S. `judge-service` lo usa para leer test cases privados y límites del módulo `problem`. No existe en el enum `Role` del módulo `auth`. |
 
 ### 6.2 Patrón de seguridad implementado (`contest-platform` y `judge-service`)
 
-Ambos servicios implementan el mismo patrón:
+Ambos servicios implementan el mismo patrón de filtro JWT, con una diferencia en la cadena (ver punto 3):
 
 1. **`JwtTokenValidator`** (bean): `contest-platform` lo declara en `auth/config/SecurityConfig`; `judge-service` en su propia configuración. Lee `app.security.jwt.secret` y `app.security.jwt.issuer`. La clave **no tiene valor por defecto** (`JWT_SECRET`): un secreto heredado en producción aceptaría tokens falsificados. Si falta la variable de entorno, el servicio no arranca.
 
 2. **`JwtAuthenticationFilter`** (extiende `OncePerRequestFilter`): Extrae el header `Authorization: Bearer <token>`, llama a `JwtTokenValidator.validate()`, convierte el claim `role` en la authority `ROLE_<rol>` y lo publica en `SecurityContextHolder`. Si el token es inválido o está ausente, la petición **continúa como anónima** — el filtro no la rechaza.
 
-3. **`SecurityConfig`** (`@Configuration @EnableWebSecurity @EnableMethodSecurity`): Registra el filtro antes de `UsernamePasswordAuthenticationFilter`. Configura la cadena como stateless y sin CSRF. En `contest-platform` añade CORS (`CORS_ALLOWED_ORIGINS`). Establece `anyRequest().permitAll()` — la autorización real la imponen los `@PreAuthorize` en cada método del controlador.
+3. **`SecurityConfig`** (`@Configuration @EnableWebSecurity @EnableMethodSecurity`): Registra el filtro antes de `UsernamePasswordAuthenticationFilter`. Configura la cadena como stateless y sin CSRF. En `contest-platform` añade CORS (`CORS_ALLOWED_ORIGINS`; métodos `GET, POST, PUT, PATCH, DELETE, OPTIONS`; cabeceras `Content-Type` y `Authorization`; credenciales permitidas) y establece `anyRequest().permitAll()`: la autorización real la imponen los `@PreAuthorize` en cada método del controlador. Los controladores de `contest`, `problem` y `submission` llevan además `@CrossOrigin(origins = "*")`. En `judge-service` la cadena usa `anyRequest().authenticated()` y responde `401` sin credenciales.
 
 **Ejemplo de uso de `@PreAuthorize`:**
 ```java
@@ -568,7 +706,7 @@ public ResponseEntity<List<TestCaseResponseDTO>> getAll(...) { ... }
 
 ### 6.3 Estado de seguridad del módulo `auth`
 
-El módulo `auth` emite los tokens, así que `/api/v1/auth/login`, `/register`, `/refresh` y `/check-username` son públicos. Los endpoints de perfil (`/me/**`) validan el access token que reciben (firma, emisor, tipo `access`, lista negra y cuenta activa). Los refresh tokens llevan `type=refresh` y `JwtTokenValidator` los rechaza como credencial de acceso. Como `auth` ya comparte proceso con el resto de módulos, la validación de los demás endpoints es la del filtro único de §6.2.
+El módulo `auth` emite los tokens, así que `/api/v1/auth/login`, `/register`, `/refresh` y `/check-username` son públicos. Los endpoints de perfil (`/me/**`) validan el access token que reciben (firma, emisor, tipo `access`, lista negra y cuenta activa). Los refresh tokens llevan `type=refresh` y `JwtTokenValidator` los rechaza como credencial de acceso. Como `auth` ya comparte proceso con el resto de módulos, la validación de los demás endpoints es la del filtro único de §6.2. Ese filtro usa un `JwtTokenValidator` sin lista negra, así que un access token revocado con `logout` (o por cambio de contraseña) solo se rechaza en los endpoints del módulo `auth` que consultan `AuthCache` (`/me/**`, `/admin/**`); en los demás sigue siendo válido hasta que expire (15 min).
 
 ### 6.4 Autenticación servicio a servicio (S2S)
 
@@ -590,6 +728,7 @@ El módulo `auth` emite los tokens, así que `/api/v1/auth/login`, `/register`, 
 | Autenticación | JWT validado en el handshake por `JwtHandshakeInterceptor`. Token rechazado → handshake devuelve `401 Unauthorized`. |
 | Alcance | La conexión se asocia al `sub` del token. Solo se entregan cambios del mismo usuario. |
 | Subprotocolo confirmado | `goslint-judge` (`app.websocket.submission.sub-protocol`) |
+| Orígenes permitidos | `app.websocket.allowed-origins` = `*` (`setAllowedOriginPatterns`), fijo en `application.properties` |
 | Destinatarios | Resueltos vía `TeamMembershipPort` (`TeamMembershipPortImpl`): los integrantes reales del equipo dueño del envío. |
 
 ### 7.1 Extracción del token en el handshake
@@ -628,6 +767,7 @@ const ws = new WebSocket(
   "memoryUsedKb": 2048,
   "occurredAt": "2026-08-25T18:30:00Z"
 }
+```
 
 ---
 
@@ -639,7 +779,7 @@ const ws = new WebSocket(
     ▼
 [contest-platform :8080]
     │  1. JwtAuthenticationFilter valida el JWT
-    │  2. @PreAuthorize("hasAnyRole('STUDENT','ADMIN','ORGANIZER')")
+    │  2. @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN','ORGANIZER')")
     │  3. SubmitCodeUseCase: valida la elegibilidad (integrante del equipo, concurso activo, problema del concurso), detecta duplicados, persiste (status: PENDING, verdict: PENDING)
     │  4. EnqueueSubmissionUseCase: publica SubmissionReceivedEvent → RabbitMQ
     │     (exchange: submission.exchange, routing-key: submission.evaluate)
@@ -653,12 +793,13 @@ const ws = new WebSocket(
     │  8. ServiceTokenProvider provee token role=SERVICE
     │  9. Recupera test cases desde contest-platform, módulo problem (autenticado como SERVICE)
     │  10. RunnerSandboxExecutor: ejecuta código en bwrap sandbox
-    │  11. Compila (C, C++, Java) y ejecuta; determina el veredicto
+    │  11. Compila (C, C++, Java, Python) y ejecuta cada caso; determina el veredicto
     │  12. Publica SubmissionJudgedEvent → RabbitMQ (routing: submission.judged)
     │
     ├─▶ [contest-platform] ← Consumidor de "submission.judged"
     │     13. UpdateSubmissionVerdictUseCase: actualiza veredicto + métricas (status: JUDGED)
-    │     14. NotifySubmissionStatusUseCase: empuja estado por WebSocket al usuario
+    │     14. NotifySubmissionStatusUseCase: empuja estado por WebSocket a los integrantes del equipo
+    │     (no se actualiza el puntaje del equipo: el flujo termina aquí, ver §11)
     │
     └─▶ [contest-platform, módulo feedback] ← PENDIENTE DE IMPLEMENTAR
            15. Llamada API LLM (si veredicto ≠ ACCEPTED)
@@ -666,16 +807,16 @@ const ws = new WebSocket(
 ```
 
 **Mecanismos de resiliencia:**
-- **DLQ:** Mensajes rechazados en `submission.evaluate.dlq` → `ExhaustedSubmissionDeadLetterListener` cierra el envío con `ENQUEUE_ERROR` y notifica por WebSocket.
+- **DLQ:** Mensajes rechazados en `submission.evaluate.dlq`, `submission.judging.dlq` o `submission.judged.dlq` → `ExhaustedSubmissionDeadLetterListener` cierra el envío con `ENQUEUE_ERROR` y notifica por WebSocket.
 - **Reintento:** `PendingSubmissionRetryScheduler` barre filas en `PENDING` periódicamente y las reencola.
 
 ---
 
 ## 9. Convenciones de paquetes Java
 
-El prefijo base es `co.uceva.contests_platform.<módulo>` en `contest-platform` (`auth`, `problem`, `contest`, `submission`) y `co.uceva.<servicio>` en el resto.
+El prefijo base es `co.uceva.contests_platform.<módulo>` en `contest-platform` (`auth`, `problem`, `contest`, `submission`) `co.uceva.judge` en `judge-service` (y `co.uceva.shared` en los módulos `shared`).
 
-> **El módulo `auth`** no sigue la estructura de abajo: usa capas planas (`controller/`, `service/`, `repository/`, `model/`, `dto/`, `exception/`, `security/`, `cache/`, `config/`). El esquema de puertos y adaptadores descrito a continuación aplica a los demás servicios que lo usan.
+> **El módulo `auth`** no sigue la estructura de abajo: usa capas planas (`controller/`, `service/`, `repository/`, `model/`, `dto/`, `exception/`, `security/`, `cache/`, `config/`). El esquema de puertos y adaptadores descrito a continuación aplica a los demás módulos y al juez, con variaciones (por ejemplo, `submission` agrupa sus puertos de salida en `application/port/out` y `contest` y `problem` los dejan en `domain/repository` y `domain/service`).
 
 ```
 co.uceva.<servicio>/   (ejemplo genérico de la estructura por capas)
@@ -753,22 +894,44 @@ Ya está en el repositorio (`gradlew`, `gradle/wrapper/`). Se usa `./gradlew` de
 
 ## 11. Problemas conocidos y deuda técnica
 
-| # | Problema | Criticidad | Acción requerida |
-|---|----------|-----------|------------------|
-| 1 | ~~`auth-service` sin `/logout`~~ | ✅ Resuelto | `POST /logout` revoca el access token (lista negra en Redis) y borra el refresh token |
-| 2 | ~~`auth-service` sin Flyway~~ | ✅ Resuelto | La tabla `users` se crea con `V7`. Pendiente: `JPA_DDL_AUTO` sigue en `update` por defecto en `application.properties`; pasar a `validate` |
-| 3 | **Propiedades JWT duplicadas** | 🟡 Parcial | `contest-platform` define `jwt.secret`/`jwt.issuer` (emisión) y `app.security.jwt.*` (validación) a la vez. Unificar en `app.security.jwt.*` |
-| 4 | ~~El sandbox de `judge-service` no soporta C, C++ y Java~~ | ✅ Resuelto | HU-34: el juez evalúa Python, C, C++ y Java |
-| 5 | ~~`JwtTokenValidator` sin lista negra~~ | ✅ Resuelto | Constructor opcional con `TokenBlacklist`; el módulo `auth` la implementa con `AuthCache` |
-| 6 | **El módulo `feedback` es un esqueleto** — Toda su lógica está pendiente | 🔴 Alta | Implementar según roadmap del proyecto |
-| 7 | ~~Residuos de la migración al monolito~~ | ✅ Resuelto | `submission-service/` y `users-service/` eliminados |
-| 8 | **Registro de sesiones WebSocket es local a la instancia** — No escala horizontalmente | 🟡 Media | Compartir el registro vía Redis cuando se requiera más de una réplica |
-| 9 | **`traefik.yml` está vacío** — Sin API Gateway cada servicio se expone por su puerto | 🟡 Media | Configurar Traefik con reenvío de `Upgrade`/`Sec-WebSocket-Protocol` |
-| 10 | **`app.websocket.allowed-origins=*`** en `contest-platform` | 🟡 Media | Restringir a los orígenes del frontend antes de exponer |
-| 11 | **Clases de arranque de prueba con nombre del servicio viejo** (`ProblemServiceApplicationTests`, `SubmissionServiceApplicationTests` en `contest-platform`) | 🟢 Baja | Unificarlas en un único `ContestsPlatformApplicationTests` |
-| 12 | **`MonitorLimits` de `judge-service` no persisten** — Los límites del sandbox se pierden en cada reinicio | 🟢 Baja | Añadir persistencia (Redis o BD) si se quieren límites configurables persistentes |
-| 13 | **`judge-service` llama por HTTP al módulo `problem`** y `PROBLEM_SERVICE_URL` tiene por defecto `localhost:8082`, un puerto que ya no existe. Además `ProblemServiceClientConfig` (módulo `contest`) es un bean sin uso que aún exige `app.problem-service.base-url`, y `APP_PUBLIC_URL` apunta por defecto a `:8086` | 🔴 Alta | Apuntar `PROBLEM_SERVICE_URL` y `APP_PUBLIC_URL` a `:8080`; borrar `ProblemServiceClientConfig` y su propiedad |
-| 14 | **`docker-compose.yml`, `start-services.sh`, `stop-services.sh` y los `rewrites` de `student-app`** siguen describiendo los antiguos auth/problem/submission/contest-service (puertos 8081–8086) | 🔴 Alta | Reemplazar esos servicios por `contest-platform` (8080) |
+Hechos técnicos verificados contra el código actual, agrupados por área.
+
+### Lógica de negocio y autorización
+
+| # | Hecho | Criticidad | Acción posible |
+|---|-------|-----------|----------------|
+| 1 | **El puntaje del equipo no se actualiza al aceptar un veredicto.** `Team.addScore(...)` y `Team.updateScore(...)` existen pero ningún caso de uso los invoca; `UpdateSubmissionVerdictUseCaseImpl` solo persiste veredicto y métricas. `GET /contests/{id}/scoreboard` ordena por `score`/`penalty_time`, que se quedan en 0 | 🔴 Alta | Al recibir `ACCEPTED`, sumar los `points` del `ContestProblem` y la penalización de los intentos previos al equipo |
+| 2 | **Consultas de envíos sin validar propiedad.** `GET /submissions/{id}`, `/team/{teamId}`, `/history` y `/{id}/metrics` aceptan el rol `STUDENT` pero no comprueban que el envío o el equipo pertenezca al usuario autenticado; la respuesta incluye el código fuente | 🔴 Alta | Comprobar la pertenencia al equipo en los casos de uso de consulta |
+| 3 | **Equipos sin validar propiedad.** `PUT /teams/{id}` y `DELETE /teams/{id}/members/{userId}` solo exigen estar autenticado: no verifican que el usuario sea capitán o integrante del equipo | 🔴 Alta | Exigir capitán (o el propio integrante al salir) |
+| 4 | **`SUPER_ADMIN` no figura en los `@PreAuthorize` del módulo `contest`** (maratones, problemas de maratón, equipos, aclaraciones: `hasAnyRole('ADMIN','ORGANIZER')`), mientras `problem`, `submission` y el juez sí lo incluyen | 🟡 Media | Unificar el criterio de roles |
+| 5 | **`createdBy` llega en el cuerpo** de `POST /contests` y `POST /problems`, no del JWT: el cliente puede indicar otro autor | 🟡 Media | Tomar el autor de `AuthenticatedUser` |
+| 6 | **Enunciados públicos.** `GET /problems/{id}`, `/problems/all`, `/problems/title/{title}` y `/problems/test-cases/{problemId}/samples` no exigen autenticación, aunque el problema pertenezca a un maratón en curso | 🟡 Media | Restringir el acceso mientras el problema esté en un maratón activo |
+| 7 | **No hay endpoint para resolver nombres a partir de ids.** Solo existe `GET /users/search?q=` (por texto) y el listado de administración; las respuestas de equipos e invitaciones traen `userId`/`captainId` sin nombre. `GetUserByIdUseCase` existe pero no está expuesto | 🟡 Media | Añadir una consulta de usuarios por lote de ids |
+| 8 | **El veredicto `JUDGE_ERROR` no está permitido por la base de datos.** El enum `VerdictStatus` lo incluye y el juez puede publicarlo, pero `ck_submissions_verdict` (migración `V8`) solo admite los otros siete valores y ninguna migración posterior lo amplía; al persistirlo se violaría la restricción y el mensaje acabaría en la DLQ | 🔴 Alta | Nueva migración que amplíe la restricción |
+
+### Seguridad y configuración
+
+| # | Hecho | Criticidad | Acción posible |
+|---|-------|-----------|----------------|
+| 9 | **Lista negra de tokens solo parcial.** El `JwtTokenValidator` de `contest-platform` se crea sin `TokenBlacklist`, así que el filtro JWT no consulta Redis: un access token revocado sigue siendo válido hasta expirar en los endpoints fuera de `auth` | 🟡 Media | Construir el validador con `AuthCache` |
+| 10 | **`jwt.secret` conserva un valor por defecto de desarrollo** en `application.properties` (`${JWT_SECRET:dev-jwt-secret-...}`). `app.security.jwt.secret` exige `JWT_SECRET` y sin ella el servicio no arranca, pero existen dos juegos de propiedades (`jwt.*` para emitir, `app.security.jwt.*` para validar) | 🟡 Media | Unificar en `app.security.jwt.*` y quitar el valor por defecto |
+| 11 | **`app.websocket.allowed-origins=*`** en `contest-platform`, y `@CrossOrigin(origins = "*")` en los controladores de `contest`, `problem` y `submission` (además del CORS global con `CORS_ALLOWED_ORIGINS`) | 🟡 Media | Restringir a los orígenes del frontend antes de exponer |
+| 12 | **`JPA_DDL_AUTO` vale `update` por defecto** aunque Flyway gestiona el esquema | 🟡 Media | Pasar a `validate` |
+| 13 | **`judge-service` exige JWT en todas sus rutas**, incluido `/actuator/health` (`anyRequest().authenticated()`): la comprobación de salud no es anónima | 🟢 Baja | Permitir `/actuator/health` en su `SecurityConfig` |
+
+### Operación e infraestructura
+
+| # | Hecho | Criticidad | Acción posible |
+|---|-------|-----------|----------------|
+| 14 | **`docker-compose.yml`, `backend/scripts/start-services.sh` y `stop-services.sh` siguen describiendo los antiguos servicios** `auth/problem/submission/contest-service` (puertos 8081–8086); no existe un servicio `contest-platform` en el compose. Además `judge-service` declara `depends_on: problem-service` y un `PROBLEM_SERVICE_URL` por defecto `http://problem-service:8082` | 🔴 Alta | Reemplazar esos servicios por `contest-platform` (8080) |
+| 15 | **Registro de sesiones WebSocket local a la instancia** — no escala horizontalmente | 🟡 Media | Compartir el registro vía Redis cuando se requiera más de una réplica |
+| 16 | **El programador de estados de concurso es en memoria** (hilos de una sola instancia); con varias réplicas se duplicaría | 🟡 Media | ShedLock/Quartz si se escala |
+| 17 | **`traefik.yml` está vacío** — Sin API Gateway cada servicio se expone por su puerto | 🟡 Media | Configurar Traefik con reenvío de `Upgrade`/`Sec-WebSocket-Protocol` |
+| 18 | **`MonitorLimits` de `judge-service` no persisten** — Los límites del sandbox se pierden en cada reinicio | 🟢 Baja | Persistencia (Redis o BD) si se quieren límites persistentes |
+| 19 | **Módulo `feedback` es un esqueleto** — Toda su lógica está pendiente | 🔴 Alta | Implementar según el roadmap |
+| 20 | **Clases de arranque de prueba con nombre del servicio viejo** (`ProblemServiceApplicationTests`, `SubmissionServiceApplicationTests` en `contest-platform`) | 🟢 Baja | Unificarlas en un único `ContestsPlatformApplicationTests` |
+
+> Resueltos y ya no aplican: `/logout` en `auth`, Flyway para `users` (`V7`), soporte de C/C++/Java en el juez, `TokenBlacklist` en `JwtTokenValidator` (existe, ver #9 para su uso), residuos de `submission-service`/`users-service`, y los valores por defecto de `PROBLEM_SERVICE_URL`/`APP_PUBLIC_URL` (ahora `localhost:8080`).
 
 ---
 
@@ -841,4 +1004,4 @@ Antes de enviar cambios en cualquier microservicio, verificar:
 
 ---
 
-*Documento actualizado el 2026-11-07, tras la migración a monolito modular (`contest-platform`). Actualizar cuando cambien decisiones arquitectónicas.*
+*Documento actualizado el 2026-11-12 y verificado contra el código de `contest-platform`, `judge-service` y `shared`. Actualizar cuando cambien decisiones arquitectónicas.*
