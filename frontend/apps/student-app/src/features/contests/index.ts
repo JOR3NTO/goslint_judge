@@ -17,6 +17,7 @@ export type { ContestSession } from "./utils/session"
 export type {
   ContestDTO,
   ContestStatus,
+  ScoreboardStatus,
   ContestProblemDTO,
   TeamDTO,
   TeamMemberDTO,

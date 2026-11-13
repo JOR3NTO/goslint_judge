@@ -38,6 +38,9 @@ export function toContestDTO(contest: ContestRecord, now: number): ContestDTO {
     endTime: contest.endTime,
     status: contestStatusAt(contest, now),
     createdAt: contest.createdAt,
+    // El mock no congela la tabla.
+    freezeMinutes: 0,
+    scoreboardStatus: "LIVE",
   }
 }
 
