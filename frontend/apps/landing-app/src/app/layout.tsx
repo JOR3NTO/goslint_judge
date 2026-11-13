@@ -25,6 +25,19 @@ export const metadata: Metadata = {
     "algoritmos",
     "ICPC",
   ],
+  openGraph: {
+    title: "Goslint Judge | Plataforma de Programación Competitiva",
+    description:
+      "Participa en maratones de programación, resuelve problemas desafiantes y consulta el veredicto de tus envíos y el ranking para mejorar tus habilidades de algoritmos.",
+    images: [{ url: "/brand/og-image.png", width: 1200, height: 630, alt: "Goslint Judge" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Goslint Judge | Plataforma de Programación Competitiva",
+    description:
+      "Participa en maratones de programación, resuelve problemas desafiantes y consulta el veredicto de tus envíos y el ranking para mejorar tus habilidades de algoritmos.",
+    images: ["/brand/og-image.png"],
+  },
 }
 
 export const viewport: Viewport = {

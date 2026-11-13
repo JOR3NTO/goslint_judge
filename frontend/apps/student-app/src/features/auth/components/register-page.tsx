@@ -4,12 +4,13 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createHttpApi } from "@/core/api"
+import { Logo } from "@/shared/ui/logo"
 import { Button } from "@/shared/ui/primitives/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
 import { Input } from "@/shared/ui/primitives/input"
 import { Label } from "@/shared/ui/primitives/label"
 import { Checkbox } from "@/shared/ui/primitives/checkbox"
-import { Building2, Code2, Eye, EyeOff, Github, Mail, User, ArrowLeft, Check } from "lucide-react"
+import { Building2, Eye, EyeOff, Github, Mail, User, ArrowLeft, Check } from "lucide-react"
 
 export function RegisterPage() {
   const router = useRouter()
@@ -116,10 +117,8 @@ export function RegisterPage() {
         <Card className="border-border bg-card shadow-md">
           <CardHeader className="text-center pb-2">
             <div className="flex justify-center mb-4">
-              <Link href="/" className="flex items-center gap-2 group">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 border border-primary/30 group-hover:glow-green-sm transition-all">
-                  <Code2 className="h-7 w-7 text-primary" />
-                </div>
+              <Link href="/" className="flex items-center rounded-xl transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Logo variant="mark" className="h-12 w-12" />
               </Link>
             </div>
             <CardTitle className="text-2xl font-bold text-foreground">

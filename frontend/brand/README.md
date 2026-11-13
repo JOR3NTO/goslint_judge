@@ -1,42 +1,56 @@
 # Marca de la plataforma (fuente única)
 
-Esta carpeta es la **fuente única de verdad** del logo de la plataforma para las tres apps del monorepo `frontend/` (`student-app`, `landing-app` y `admin-app`). Aquí se deja el logo original; después se copia a `apps/*/public/brand/` para que las apps lo sirvan.
+Esta carpeta es la **fuente única** del logo de Goslint Judge para el monorepo `frontend/`. Los archivos de aquí se copian a `apps/student-app/public/brand/` y `apps/landing-app/public/brand/` con `pnpm brand:sync` (desde `frontend/`). No editar las copias de `public/brand/` a mano.
 
-Hoy el logo es un cuadrito redondeado con el icono `</>` de lucide y el texto "Goslint" (negro) + "Judge" (verde). Se reemplazará por el logo propio.
+## Archivos actuales
 
-## Archivos que hay que dejar aquí
+Todos son PNG rasterizados con fondo transparente.
 
-Los nombres deben ser **exactos** (minúsculas, con guiones, sin espacios).
-
-| Archivo | Obligatorio | Qué es | Formato preferido |
+| Archivo | Tamaño | Qué es | Uso en el código |
 |---|---|---|---|
-| `logo.svg` | Sí | Logotipo horizontal completo: símbolo + palabra, a color, pensado para **fondo claro**. | SVG. Si solo hay PNG: `logo.png`, mínimo 1000 px de ancho, fondo transparente. |
-| `logo-mark.svg` | Sí | Solo el símbolo (isotipo), cuadrado. Para el icono pequeño, favicon y avatares. | SVG. Alternativa: `logo-mark.png` de 512 x 512 px, fondo transparente. |
-| `logo-dark.svg` | Opcional | Versión del logotipo completo para **fondo oscuro**, por si vuelve a existir un tema oscuro. | SVG (o `logo-dark.png`, ≥ 1000 px de ancho). |
-| `favicon.ico` o `favicon.png` | Opcional | Icono de la pestaña del navegador. | `favicon.png` de 32 o 48 px; `favicon.ico` si se quiere multitamaño. |
-| `og-image.png` | Opcional | Imagen para previsualizar enlaces (WhatsApp, LinkedIn, etc.). | PNG de 1200 x 630 px. |
+| `logo.png` | 2919 x 890 | Logo horizontal: símbolo + texto GOSLINT (ratio ~3.28:1), para fondo claro. | Navbar y footer de `student-app` y `landing-app` (variante `full`). |
+| `logo-dark.png` | 2919 x 890 | Logo horizontal para fondo oscuro. | Ninguno por ahora (la app solo tiene tema claro). |
+| `logo-mark.png` | 1024 x 1024 | Solo el símbolo (cuadrado). | Login y registro de `student-app` (variante `mark`). |
+| `logo-mark-dark.png` | 1024 x 1024 | Símbolo para fondo oscuro. | Ninguno por ahora. |
+| `og-image.png` | 1200 x 630 | Imagen para previsualizar enlaces (Open Graph / Twitter). | `metadata.openGraph` y `metadata.twitter` de `student-app` y `landing-app`. |
+| `favicon-512.png` | 512 x 512 | Origen del icono de la app. | Copiado como `src/app/icon.png` en `student-app`, `landing-app` y `admin-app`. |
+| `apple-icon.png` | 180 x 180 | Icono para iOS. | Copiado como `src/app/apple-icon.png` en las tres apps. |
+| `favicon-32.png` | 32 x 32 | Icono pequeño de pestaña. | Sin uso directo (Next usa `favicon.ico` y `icon.png`). |
+| `favicon.ico` | multitamaño | Icono de pestaña. | Copiado como `src/app/favicon.ico` en las tres apps. |
+| `logo-vertical.png` | 768 x 1072 | Variante vertical (símbolo encima del texto). | Sin uso por ahora. |
 
-Si no hay favicon ni imagen OG, no pasa nada: se puede generar más adelante a partir de `logo-mark.svg`.
+## Sincronización
 
-## Uso real de cada archivo (inventario del código actual)
+```bash
+cd frontend
+pnpm brand:sync   # node scripts/sync-brand.cjs
+```
 
-| Archivo | Dónde se usaría | Tamaño de uso real hoy (referencia) |
-|---|---|---|
-| `logo.svg` | Navbar de `student-app` (`shared/ui/navbar.tsx`) y `landing-app` (`shared/ui/navbar.tsx`); pie de página de `student-app` y `landing-app` (`shared/ui/footer.tsx`) | Navbar: alto ~36 px (tile h-9) + texto text-xl; ancho total aprox. 170 px. Footer: alto ~32 px en `student-app` y ~36 px en `landing-app` |
-| `logo-mark.svg` | Tarjetas de login y registro (`features/auth/components/login-page.tsx` y `register-page.tsx`); navbar y footer (tiles); favicon; avatares | Login/registro: 48 x 48 px (h-12 w-12). Navbar: 36 x 36 px. Footer: 32 x 32 (student) o 36 x 36 (landing). Favicon: 32 px |
-| `logo-dark.svg` | Ninguno hoy. Solo si se reactiva el tema oscuro (`admin-app` usa `class="dark"` en su layout) | Igual que `logo.svg` |
-| `favicon.png` / `favicon.ico` | Ninguna app lo tiene configurado (no hay `icons` en `metadata`) | 32 px (pestaña) o 48 px |
-| `og-image.png` | Ninguna app tiene `openGraph` en `metadata` | 1200 x 630 px |
+El script copia `logo.png`, `logo-dark.png`, `logo-mark.png`, `logo-mark-dark.png` y `og-image.png` a `apps/student-app/public/brand/` y `apps/landing-app/public/brand/`. Los iconos de `src/app/` (`icon.png`, `apple-icon.png`, `favicon.ico`) se copian a mano desde esta carpeta si cambian.
+
+## Uso en código
+
+Componente `Logo` (`shared/ui/logo.tsx`, en cada app):
+
+```tsx
+<Logo variant="full" className="h-8 w-auto" />  // logo.png, horizontal
+<Logo variant="mark" className="h-12 w-12" />   // logo-mark.png, cuadrado
+```
+
+El alto lo controla `className`. El componente usa `next/image` con las dimensiones reales de cada PNG.
+
+## Reemplazar por el SVG vectorial
+
+Si el equipo dispone del logo en SVG, conviene usarlo por nitidez. Para hacerlo:
+
+1. Dejar el SVG con el mismo nombre base en esta carpeta (`logo.svg`, `logo-mark.svg`).
+2. Cambiar la extensión en `LOGOS` de `shared/ui/logo.tsx` (en ambas apps) y en `FILES` de `scripts/sync-brand.cjs`.
+3. Ejecutar `pnpm brand:sync`.
+
+El SVG debe tener el texto convertido a trazos (sin depender de una fuente instalada) y fondo transparente.
 
 ## Recomendaciones
 
-- **Márgenes de aire:** deja alrededor del logo un margen de al menos el 10 % del tamaño del símbolo. Así no se corta en los tiles redondeados.
-- **SVG sin fuentes:** convierte el texto a trazos (vectores), tipo "Convertir a contorno / Outline text" en Illustrator o Inkscape. Si el SVG depende de una fuente instalada, se verá distinto en otros equipos.
-- **Fondo transparente** tanto en SVG como en PNG. Sin fondo blanco incorporado.
-- **Relación de aspecto del logotipo horizontal:** el logo actual (tile + texto) ronda 4,7:1 (ancho:alto). Para el nuevo, procura algo entre 3:1 y 5:1 para que quepa en la navbar sin deformarse. Usa `viewBox` correcto y no fijes ancho y alto a la vez con valores que no sean proporcionales.
-- **El símbolo debe leerse a 32 px** (favicon y footer): evita detalles finos o textos dentro del símbolo.
-- **Nombres:** respeta exactamente los nombres de la tabla; el código los referenciará por ruta.
-
----
-
-Cuando coloques los archivos aquí, avisa para conectarlos en las tres apps (copia a `apps/*/public/brand/`, componente `Logo` y metadatos).
+- Dejar un margen de al menos el 10 % del tamaño del símbolo alrededor del logo.
+- El símbolo debe leerse a 32 px (favicon y footer): evitar detalles finos.
+- Mantener el fondo transparente en los PNG (salvo `og-image.png`, que es una imagen completa).

@@ -18,6 +18,17 @@ export const metadata: Metadata = {
   description: 'The ultimate competitive programming judge platform. Join marathons, solve problems, and get submission verdicts and rankings to improve your coding skills.',
   generator: 'Goslint Judge',
   keywords: ['competitive programming', 'coding contests', 'programming judge', 'algorithm challenges', 'ICPC', 'coding marathons'],
+  openGraph: {
+    title: 'Goslint Judge | Competitive Programming Platform',
+    description: 'The ultimate competitive programming judge platform. Join marathons, solve problems, and get submission verdicts and rankings to improve your coding skills.',
+    images: [{ url: '/brand/og-image.png', width: 1200, height: 630, alt: 'Goslint Judge' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Goslint Judge | Competitive Programming Platform',
+    description: 'The ultimate competitive programming judge platform. Join marathons, solve problems, and get submission verdicts and rankings to improve your coding skills.',
+    images: ['/brand/og-image.png'],
+  },
 }
 
 export const viewport: Viewport = {
