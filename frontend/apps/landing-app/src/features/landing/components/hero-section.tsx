@@ -16,7 +16,7 @@ export function HeroSection() {
         className="absolute inset-0 opacity-50"
         style={{
           backgroundImage:
-            "url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%2300ff88%22%20fill-opacity%3D%220.03%22%3E%3Ccircle%20cx%3D%221%22%20cy%3D%221%22%20r%3D%221%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')",
+            "url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%230a7e3a%22%20fill-opacity%3D%220.06%22%3E%3Ccircle%20cx%3D%221%22%20cy%3D%221%22%20r%3D%221%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')",
         }}
       />
 
@@ -96,20 +96,20 @@ export function HeroSection() {
 
           {/* Terminal Preview */}
           <div className="mt-16 max-w-4xl mx-auto">
-            <div className="rounded-xl overflow-hidden border border-border bg-card shadow-2xl glow-green-sm">
+            <div className="rounded-xl overflow-hidden border border-border bg-card shadow-md glow-green-sm">
               {/* Terminal Header */}
               <div className="flex items-center gap-2 px-4 py-3 bg-secondary/50 border-b border-border">
                 <div className="flex gap-1.5">
-                  <div className="h-3 w-3 rounded-full bg-red-500/80" />
-                  <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
-                  <div className="h-3 w-3 rounded-full bg-green-500/80" />
+                  <div className="h-3 w-3 rounded-full bg-destructive/70" />
+                  <div className="h-3 w-3 rounded-full bg-warning/70" />
+                  <div className="h-3 w-3 rounded-full bg-success/70" />
                 </div>
                 <div className="flex-1 text-center text-sm text-muted-foreground font-mono">
                   goslint-judge.cpp — GoslintJudge
                 </div>
               </div>
               {/* Terminal Content */}
-              <div className="p-6 font-mono text-sm text-left space-y-2 bg-[oklch(0.08_0.01_240)]">
+              <div className="p-6 font-mono text-sm text-left space-y-2 bg-muted/40">
                 <div className="text-muted-foreground">
                   <span className="text-primary">$</span> goslint submit solution.cpp
                 </div>

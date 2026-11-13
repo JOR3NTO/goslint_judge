@@ -48,11 +48,11 @@ export function CodeEditor({ id, value, onChange, disabled, ariaLabel }: CodeEdi
   }
 
   return (
-    <div className="flex overflow-hidden rounded-md border border-input bg-background font-mono text-sm focus-within:ring-2 focus-within:ring-ring/50">
+    <div className="flex overflow-hidden rounded-md border border-border bg-muted/40 font-mono text-sm shadow-sm focus-within:ring-2 focus-within:ring-ring/50">
       <div
         ref={gutterRef}
         aria-hidden="true"
-        className="w-12 shrink-0 select-none overflow-hidden border-r border-border bg-secondary/40 py-3 pr-3 text-right leading-6 text-muted-foreground"
+        className="w-12 shrink-0 select-none overflow-hidden border-r border-border bg-muted py-3 pr-3 text-right leading-6 text-muted-foreground"
         style={{ height: EDITOR_HEIGHT }}
       >
         {Array.from({ length: lineCount }, (_, index) => (
@@ -72,7 +72,7 @@ export function CodeEditor({ id, value, onChange, disabled, ariaLabel }: CodeEdi
         autoCapitalize="off"
         autoCorrect="off"
         wrap="off"
-        className="w-full min-w-0 resize-none overflow-auto whitespace-pre bg-transparent p-3 leading-6 text-foreground outline-none disabled:opacity-60"
+        className="w-full min-w-0 resize-none overflow-auto whitespace-pre bg-transparent p-3 leading-6 text-foreground caret-primary outline-none selection:bg-primary/25 selection:text-foreground disabled:opacity-60"
         style={{ height: EDITOR_HEIGHT }}
       />
     </div>

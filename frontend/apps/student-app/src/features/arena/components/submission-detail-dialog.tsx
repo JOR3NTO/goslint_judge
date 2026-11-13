@@ -48,7 +48,7 @@ export function SubmissionDetailDialog({
 
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-foreground">Código fuente</h3>
-              <pre className="max-h-[50vh] overflow-auto rounded-md border border-border bg-background p-3 font-mono text-sm leading-6 text-foreground">
+              <pre className="max-h-[50vh] overflow-auto rounded-md border border-border bg-muted p-3 font-mono text-sm leading-6 text-foreground">
                 {submission.sourceCode}
               </pre>
             </div>
@@ -61,7 +61,7 @@ export function SubmissionDetailDialog({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-border bg-background/40 px-3 py-2">
+    <div className="rounded-md border border-border bg-muted/40 px-3 py-2">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="font-mono text-foreground">{value}</dd>
     </div>

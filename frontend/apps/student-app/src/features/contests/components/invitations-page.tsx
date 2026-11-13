@@ -15,7 +15,7 @@ import { formatDateTime } from "../utils/format"
 import { TEAM_MAX_MEMBERS, isRegistrationOpen } from "../utils/team-rules"
 
 const statusBadge: Record<InvitationStatus, { label: string; className: string }> = {
-  PENDING: { label: "Pendiente", className: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
+  PENDING: { label: "Pendiente", className: "bg-info/10 text-info border-info/30" },
   ACCEPTED: { label: "Aceptada", className: "bg-primary/10 text-primary border-primary/30" },
   REJECTED: { label: "Rechazada", className: "bg-muted text-muted-foreground border-muted" },
   EXPIRED: { label: "Vencida", className: "bg-muted text-muted-foreground border-muted" },
