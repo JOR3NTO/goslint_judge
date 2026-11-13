@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Code2 } from "lucide-react"
 import { env } from "@/core/config/env"
+import { Logo } from "@/shared/ui/logo"
 
 export function Footer() {
   // El año se calcula en cliente para evitar diferencias de hidratación entre servidor y navegador.
@@ -15,13 +15,8 @@ export function Footer() {
     <footer className="border-t border-border bg-muted/40">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 md:flex-row md:items-start md:justify-between lg:px-8">
         <div className="max-w-sm space-y-3">
-          <a href="/" className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
-              <Code2 className="h-5 w-5 text-primary" aria-hidden="true" />
-            </div>
-            <span className="text-xl font-bold text-foreground">
-              Goslint<span className="text-primary">Judge</span>
-            </span>
+          <a href="/" className="flex items-center rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+            <Logo variant="full" className="h-9" />
           </a>
           <p className="text-sm text-muted-foreground">
             Juez de programación competitiva para maratones de programación.

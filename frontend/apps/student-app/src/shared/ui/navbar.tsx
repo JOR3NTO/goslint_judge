@@ -8,10 +8,10 @@ import { usePendingInvitationsCount } from "@/features/contests"
 import { env } from "@/core/config/env"
 import { useHasSession } from "@/shared/hooks/use-session"
 import { DemoModeBadge } from "@/shared/ui/demo-mode-badge"
+import { Logo } from "@/shared/ui/logo"
 import { Button } from "@/shared/ui/primitives/button"
 import { cn } from "@/shared/utils/cn"
 import {
-  Code2,
   Trophy,
   History,
   Menu,
@@ -72,13 +72,8 @@ export function Navbar() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo: lleva a la landing pública (otra app/origen, por eso <a> y no next/link) */}
-          <a href={env.LANDING_URL} className="flex items-center gap-2 group">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/30 group-hover:glow-green-sm transition-all">
-              <Code2 className="h-5 w-5 text-primary" />
-            </div>
-            <span className="text-xl font-bold text-foreground">
-              Goslint<span className="text-primary">Judge</span>
-            </span>
+          <a href={env.LANDING_URL} className="flex items-center rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Logo variant="full" priority className="h-8 sm:h-10" />
           </a>
 
           {/* Desktop Navigation */}

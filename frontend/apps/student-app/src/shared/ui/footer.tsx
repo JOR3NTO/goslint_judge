@@ -3,8 +3,8 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Code2 } from "lucide-react"
 import { env } from "@/core/config/env"
+import { Logo } from "@/shared/ui/logo"
 
 /** Enlaces reales de la plataforma (todos requieren sesión, el footer solo vive en rutas protegidas). */
 const FOOTER_LINKS = [
@@ -52,22 +52,17 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           {/* Marca: lleva a la landing pública (otra app/origen, por eso <a> y no next/link) */}
-          <div className="flex items-start gap-3">
+          <div className="flex flex-col items-start gap-2">
             <a
               href={env.LANDING_URL}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 transition-colors hover:bg-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex items-center rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Goslint Judge: ir a la página principal"
             >
-              <Code2 className="h-4 w-4 text-primary" aria-hidden="true" />
+              <Logo variant="full" className="h-8" />
             </a>
-            <div>
-              <p className="text-sm font-bold text-foreground">
-                Goslint<span className="text-primary">Judge</span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Juez de programación competitiva para maratones y prácticas.
-              </p>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Juez de programación competitiva para maratones y prácticas.
+            </p>
           </div>
 
           <nav aria-label="Enlaces del pie de página" className="flex flex-wrap gap-x-5 gap-y-1 text-sm">

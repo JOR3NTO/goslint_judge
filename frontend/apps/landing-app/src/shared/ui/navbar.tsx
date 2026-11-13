@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { Button } from "@/shared/ui/primitives/button"
 import { env } from "@/core/config/env"
-import { Code2, LogIn, User, Menu, X } from "lucide-react"
+import { Logo } from "@/shared/ui/logo"
+import { LogIn, User, Menu, X } from "lucide-react"
 
 /** Enlaces ancla de la landing. Los ids existen en las secciones. */
 const NAV_LINKS = [
@@ -25,13 +26,8 @@ export function Navbar() {
     <nav className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
-          <a href="/" className="group flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 transition-all group-hover:glow-green-sm">
-              <Code2 className="h-5 w-5 text-primary" aria-hidden="true" />
-            </div>
-            <span className="text-xl font-bold text-foreground">
-              Goslint<span className="text-primary">Judge</span>
-            </span>
+          <a href="/" className="flex items-center rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+            <Logo variant="full" priority className="h-8 sm:h-10" />
           </a>
 
           {/* Escritorio */}
