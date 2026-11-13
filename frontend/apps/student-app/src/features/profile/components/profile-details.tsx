@@ -14,8 +14,8 @@ interface DetailRowProps {
 function DetailRow({ icon: Icon, label, value, emptyText = "No disponible" }: DetailRowProps) {
   return (
     <div className="flex items-start gap-3 py-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
-        <Icon className="h-4 w-4 text-primary" />
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted border border-border">
+        <Icon className="h-4 w-4 text-muted-foreground" />
       </div>
       <div className="min-w-0">
         <dt className="text-sm text-muted-foreground">{label}</dt>
@@ -34,7 +34,7 @@ export function ProfileDetails({ profile }: { profile: ProfileResult["profile"] 
   const institutionEmpty = profile.institution === undefined ? "No disponible" : "No especificada"
 
   return (
-    <Card className="border-border bg-card/50 backdrop-blur">
+    <Card className="border-border bg-card shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg">Información de la cuenta</CardTitle>
       </CardHeader>

@@ -163,7 +163,7 @@ export function SubmitPanel({
           type="button"
           onClick={handleSubmit}
           disabled={blocked}
-          className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-green-sm"
+          className="w-full gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 glow-green-sm"
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           {submitting ? "Enviando…" : "Enviar solución"}
@@ -188,7 +188,7 @@ export function SubmitPanel({
               {recent.map((submission) => (
                 <li
                   key={submission.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-background/40 px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
                 >
                   <SubmissionStateBadge submission={submission} />
                   <span className="text-muted-foreground">

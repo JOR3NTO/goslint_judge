@@ -16,38 +16,33 @@ export function LandingPage() {
         <FeaturesSection />
         <ContestsPreview />
 
-        {/* CTA Final */}
-        <section className="py-24 relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent" />
-          <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto space-y-6">
-              <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
-                ¿Listo para el <span className="text-primary text-glow">desafío</span>?
-              </h2>
-              <p className="text-lg text-muted-foreground">
-                Únete a la comunidad de programadores competitivos.
-                Mejora tus habilidades, compite con los mejores y alcanza nuevas metas.
-              </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+        {/* CTA final */}
+        <section className="relative py-24">
+          <div className="relative mx-auto max-w-3xl space-y-6 px-4 text-center sm:px-6 lg:px-8">
+            <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
+              ¿Listo para el <span className="text-primary">desafío</span>?
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              Crea tu cuenta para participar en las maratones publicadas. Si ya tienes una, inicia
+              sesión.
+            </p>
+            <div className="flex flex-col items-center justify-center gap-4 pt-4 sm:flex-row">
+              <Button
+                asChild
+                size="lg"
+                className="glow-green h-12 w-full bg-primary px-8 text-base text-primary-foreground hover:bg-primary/90 sm:w-56"
+              >
                 <a href={`${env.APP_URL}/register`}>
-                  <Button
-                    size="lg"
-                    className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 glow-green px-8"
-                  >
-                    Crear Cuenta Gratis
-                    <ArrowRight className="h-5 w-5" />
-                  </Button>
+                  Crear cuenta
+                  <ArrowRight className="h-5 w-5" aria-hidden="true" />
                 </a>
-                <a href={`${env.APP_URL}/login`}>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="gap-2 border-border hover:border-primary hover:bg-primary/10 px-8"
-                  >
-                    Iniciar Sesión
-                  </Button>
-                </a>
-              </div>
+              </Button>
+              <a
+                href={`${env.APP_URL}/login`}
+                className="rounded-md text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                Ya tengo cuenta: iniciar sesión
+              </a>
             </div>
           </div>
         </section>

@@ -47,7 +47,7 @@ export function UserCombobox({ id, value, onChange, disabled, invalid }: UserCom
           aria-expanded={open}
           aria-invalid={invalid}
           disabled={disabled}
-          className="w-full justify-between border-border bg-input font-normal"
+          className="w-full justify-between font-normal"
         >
           <span className={cn("truncate", !value && "text-muted-foreground")}>
             {value ? value.username : "Selecciona un estudiante"}

@@ -15,7 +15,7 @@ interface ContestCardProps {
 }
 
 const statusColors: Record<ContestStatus, string> = {
-  UPCOMING: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  UPCOMING: "bg-info/10 text-info border-info/30",
   ACTIVE: "bg-primary/10 text-primary border-primary/30",
   ENDED: "bg-muted text-muted-foreground border-muted",
 }
@@ -26,30 +26,35 @@ const statusLabels: Record<ContestStatus, string> = {
   ENDED: "Finalizado",
 }
 
+/** Acción principal de la tarjeta según el estado: solo la maratón en curso usa el verde sólido. */
+const ctaByStatus: Record<ContestStatus, { label: string; variant: "default" | "outline" }> = {
+  ACTIVE: { label: "Entrar al maratón", variant: "default" },
+  UPCOMING: { label: "Ver detalles", variant: "outline" },
+  ENDED: { label: "Ver resultados", variant: "outline" },
+}
+
 export function ContestCard({ contest }: ContestCardProps) {
   const { participants, problems, isLoading } = useContestCounts(contest.id)
-  const isEnded = contest.status === "ENDED"
+  const cta = ctaByStatus[contest.status]
 
   return (
-    <Card className="group relative overflow-hidden border-border bg-card hover:border-primary/50 transition-all duration-300 hover:glow-green-sm">
-      {/* Glow effect on hover */}
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-
+    <Card className="group relative flex h-full flex-col overflow-hidden border-border bg-card shadow-sm transition-all duration-300 hover:border-primary/50 hover:glow-green-sm">
       <CardHeader className="relative pb-3">
         <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1 flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className={statusColors[contest.status]}>
-                {statusLabels[contest.status]}
-              </Badge>
-            </div>
-            <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">
+          <div className="min-w-0 flex-1 space-y-2">
+            <Badge variant="outline" className={statusColors[contest.status]}>
+              {statusLabels[contest.status]}
+            </Badge>
+            <h3
+              title={contest.title}
+              className="min-h-[3.25rem] line-clamp-2 text-lg font-semibold leading-snug text-foreground transition-colors group-hover:text-primary"
+            >
               {contest.title}
             </h3>
           </div>
-          <Trophy className="h-6 w-6 text-primary/50 group-hover:text-primary transition-colors flex-shrink-0" />
+          <Trophy aria-hidden="true" className="h-6 w-6 flex-shrink-0 text-primary/50 transition-colors group-hover:text-primary" />
         </div>
-        <p className="text-sm text-muted-foreground line-clamp-2">
+        <p className="min-h-[2.5rem] line-clamp-2 text-sm text-muted-foreground">
           {contest.description}
         </p>
       </CardHeader>
@@ -57,21 +62,21 @@ export function ContestCard({ contest }: ContestCardProps) {
       <CardContent className="relative pb-3">
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="h-4 w-4 text-primary/70" />
+            <Calendar aria-hidden="true" className="h-4 w-4 flex-shrink-0 text-primary/70" />
             <span>{formatDate(contest.startTime)}</span>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4 text-primary/70" />
+            <Clock aria-hidden="true" className="h-4 w-4 flex-shrink-0 text-primary/70" />
             <span>{formatDuration(contest.durationMs)}</span>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Users className="h-4 w-4 text-primary/70" />
+            <Users aria-hidden="true" className="h-4 w-4 flex-shrink-0 text-primary/70" />
             <span>
               {isLoading ? <Skeleton className="inline-block h-4 w-20 align-middle" /> : `${participants ?? "—"} participantes`}
             </span>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Trophy className="h-4 w-4 text-primary/70" />
+            <Trophy aria-hidden="true" className="h-4 w-4 flex-shrink-0 text-primary/70" />
             <span>
               {isLoading ? <Skeleton className="inline-block h-4 w-16 align-middle" /> : `${problems ?? "—"} problemas`}
             </span>
@@ -79,16 +84,14 @@ export function ContestCard({ contest }: ContestCardProps) {
         </div>
       </CardContent>
 
-      <CardFooter className="relative pt-3 border-t border-border">
-        <Link href={`/contests/${contest.id}`} className="w-full">
-          <Button
-            className="w-full gap-2 bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground transition-all"
-            disabled={isEnded}
-          >
-            {isEnded ? "Ver Resultados" : contest.status === "ACTIVE" ? "Entrar al Maratón" : "Ver Detalles"}
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        </Link>
+      <CardFooter className="relative mt-auto border-t border-border pt-3">
+        <Button asChild variant={cta.variant} className="w-full gap-2">
+          <Link href={`/contests/${contest.id}`}>
+            {cta.label}
+            <ArrowRight aria-hidden="true" className="h-4 w-4" />
+            <span className="sr-only">({contest.title})</span>
+          </Link>
+        </Button>
       </CardFooter>
     </Card>
   )

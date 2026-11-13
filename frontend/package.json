@@ -6,6 +6,7 @@
     "dev:admin": "pnpm --filter @uceva-judge/admin-app dev",
     "build": "pnpm -r build",
     "build:landing": "pnpm --filter @uceva-judge/landing-app build",
-    "build:student": "pnpm --filter @uceva-judge/student-app build"
+    "build:student": "pnpm --filter @uceva-judge/student-app build",
+    "brand:sync": "node scripts/sync-brand.cjs"
   }
 }

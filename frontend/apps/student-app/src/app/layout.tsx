@@ -18,10 +18,22 @@ export const metadata: Metadata = {
   description: 'The ultimate competitive programming judge platform. Join marathons, solve problems, and get submission verdicts and rankings to improve your coding skills.',
   generator: 'Goslint Judge',
   keywords: ['competitive programming', 'coding contests', 'programming judge', 'algorithm challenges', 'ICPC', 'coding marathons'],
+  openGraph: {
+    title: 'Goslint Judge | Competitive Programming Platform',
+    description: 'The ultimate competitive programming judge platform. Join marathons, solve problems, and get submission verdicts and rankings to improve your coding skills.',
+    images: [{ url: '/brand/og-image.png', width: 1200, height: 630, alt: 'Goslint Judge' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Goslint Judge | Competitive Programming Platform',
+    description: 'The ultimate competitive programming judge platform. Join marathons, solve problems, and get submission verdicts and rankings to improve your coding skills.',
+    images: ['/brand/og-image.png'],
+  },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#00ff88',
+  themeColor: '#ffffff',
+  colorScheme: 'light',
   width: 'device-width',
   initialScale: 1,
 }
@@ -32,7 +44,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className="dark bg-background" suppressHydrationWarning>
+    <html lang="es" className="bg-background" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased min-h-screen`}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}

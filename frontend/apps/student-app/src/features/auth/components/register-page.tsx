@@ -4,12 +4,13 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createHttpApi } from "@/core/api"
+import { Logo } from "@/shared/ui/logo"
 import { Button } from "@/shared/ui/primitives/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
 import { Input } from "@/shared/ui/primitives/input"
 import { Label } from "@/shared/ui/primitives/label"
 import { Checkbox } from "@/shared/ui/primitives/checkbox"
-import { Building2, Code2, Eye, EyeOff, Github, Mail, User, ArrowLeft, Check } from "lucide-react"
+import { Building2, Eye, EyeOff, Github, Mail, User, ArrowLeft, Check } from "lucide-react"
 
 export function RegisterPage() {
   const router = useRouter()
@@ -101,8 +102,7 @@ export function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative py-12">
       {/* Background Effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%2300ff88%22%20fill-opacity%3D%220.03%22%3E%3Ccircle%20cx%3D%221%22%20cy%3D%221%22%20r%3D%221%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
       
       <div className="relative w-full max-w-md">
         {/* Back to Home */}
@@ -114,13 +114,11 @@ export function RegisterPage() {
           Volver al inicio
         </Link>
 
-        <Card className="border-border bg-card/80 backdrop-blur-xl shadow-2xl">
+        <Card className="border-border bg-card shadow-md">
           <CardHeader className="text-center pb-2">
             <div className="flex justify-center mb-4">
-              <Link href="/" className="flex items-center gap-2 group">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 border border-primary/30 group-hover:glow-green-sm transition-all">
-                  <Code2 className="h-7 w-7 text-primary" />
-                </div>
+              <Link href="/" className="flex items-center rounded-xl transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Logo variant="mark" className="h-12 w-12" />
               </Link>
             </div>
             <CardTitle className="text-2xl font-bold text-foreground">
@@ -133,7 +131,7 @@ export function RegisterPage() {
 
           <CardContent className="space-y-4 pt-4">
             {serverError && (
-              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-500 text-sm text-center">
+              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm text-center">
                 {serverError}
               </div>
             )}
@@ -148,7 +146,7 @@ export function RegisterPage() {
                     id="firstName"
                     type="text"
                     placeholder="Juan"
-                    className="bg-input border-border focus:border-primary focus:ring-primary"
+                    className="bg-background border-input"
                     value={formData.firstName}
                     onChange={handleChange}
                     required
@@ -162,7 +160,7 @@ export function RegisterPage() {
                     id="lastName"
                     type="text"
                     placeholder="Pérez"
-                    className="bg-input border-border focus:border-primary focus:ring-primary"
+                    className="bg-background border-input"
                     value={formData.lastName}
                     onChange={handleChange}
                     required
@@ -180,7 +178,7 @@ export function RegisterPage() {
                     id="username"
                     type="text"
                     placeholder="juanperez_dev"
-                    className="pl-10 bg-input border-border focus:border-primary focus:ring-primary"
+                    className="pl-10 bg-background border-input"
                     value={formData.username}
                     onChange={handleChange}
                     required
@@ -198,7 +196,7 @@ export function RegisterPage() {
                     id="email"
                     type="email"
                     placeholder="tu@email.com"
-                    className="pl-10 bg-input border-border focus:border-primary focus:ring-primary"
+                    className="pl-10 bg-background border-input"
                     value={formData.email}
                     onChange={handleChange}
                     required
@@ -217,7 +215,7 @@ export function RegisterPage() {
                     type="text"
                     maxLength={255}
                     placeholder="Universidad, colegio u organización"
-                    className="pl-10 bg-input border-border focus:border-primary focus:ring-primary"
+                    className="pl-10 bg-background border-input"
                     value={formData.institution}
                     onChange={handleChange}
                     aria-invalid={institutionError ? true : undefined}
@@ -225,7 +223,7 @@ export function RegisterPage() {
                   />
                 </div>
                 {institutionError && (
-                  <p id="institution-error" className="text-xs text-red-500">
+                  <p id="institution-error" className="text-xs text-destructive">
                     {institutionError}
                   </p>
                 )}
@@ -240,7 +238,7 @@ export function RegisterPage() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    className="pr-10 bg-input border-border focus:border-primary focus:ring-primary"
+                    className="pr-10 bg-background border-input"
                     value={formData.password}
                     onChange={handleChange}
                     required
