@@ -15,6 +15,7 @@ import { useSubmissions } from "../hooks/use-submissions"
 import { teamProblemStatus } from "../utils/verdict"
 import { ArenaHeader } from "./arena-header"
 import { ArenaMessage, ComingSoon } from "./arena-message"
+import { ClarificationsTab } from "./clarifications-tab"
 import { ProblemsTab } from "./problems-tab"
 import { SubmissionDetailDialog } from "./submission-detail-dialog"
 import { SubmissionsTab } from "./submissions-tab"
@@ -166,7 +167,12 @@ export function ContestArenaPage() {
                 </TabsContent>
 
                 <TabsContent value="clarifications">
-                  <ComingSoon title="Aclaraciones" />
+                  <ClarificationsTab
+                    contestId={id}
+                    problems={arena.problems}
+                    myTeamId={teamId}
+                    initialProblemId={selected?.id ?? null}
+                  />
                 </TabsContent>
 
                 <TabsContent value="submissions">

@@ -93,3 +93,23 @@ export type TeamProblemStatus =
   | { kind: "pending" }
   | { kind: "verdict"; verdict: SubmissionVerdict }
   | { kind: "none" }
+
+/** Estado de una aclaración (`ClarificationStatus` del backend). */
+export type ClarificationStatus = "PENDING" | "ANSWERED"
+
+/**
+ * `ClarificationDTO` de `GET /v1/contests/{id}/clarifications` y `POST /v1/contest-problems/{id}/clarifications` (201).
+ * `problemId` es el id de la relación contest-problem (`ArenaProblem.id`), NO el `problemId` del problem-service.
+ */
+export interface ClarificationDTO {
+  id: string
+  problemId: string
+  teamId: string
+  question: string
+  answer: string | null
+  status: ClarificationStatus
+  /** ISO-8601 (Instant). */
+  createdAt: string
+  /** ISO-8601 (Instant); `null` mientras esté pendiente. */
+  answeredAt: string | null
+}
