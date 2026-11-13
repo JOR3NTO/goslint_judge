@@ -1,0 +1,89 @@
+/* Misma identidad que los demás probadores: fondo oscuro y verde neón. */
+:root {
+  --bg: #020405;
+  --panel: #05080b;
+  --panel-2: #0e1216;
+  --border: #19232a;
+  --text: #eeeeee;
+  --dim: #8a8f94;
+  --accent: #45cd55;
+  --accent-ink: #020405;
+  --ok: #45cd55;
+  --warn: #e6b43c;
+  --err: #e5484d;
+  --info: #4aa3ff;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Geist, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+header { padding: 24px 32px 8px; }
+h1 { margin: 0 0 4px; font-size: 22px; display: flex; align-items: center; gap: 10px; }
+h2 { margin: 0 0 10px; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+h3 { margin: 16px 0 6px; font-size: 14px; }
+.subtitle, .hint { margin: 0; color: var(--dim); }
+.hint { font-size: 13px; margin-top: 8px; }
+.logo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border: 1px solid #1f5a28; border-radius: 8px;
+  background: #0b1a0e; color: var(--accent); font: 700 13px "Geist Mono", Consolas, monospace;
+}
+
+main { padding: 16px 32px 32px; display: grid; gap: 16px; }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; min-width: 0; }
+.boards { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--dim); }
+label.wide { margin-top: 12px; max-width: 520px; }
+input, select {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 8px; font: inherit;
+}
+
+.actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+button {
+  background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 6px;
+  padding: 8px 14px; font: 600 14px inherit; cursor: pointer;
+}
+button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+.status { margin: 12px 0 0; font-family: "Geist Mono", Consolas, monospace; font-size: 13px; }
+
+.stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.stat { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 13px; }
+.stat b { color: var(--accent); }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--border); }
+th { color: var(--dim); font-weight: 500; }
+td.num, th.num { text-align: right; }
+tr.mismatch td { color: var(--err); }
+tr.flash td { animation: flash 1.2s ease-out; }
+@keyframes flash { from { background: #1f5a28; } to { background: transparent; } }
+
+.v-ACCEPTED { color: var(--ok); }
+.v-PENDING { color: var(--dim); }
+.v-WRONG_ANSWER, .v-RUNTIME_ERROR, .v-COMPILATION_ERROR { color: var(--err); }
+.v-TIME_LIMIT_EXCEEDED, .v-MEMORY_LIMIT_EXCEEDED { color: var(--warn); }
+.v-JUDGE_ERROR { color: var(--info); }
+
+.badge { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 99px; background: var(--panel-2); color: var(--dim); border: 1px solid var(--border); }
+.badge.on { color: var(--ok); border-color: #1f5a28; }
+
+.log { max-height: 240px; overflow: auto; font: 12px "Geist Mono", Consolas, monospace; }
+.entry { padding: 2px 0; color: var(--dim); }
+.entry.ok { color: var(--ok); }
+.entry.err { color: var(--err); }
+
+@media (max-width: 900px) {
+  header, main { padding-left: 16px; padding-right: 16px; }
+  .boards { grid-template-columns: 1fr; }
+}

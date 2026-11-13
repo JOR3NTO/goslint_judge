@@ -261,7 +261,9 @@ export function ContestDetailPage() {
                         Tabla de Posiciones
                       </CardTitle>
                       <CardDescription>
-                        Equipos ordenados según el marcador del servidor
+                        {contest?.scoreboardStatus === "FROZEN"
+                          ? "Ranking congelado: los envíos de los últimos minutos se publicarán cuando el organizador libere los resultados."
+                          : "Equipos ordenados según el marcador del servidor"}
                       </CardDescription>
                     </CardHeader>
                     <CardContent>

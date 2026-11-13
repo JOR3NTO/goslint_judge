@@ -12,6 +12,7 @@ import java.util.UUID;
  * @param password    Contraseña en texto plano para la inscripción de equipos.
  * @param startTime   Fecha y hora de inicio.
  * @param endTime     Fecha y hora de finalización.
+ * @param freezeMinutes Minutos finales con la tabla pública congelada; nulo o 0 para no congelar.
  */
 public record CreateContestRequestDTO(
     UUID createdBy,
@@ -19,5 +20,6 @@ public record CreateContestRequestDTO(
     String description,
     String password,
     Instant startTime,
-    Instant endTime
+    Instant endTime,
+    Integer freezeMinutes
 ) {}

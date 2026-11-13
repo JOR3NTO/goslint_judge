@@ -44,7 +44,7 @@ function createSubmission(req: MockRequest, ctx: MockContext) {
   if (contestStatusAt(contest, now) !== "ACTIVE") {
     throw httpError(403, "El concurso no está activo: solo se aceptan envíos durante la maratón.")
   }
-  const belongs = state.contestProblems.some((p) => p.contestId === contest.id && p.problemId === problemId)
+  const belongs = state.contestProblems.some((p) => p.contestId === contest.id && p.id === problemId)
   if (!belongs) throw httpError(403, "El problema no pertenece a la maratón de este equipo.")
 
   const duplicate = state.submissions.some(

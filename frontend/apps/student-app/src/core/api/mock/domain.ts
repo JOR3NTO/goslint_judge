@@ -38,6 +38,9 @@ export function toContestDTO(contest: ContestRecord, now: number): ContestDTO {
     endTime: contest.endTime,
     status: contestStatusAt(contest, now),
     createdAt: contest.createdAt,
+    // El mock no congela la tabla.
+    freezeMinutes: 0,
+    scoreboardStatus: "LIVE",
   }
 }
 
@@ -97,7 +100,7 @@ export function teamScore(
   for (const cp of state.contestProblems.filter((p) => p.contestId === team.contestId)) {
     const problem = state.problems.find((p) => p.id === cp.problemId)
     const attempts = state.submissions
-      .filter((s) => s.teamId === team.id && s.problemId === cp.problemId)
+      .filter((s) => s.teamId === team.id && s.problemId === cp.id)
       .sort((a, b) => Date.parse(a.submittedAt) - Date.parse(b.submittedAt))
 
     let wrong = 0
@@ -145,7 +148,8 @@ export function scoreboardOf(state: MockState, contestId: string, now: number): 
 // ─── Envíos ──────────────────────────────────────────────────────────────────
 
 export function toSubmissionDTO(state: MockState, record: SubmissionRecord, now: number): SubmissionDTO {
-  const problem = state.problems.find((p) => p.id === record.problemId)
+  const catalogId = state.contestProblems.find((cp) => cp.id === record.problemId)?.problemId
+  const problem = state.problems.find((p) => p.id === catalogId)
   const resolved = resolveSubmission(record, now, problem)
   return {
     id: record.id,

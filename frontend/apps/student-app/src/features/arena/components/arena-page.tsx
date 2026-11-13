@@ -46,15 +46,16 @@ export function ContestArenaPage() {
     arena.problems.find((p) => p.problemId === selectedProblemId) ?? arena.problems[0] ?? null
   const detail = useProblemDetail(selected?.problemId ?? null)
 
+  // Los envíos apuntan al problema del concurso (`id`), no al del catálogo (`problemId`).
   const problemsById = useMemo(
-    () => new Map(arena.problems.map((p) => [p.problemId, p])),
+    () => new Map(arena.problems.map((p) => [p.id, p])),
     [arena.problems]
   )
   const statusOf = useCallback(
     (problemId: string) => teamProblemStatus(subs.submissions, problemId),
     [subs.submissions]
   )
-  const accepted = arena.problems.filter((p) => statusOf(p.problemId).kind === "accepted").length
+  const accepted = arena.problems.filter((p) => statusOf(p.id).kind === "accepted").length
 
   const contest = arena.contest
   const canSubmit = contest?.status === "ACTIVE" && teamId !== null
@@ -161,7 +162,7 @@ export function ContestArenaPage() {
                       canSubmit,
                       disabledReason,
                       onSubmit: (language, code) =>
-                        subs.submit(selected?.problemId ?? "", language, code),
+                        subs.submit(selected?.id ?? "", language, code),
                       onViewAll: () => setTab("submissions"),
                     }}
                   />

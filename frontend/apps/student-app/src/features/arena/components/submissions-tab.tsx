@@ -20,7 +20,7 @@ import { SubmissionStateBadge } from "./verdict-badge"
 
 interface SubmissionsTabProps {
   submissions: SubmissionDTO[]
-  /** Problemas de la maratón indexados por `problemId`, para mostrar letra y título. */
+  /** Problemas de la maratón indexados por `id` (contest-problem), para mostrar letra y título. */
   problemsById: Map<string, ArenaProblem>
   isLoading: boolean
   error: string | null

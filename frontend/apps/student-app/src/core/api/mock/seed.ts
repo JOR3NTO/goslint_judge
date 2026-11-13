@@ -443,7 +443,7 @@ export function createSeedState(now: number): MockState {
     submissions.push({
       id: uid(9, subN),
       teamId: uid(6, teamN),
-      problemId: uid(4, problemN),
+      problemId: contestProblems.find((cp) => cp.contestId === uid(2, contest) && cp.problemId === uid(4, problemN))!.id,
       language,
       sourceCode: code,
       submittedAt: isoAt(contestStart(contest) + minute * MIN),

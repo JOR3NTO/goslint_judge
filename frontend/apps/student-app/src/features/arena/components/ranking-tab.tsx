@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/shared/ui/primitives/table"
 import { cn } from "@/shared/utils/cn"
-import { RefreshCw, Trophy } from "lucide-react"
+import { RefreshCw, Snowflake, Trophy } from "lucide-react"
 import type { TeamDTO } from "@/features/contests"
 import { useScoreboard, SCOREBOARD_REFRESH_MS } from "../hooks/use-scoreboard"
 
@@ -32,14 +32,14 @@ const timeFormatter = new Intl.DateTimeFormat("es-CO", {
 })
 
 /**
- * Posición estilo ICPC: equipos con el mismo puntaje y penalización comparten posición
- * (1, 1, 3...). La lista llega ya ordenada desde el backend.
+ * Posición según el orden del backend, que ya desempata por la hora del último problema resuelto.
+ * Solo comparten posición los equipos sin problemas resueltos (1, 2, 3, 4, 4...): entre ellos no hay desempate.
  */
 function competitionRanks(teams: TeamDTO[]): number[] {
   let rank = 0
   return teams.map((team, index) => {
     const previous = teams[index - 1]
-    if (!previous || previous.score !== team.score || previous.penaltyTime !== team.penaltyTime) {
+    if (!previous || team.score > 0 || previous.score !== team.score || previous.penaltyTime !== team.penaltyTime) {
       rank = index + 1
     }
     return rank
@@ -55,16 +55,18 @@ function positionTone(position: number): string {
 
 /** Pestaña Ranking: tabla de posiciones de la maratón con recarga manual y automática. */
 export function RankingTab({ contestId, contestActive, myTeamId }: RankingTabProps) {
-  const { teams, isLoading, isRefreshing, error, updatedAt, refresh } = useScoreboard(
+  const { teams, isLoading, isRefreshing, error, updatedAt, frozen, live, refresh } = useScoreboard(
     contestId,
     contestActive
   )
 
   const ranks = competitionRanks(teams)
   const allZero = teams.length > 0 && teams.every((team) => team.score === 0)
-  const refreshNote = contestActive
-    ? `Se actualiza sola cada ${SCOREBOARD_REFRESH_MS / 1000} s.`
-    : "La maratón no está activa: usa Actualizar para ver cambios."
+  const refreshNote = live
+    ? "En vivo: se actualiza con cada envío aceptado."
+    : contestActive
+      ? `Se actualiza sola cada ${SCOREBOARD_REFRESH_MS / 1000} s.`
+      : "La maratón no está activa: usa Actualizar para ver cambios."
 
   return (
     <Card className="border-border bg-card">
@@ -73,6 +75,12 @@ export function RankingTab({ contestId, contestActive, myTeamId }: RankingTabPro
           <CardTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-primary" />
             Ranking
+            {frozen && (
+              <Badge variant="outline" className="border-border bg-secondary text-foreground">
+                <Snowflake className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                Congelado
+              </Badge>
+            )}
           </CardTitle>
           <CardDescription>{refreshNote}</CardDescription>
         </div>
@@ -119,6 +127,12 @@ export function RankingTab({ contestId, contestActive, myTeamId }: RankingTabPro
             {error && (
               <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-foreground">
                 No se pudo actualizar el ranking ({error}). Se muestran los últimos datos.
+              </p>
+            )}
+            {frozen && (
+              <p className="rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-muted-foreground">
+                El ranking está congelado: los envíos de los últimos minutos no se reflejan hasta que el
+                organizador publique los resultados. Tus propios veredictos siguen apareciendo en Envíos.
               </p>
             )}
             {allZero && (

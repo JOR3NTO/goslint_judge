@@ -13,6 +13,7 @@ import co.uceva.contests_platform.contest.domain.model.ContestStatus;
  * @param startTime   Nueva fecha de inicio.
  * @param endTime     Nueva fecha de finalización.
  * @param status      Nuevo estado del concurso.
+ * @param freezeMinutes Minutos finales con la tabla pública congelada; nulo para no cambiarlos.
  */
 public record UpdateContestRequestDTO(
     String title,
@@ -20,5 +21,6 @@ public record UpdateContestRequestDTO(
     String password,
     Instant startTime,
     Instant endTime,
-    ContestStatus status
+    ContestStatus status,
+    Integer freezeMinutes
 ) {}

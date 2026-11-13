@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 import co.uceva.contests_platform.contest.domain.model.ContestStatus;
+import co.uceva.contests_platform.contest.domain.model.ScoreboardStatus;
 
 /**
  * DTO de respuesta con los datos de un concurso. No expone la contraseña ni su hash.
@@ -16,6 +17,8 @@ import co.uceva.contests_platform.contest.domain.model.ContestStatus;
  * @param endTime     Fecha y hora de finalización.
  * @param status      Estado del concurso.
  * @param createdAt   Fecha y hora de creación.
+ * @param freezeMinutes    Minutos finales con la tabla pública congelada; 0 si no se congela.
+ * @param scoreboardStatus Estado de la tabla pública: en vivo, congelada o liberada.
  */
 public record ContestResponseDTO(
     UUID id,
@@ -25,5 +28,7 @@ public record ContestResponseDTO(
     Instant startTime,
     Instant endTime,
     ContestStatus status,
-    Instant createdAt
+    Instant createdAt,
+    int freezeMinutes,
+    ScoreboardStatus scoreboardStatus
 ) {}

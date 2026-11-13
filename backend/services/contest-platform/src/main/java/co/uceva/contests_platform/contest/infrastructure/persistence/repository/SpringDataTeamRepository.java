@@ -15,8 +15,6 @@ import org.springframework.data.repository.query.Param;
 public interface SpringDataTeamRepository extends JpaRepository<TeamEntity, UUID> {
     List<TeamEntity> findByContestId(UUID contestId);
 
-    List<TeamEntity> findByContestIdOrderByScoreDescPenaltyTimeAsc(UUID contestId);
-
     List<TeamEntity> findByContestIdAndTeamNameContainingIgnoreCase(UUID contestId, String teamName);
 
     Optional<TeamEntity> findByContestIdAndTeamName(UUID contestId, String teamName);

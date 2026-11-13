@@ -71,9 +71,9 @@ export interface SubmissionStatusUpdatedEvent {
 
 /** Problema de la maratón enriquecido para la UI de la arena. */
 export interface ArenaProblem {
-  /** Id de la relación contest-problem. */
+  /** Id de la relación contest-problem: el que usan los envíos. */
   id: string
-  /** Id del problema en el problem-service (el que usan envíos y muestras). */
+  /** Id del problema en el catálogo: el que usan el enunciado y las muestras. */
   problemId: string
   /** Letra mostrada (A, B, C…) según la posición al ordenar por `orderIndex`. */
   letter: string

@@ -1,5 +1,6 @@
 package co.uceva.contests_platform.contest.domain.model;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -36,6 +37,10 @@ public class Contest {
     private ContestStatus status;
     /** Fecha y hora de creación del registro del concurso. */
     private Instant createdAt;
+    /** Minutos finales en los que la tabla pública se congela; 0 si no se congela. */
+    private int freezeMinutes;
+    /** Estado de la tabla de posiciones pública. */
+    private ScoreboardStatus scoreboardStatus;
 
     /**
      * Constructor privado usado por Lombok Builder.
@@ -48,10 +53,13 @@ public class Contest {
      * @param period       Período de fechas del concurso.
      * @param status       Estado del concurso.
      * @param createdAt    Fecha y hora de registro.
+     * @param freezeMinutes    Minutos finales con la tabla congelada; 0 si no se congela.
+     * @param scoreboardStatus Estado de la tabla pública; {@link ScoreboardStatus#LIVE} si es nulo.
      */
     @Builder
     private Contest(UUID id, UUID createdBy, String title, String description, String passwordHash,
-                    ContestPeriod period, ContestStatus status, Instant createdAt) {
+                    ContestPeriod period, ContestStatus status, Instant createdAt,
+                    int freezeMinutes, ScoreboardStatus scoreboardStatus) {
         this.id = id;
         this.createdBy = createdBy;
         this.title = title;
@@ -60,6 +68,8 @@ public class Contest {
         this.period = period;
         this.status = status;
         this.createdAt = createdAt;
+        this.freezeMinutes = freezeMinutes;
+        this.scoreboardStatus = scoreboardStatus != null ? scoreboardStatus : ScoreboardStatus.LIVE;
     }
 
     /**
@@ -141,6 +151,30 @@ public class Contest {
      */
     public void updatePeriod(Instant startTime, Instant endTime) {
         this.period = new ContestPeriod(startTime, endTime);
+    }
+
+    /**
+     * Cambia los minutos finales en los que la tabla pública queda congelada.
+     *
+     * @param minutes Minutos antes del fin; 0 para no congelar. No pueden superar la duración del concurso.
+     */
+    public void changeFreezeMinutes(int minutes) {
+        long duration = Duration.between(getStartTime(), getEndTime()).toMinutes();
+        if (minutes < 0 || minutes > duration) {
+            throw new IllegalArgumentException(
+                    "Los minutos de congelamiento deben estar entre 0 y la duración del concurso (" + duration + ").");
+        }
+        this.freezeMinutes = minutes;
+    }
+
+    /** @return Momento en que se congela la tabla pública, o nulo si el concurso no se congela. */
+    public Instant getFreezeTime() {
+        return freezeMinutes > 0 ? getEndTime().minus(Duration.ofMinutes(freezeMinutes)) : null;
+    }
+
+    /** @return {@code true} si la tabla pública muestra los resultados del momento del congelamiento. */
+    public boolean isScoreboardFrozen() {
+        return scoreboardStatus == ScoreboardStatus.FROZEN;
     }
 
     /** @return La fecha y hora de inicio del concurso. */

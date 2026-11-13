@@ -1,5 +1,8 @@
 package co.uceva.contests_platform.submission.application.port.out;
 
+import java.util.Optional;
+import java.util.UUID;
+
 import co.uceva.contests_platform.submission.domain.service.ContestDataSource;
 
 /**
@@ -15,4 +18,14 @@ import co.uceva.contests_platform.submission.domain.service.ContestDataSource;
  * </p>
  */
 public interface ContestDataPort extends ContestDataSource {
+
+    /**
+     * Traduce un problema del concurso al problema del catálogo, que es el que conoce el juez
+     * para cargar los límites y los casos de prueba.
+     *
+     * @param contestId        Identificador del concurso.
+     * @param contestProblemId Identificador del problema dentro del concurso ({@code contest_problems.id}).
+     * @return Identificador del problema en el catálogo, o vacío si no pertenece al concurso.
+     */
+    Optional<UUID> findCatalogProblemId(UUID contestId, UUID contestProblemId);
 }

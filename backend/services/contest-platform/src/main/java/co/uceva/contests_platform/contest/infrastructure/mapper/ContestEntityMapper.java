@@ -29,6 +29,8 @@ public class ContestEntityMapper {
                 .endTime(domain.getEndTime())
                 .status(domain.getStatus())
                 .createdAt(domain.getCreatedAt())
+                .freezeMinutes(domain.getFreezeMinutes())
+                .scoreboardStatus(domain.getScoreboardStatus())
                 .build();
     }
 
@@ -51,6 +53,8 @@ public class ContestEntityMapper {
                 .period(ContestPeriod.restore(entity.getStartTime(), entity.getEndTime()))
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())
+                .freezeMinutes(entity.getFreezeMinutes())
+                .scoreboardStatus(entity.getScoreboardStatus())
                 .build();
     }
 }

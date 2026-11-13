@@ -4,6 +4,7 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 
 import co.uceva.contests_platform.contest.application.usecase.FinishContestUseCase;
+import co.uceva.contests_platform.contest.application.usecase.FreezeScoreboardUseCase;
 import co.uceva.contests_platform.contest.application.usecase.StartContestUseCase;
 import co.uceva.contests_platform.contest.domain.model.Contest;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class ContestSchedulerService {
     private final TaskScheduler taskScheduler;
     private final StartContestUseCase startContest;
     private final FinishContestUseCase finishContest;
+    private final FreezeScoreboardUseCase freezeScoreboard;
 
     /**
      * Programa el inicio y el fin del concurso según su período. Se invoca al crear o
@@ -40,5 +42,8 @@ public class ContestSchedulerService {
         var id = contest.getId();
         taskScheduler.schedule(() -> startContest.execute(id), contest.getStartTime());
         taskScheduler.schedule(() -> finishContest.execute(id), contest.getEndTime());
+        if (contest.getFreezeTime() != null) {
+            taskScheduler.schedule(() -> freezeScoreboard.execute(id), contest.getFreezeTime());
+        }
     }
 }

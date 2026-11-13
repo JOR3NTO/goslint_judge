@@ -67,6 +67,9 @@ public class UpdateContestUseCaseImpl implements UpdateContestUseCase {
                 period,
                 command.status()
         );
+        if (command.freezeMinutes() != null) {
+            contest.changeFreezeMinutes(command.freezeMinutes());
+        }
 
         Contest saved = contestRepository.save(contest);
         scheduler.scheduleContest(saved);

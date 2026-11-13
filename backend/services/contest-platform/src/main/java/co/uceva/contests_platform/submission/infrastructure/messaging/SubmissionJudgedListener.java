@@ -49,7 +49,9 @@ public class SubmissionJudgedListener {
      * @param event Resultado de la evaluación publicado por {@code judge-service}.
      * @throws AmqpRejectAndDontRequeueException Si el envío referido no existe.
      */
-    @RabbitListener(queues = "${app.messaging.submission.judged-queue}")
+    // Un solo consumidor: los veredictos se aplican de uno en uno, así el recálculo del puntaje de
+    // un equipo no compite con otro. Si se sube, hay que bloquear la fila del equipo al leerla.
+    @RabbitListener(queues = "${app.messaging.submission.judged-queue}", concurrency = "1")
     public void onSubmissionJudged(SubmissionJudgedEvent event) {
         try {
             updateSubmissionVerdictUseCase.execute(new UpdateSubmissionVerdictCommand(

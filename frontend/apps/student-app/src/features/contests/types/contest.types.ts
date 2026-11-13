@@ -9,6 +9,9 @@
 /** Estado de una maratón tal como lo devuelve el backend. */
 export type ContestStatus = "UPCOMING" | "ACTIVE" | "ENDED"
 
+/** Estado de la tabla pública: en vivo, congelada en los últimos minutos o liberada por el organizador. */
+export type ScoreboardStatus = "LIVE" | "FROZEN" | "UNFROZEN"
+
 /** `GET /v1/contests` y `GET /v1/contests/{id}`. Fechas en ISO-8601 (Instant). */
 export interface ContestDTO {
   id: string
@@ -19,6 +22,9 @@ export interface ContestDTO {
   endTime: string
   status: ContestStatus
   createdAt: string
+  /** Minutos antes del fin en que se congela la tabla pública; 0 si no se congela. */
+  freezeMinutes: number
+  scoreboardStatus: ScoreboardStatus
 }
 
 /** Problema asociado a una maratón (`GET /v1/contests/{id}/problems`). */

@@ -55,10 +55,19 @@ class ContestServiceDataAdapterTest {
     }
 
     @Test
-    void shouldReturnProblemIdsNotContestProblemAssignmentIds() {
+    void shouldReturnContestProblemIdsNotCatalogProblemIds() {
         var assignment = ContestProblem.create(contestId, problemId, "A", 1, BalloonColor.of("#FF0000"));
         when(getProblemsByContestUseCase.execute(contestId)).thenReturn(List.of(assignment));
 
-        assertThat(adapter.findContestProblemIds(contestId)).containsExactly(problemId);
+        assertThat(adapter.findContestProblemIds(contestId)).containsExactly(assignment.getId());
+    }
+
+    @Test
+    void shouldTranslateAContestProblemToItsCatalogProblem() {
+        var assignment = ContestProblem.create(contestId, problemId, "A", 1, BalloonColor.of("#FF0000"));
+        when(getProblemsByContestUseCase.execute(contestId)).thenReturn(List.of(assignment));
+
+        assertThat(adapter.findCatalogProblemId(contestId, assignment.getId())).contains(problemId);
+        assertThat(adapter.findCatalogProblemId(contestId, UUID.randomUUID())).isEmpty();
     }
 }
