@@ -16,7 +16,12 @@ import { Label } from "@/shared/ui/primitives/label"
 import { Loader2 } from "lucide-react"
 import { ContestApiError } from "../services/contests-service"
 import type { ContestFieldErrors } from "../types/contest.types"
-import { validateTeamName } from "../utils/team-rules"
+import {
+  TEAM_MAX_MEMBERS,
+  TEAM_NAME_MAX_LENGTH,
+  TEAM_NAME_MIN_LENGTH,
+  validateTeamName,
+} from "../utils/team-rules"
 
 interface JoinContestDialogProps {
   open: boolean
@@ -28,20 +33,32 @@ interface JoinContestDialogProps {
 
 const FIELD_TEAM = "teamName"
 const FIELD_PASSWORD = "contestPassword"
+const PASSWORD_REQUIRED = "La contraseña de la maratón es obligatoria."
 
 /** Diálogo para inscribir un equipo: nombre del equipo + contraseña de la maratón. */
 export function JoinContestDialog({ open, onOpenChange, contestTitle, onJoin }: JoinContestDialogProps) {
   const [teamName, setTeamName] = useState("")
   const [contestPassword, setContestPassword] = useState("")
+  // Errores que devuelve el backend (se limpian al editar el campo correspondiente).
   const [fieldErrors, setFieldErrors] = useState<ContestFieldErrors>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Campos tocados: solo se muestra el error de validación local tras interactuar con ellos.
+  const [touched, setTouched] = useState<{ team: boolean; password: boolean }>({ team: false, password: false })
+
+  const teamNameError = validateTeamName(teamName)
+  const passwordError = contestPassword ? null : PASSWORD_REQUIRED
+  const canSubmit = teamNameError === null && passwordError === null && !isSubmitting
+
+  const shownTeamError = fieldErrors[FIELD_TEAM] ?? (touched.team ? teamNameError : null)
+  const shownPasswordError = fieldErrors[FIELD_PASSWORD] ?? (touched.password ? passwordError : null)
 
   const reset = () => {
     setTeamName("")
     setContestPassword("")
     setFieldErrors({})
     setServerError(null)
+    setTouched({ team: false, password: false })
   }
 
   const handleOpenChange = (next: boolean) => {
@@ -50,18 +67,24 @@ export function JoinContestDialog({ open, onOpenChange, contestTitle, onJoin }: 
     onOpenChange(next)
   }
 
+  /** Quita el error del backend de un campo cuando el usuario vuelve a escribir en él. */
+  const clearFieldError = (field: string) => {
+    setFieldErrors((prev) => {
+      if (!(field in prev)) return prev
+      const next = { ...prev }
+      delete next[field]
+      return next
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (isSubmitting) return
+    if (!canSubmit) {
+      setTouched({ team: true, password: true })
+      return
+    }
 
-    const localErrors: ContestFieldErrors = {}
-    const teamNameError = validateTeamName(teamName)
-    if (teamNameError) localErrors[FIELD_TEAM] = teamNameError
-    if (!contestPassword) localErrors[FIELD_PASSWORD] = "La contraseña de la maratón es obligatoria."
-    setFieldErrors(localErrors)
     setServerError(null)
-    if (Object.keys(localErrors).length > 0) return
-
     setIsSubmitting(true)
     try {
       await onJoin(teamName.trim(), contestPassword)
@@ -101,19 +124,25 @@ export function JoinContestDialog({ open, onOpenChange, contestTitle, onJoin }: 
               id="team-name"
               name={FIELD_TEAM}
               value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
+              onChange={(e) => {
+                setTeamName(e.target.value)
+                clearFieldError(FIELD_TEAM)
+              }}
+              onBlur={() => setTouched((t) => ({ ...t, team: true }))}
               placeholder="Ej: Los Algoritmos"
               autoComplete="off"
-              aria-invalid={Boolean(fieldErrors[FIELD_TEAM])}
+              aria-invalid={Boolean(shownTeamError)}
               aria-describedby="team-name-help"
-              className="bg-input border-border focus:border-primary"
+             
               disabled={isSubmitting}
+              required
             />
             <p id="team-name-help" className="text-xs text-muted-foreground">
-              El equipo puede tener de 1 a 3 integrantes; tras crearlo podrás invitar a los demás.
+              Entre {TEAM_NAME_MIN_LENGTH} y {TEAM_NAME_MAX_LENGTH} caracteres. Tu equipo puede tener hasta{" "}
+              {TEAM_MAX_MEMBERS} integrantes; podrás invitar a los demás después de inscribirte.
             </p>
-            {fieldErrors[FIELD_TEAM] && (
-              <p className="text-sm text-destructive">{fieldErrors[FIELD_TEAM]}</p>
+            {shownTeamError && (
+              <p className="text-sm text-destructive">{shownTeamError}</p>
             )}
           </div>
 
@@ -124,19 +153,28 @@ export function JoinContestDialog({ open, onOpenChange, contestTitle, onJoin }: 
               name={FIELD_PASSWORD}
               type="password"
               value={contestPassword}
-              onChange={(e) => setContestPassword(e.target.value)}
+              onChange={(e) => {
+                setContestPassword(e.target.value)
+                clearFieldError(FIELD_PASSWORD)
+              }}
+              onBlur={() => setTouched((t) => ({ ...t, password: true }))}
               autoComplete="off"
-              aria-invalid={Boolean(fieldErrors[FIELD_PASSWORD])}
-              className="bg-input border-border focus:border-primary"
+              aria-invalid={Boolean(shownPasswordError)}
+              aria-describedby="contest-password-help"
+             
               disabled={isSubmitting}
+              required
             />
-            {fieldErrors[FIELD_PASSWORD] && (
-              <p className="text-sm text-destructive">{fieldErrors[FIELD_PASSWORD]}</p>
+            <p id="contest-password-help" className="text-xs text-muted-foreground">
+              Pídesela al organizador de la maratón si no la tienes.
+            </p>
+            {shownPasswordError && (
+              <p className="text-sm text-destructive">{shownPasswordError}</p>
             )}
           </div>
 
           {serverError && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" role="alert">
               <AlertDescription>{serverError}</AlertDescription>
             </Alert>
           )}
@@ -147,17 +185,16 @@ export function JoinContestDialog({ open, onOpenChange, contestTitle, onJoin }: 
               variant="outline"
               onClick={() => handleOpenChange(false)}
               disabled={isSubmitting}
-              className="border-border hover:border-primary hover:bg-primary/10"
             >
               Cancelar
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={!canSubmit}
               className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              Inscribirme
+              {isSubmitting && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Inscribiendo…" : "Inscribirme"}
             </Button>
           </DialogFooter>
         </form>

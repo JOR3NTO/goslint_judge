@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { Navbar } from "@/shared/ui/navbar"
 import { Footer } from "@/shared/ui/footer"
 import { Badge } from "@/shared/ui/primitives/badge"
 import { Button } from "@/shared/ui/primitives/button"
+import { cn } from "@/shared/utils/cn"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
 import { Skeleton } from "@/shared/ui/primitives/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/primitives/tabs"
@@ -84,6 +85,36 @@ export function ContestDetailPage() {
     setIsJoinOpen(true)
   }
 
+  // Acción principal del hero: inscribirse si no hay equipo, o entrar a la arena si ya está inscrito.
+  let primaryAction: ReactNode = null
+  if (contest && !isLoading && !error) {
+    if (!myTeam && contest.status !== "ENDED") {
+      primaryAction = (
+        <Button
+          size="lg"
+          onClick={openJoin}
+          className="h-12 w-full gap-2 bg-primary text-base text-primary-foreground shadow-sm hover:bg-primary/90"
+        >
+          <UserPlus aria-hidden="true" className="h-5 w-5" />
+          Inscribirme
+        </Button>
+      )
+    } else if (myTeam && contest.status !== "UPCOMING") {
+      primaryAction = (
+        <Button
+          asChild
+          size="lg"
+          className="h-12 w-full gap-2 bg-primary text-base text-primary-foreground shadow-sm hover:bg-primary/90 glow-green-sm"
+        >
+          <Link href={`/contests/${contest.id}/arena`}>
+            <Swords aria-hidden="true" className="h-5 w-5" />
+            {contest.status === "ACTIVE" ? "Entrar al maratón" : "Ver arena"}
+          </Link>
+        </Button>
+      )
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -106,93 +137,63 @@ export function ContestDetailPage() {
             {!isLoading && !error && contest && (
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
                 <div className="space-y-4 min-w-0">
-                  <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className={statusColors[contest.status]}>
                       {statusLabels[contest.status]}
                     </Badge>
+                    {myTeam && (
+                      <Badge variant="outline" className="gap-1.5 border-primary/30 bg-primary/10 px-2.5 py-1 text-sm text-primary">
+                        <CheckCircle2 aria-hidden="true" />
+                        Inscrito como <span className="font-semibold">{myTeam.teamName}</span>
+                      </Badge>
+                    )}
                   </div>
-                  <h1 className="text-3xl sm:text-4xl font-bold text-foreground">
+                  <h1 className="text-3xl sm:text-4xl font-bold text-foreground break-words">
                     {contest.title}
                   </h1>
                   <p className="text-muted-foreground max-w-2xl">
                     {contest.description}
                   </p>
-                  <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-primary" />
+                      <Calendar aria-hidden="true" className="h-4 w-4 text-primary" />
                       {formatDateTime(contest.startTime)} – {formatDateTime(contest.endTime)}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-primary" />
+                      <Clock aria-hidden="true" className="h-4 w-4 text-primary" />
                       {formatDuration(contestDurationMs(contest.startTime, contest.endTime))}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-primary" />
+                      <Users aria-hidden="true" className="h-4 w-4 text-primary" />
                       {sectionErrors.teams ? "—" : teams.length} participantes
                     </div>
                     <div className="flex items-center gap-2">
-                      <FileCode2 className="h-4 w-4 text-primary" />
+                      <FileCode2 aria-hidden="true" className="h-4 w-4 text-primary" />
                       {sectionErrors.problems ? "—" : problems.length} problemas
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-4 w-full lg:w-auto">
+                <div className="flex flex-col gap-4 w-full lg:w-80 lg:flex-shrink-0">
                   <ContestTimer contest={contest} />
 
-                  {myTeam ? (
-                    <Card className="border-primary/30 bg-primary/5">
-                      <CardContent className="py-4 flex items-center gap-3">
-                        <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
-                        <p className="text-foreground">
-                          Inscrito como <span className="font-semibold text-primary">{myTeam.teamName}</span>
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ) : contest.status !== "ENDED" ? (
-                    <Button
-                      onClick={openJoin}
-                      className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      Inscribirme
-                    </Button>
-                  ) : null}
-
-                  {myTeam && contest.status !== "UPCOMING" && (
-                    <Link href={`/contests/${contest.id}/arena`}>
-                      <Button className="w-full gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 glow-green-sm">
-                        <Swords className="h-4 w-4" />
-                        {contest.status === "ACTIVE" ? "Entrar al maratón" : "Ver arena"}
-                      </Button>
-                    </Link>
-                  )}
+                  {primaryAction}
                 </div>
               </div>
             )}
           </div>
         </section>
 
-        {/* Mi equipo: solo si el usuario ya está inscrito en esta maratón */}
-        {!isLoading && !error && contest && myTeam && (
-          <section className="pt-8">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <MyTeamPanel
-                contest={contest}
-                team={myTeam}
-                currentUserId={currentUserId}
-                onTeamChanged={replaceMyTeam}
-                onTeamLeft={clearMyTeam}
-              />
-            </div>
-          </section>
-        )}
-
-        {/* Content */}
+        {/* Contenido: problemas y ranking; el panel del equipo va en columna lateral en escritorio */}
         {!isLoading && !error && contest && (
           <section className="py-8">
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-              <Tabs defaultValue="problems" className="space-y-6">
+            <div
+              className={cn(
+                "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid gap-8",
+                myTeam && "lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start"
+              )}
+            >
+              <Tabs defaultValue="problems" className="min-w-0 space-y-6">
                 <TabsList className="bg-secondary/50 border border-border">
                   <TabsTrigger value="problems" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <FileCode2 className="h-4 w-4 mr-2" />
@@ -218,9 +219,15 @@ export function ContestDetailPage() {
                     </CardHeader>
                     <CardContent>
                       {sectionErrors.problems ? (
-                        <p className="text-muted-foreground">No se pudieron cargar los problemas.</p>
+                        <EmptyState
+                          title="No se pudieron cargar los problemas"
+                          description="Revisa tu conexión e inténtalo de nuevo más tarde."
+                        />
                       ) : problems.length === 0 ? (
-                        <p className="text-muted-foreground">Esta maratón aún no tiene problemas asignados.</p>
+                        <EmptyState
+                          title="Aún no hay problemas"
+                          description="Esta maratón todavía no tiene problemas asignados. Vuelve a revisar más tarde."
+                        />
                       ) : (
                         <div className="overflow-x-auto">
                           <Table>
@@ -259,9 +266,15 @@ export function ContestDetailPage() {
                     </CardHeader>
                     <CardContent>
                       {sectionErrors.scoreboard ? (
-                        <p className="text-muted-foreground">No se pudo cargar el ranking.</p>
+                        <EmptyState
+                          title="No se pudo cargar el ranking"
+                          description="Inténtalo de nuevo más tarde."
+                        />
                       ) : scoreboard.length === 0 ? (
-                        <p className="text-muted-foreground">Aún no hay equipos inscritos.</p>
+                        <EmptyState
+                          title="Aún no hay equipos inscritos"
+                          description="El ranking aparecerá cuando se inscriba el primer equipo."
+                        />
                       ) : (
                         <div className="overflow-x-auto">
                           <Table>
@@ -286,6 +299,19 @@ export function ContestDetailPage() {
                   </Card>
                 </TabsContent>
               </Tabs>
+
+              {/* Mi equipo: solo si el usuario ya está inscrito en esta maratón */}
+              {myTeam && (
+                <div className="min-w-0">
+                  <MyTeamPanel
+                    contest={contest}
+                    team={myTeam}
+                    currentUserId={currentUserId}
+                    onTeamChanged={replaceMyTeam}
+                    onTeamLeft={clearMyTeam}
+                  />
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -320,16 +346,50 @@ function ProblemRow({ problem }: { problem: ContestProblemItem }) {
       <TableCell className="text-center font-mono text-primary">{problem.points}</TableCell>
       <TableCell className="text-center font-mono text-muted-foreground">{problem.penalty}</TableCell>
       <TableCell>
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <span
-            className="inline-block h-4 w-4 rounded-full border border-border"
-            style={{ backgroundColor: problem.balloonColor }}
-            aria-hidden="true"
-          />
-          <span className="text-sm">{problem.balloonColor}</span>
-        </div>
+        <span
+          role="img"
+          aria-label={`Globo ${balloonColorLabel(problem.balloonColor)}`}
+          title={balloonColorLabel(problem.balloonColor)}
+          className="inline-block h-4 w-4 rounded-full border border-border"
+          style={{ backgroundColor: problem.balloonColor }}
+        />
       </TableCell>
     </TableRow>
+  )
+}
+
+/** Nombres en español de los colores de globo más comunes; el resto se muestra tal cual. */
+const BALLOON_COLOR_NAMES: Record<string, string> = {
+  red: "rojo",
+  blue: "azul",
+  green: "verde",
+  yellow: "amarillo",
+  orange: "naranja",
+  purple: "morado",
+  violet: "violeta",
+  pink: "rosa",
+  black: "negro",
+  white: "blanco",
+  brown: "café",
+  gray: "gris",
+  grey: "gris",
+  cyan: "cian",
+  teal: "verde azulado",
+}
+
+function balloonColorLabel(color: string): string {
+  const key = color.trim().toLowerCase()
+  if (BALLOON_COLOR_NAMES[key]) return BALLOON_COLOR_NAMES[key]
+  return key.startsWith("#") ? "personalizado" : color
+}
+
+/** Estado vacío con título y explicación, para las pestañas. */
+function EmptyState({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="py-10 text-center">
+      <p className="font-medium text-foreground">{title}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+    </div>
   )
 }
 

@@ -33,7 +33,11 @@ export function ContestArenaPage() {
 
   const [tab, setTab] = useState<ArenaTab>("problems")
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null)
+  // Se guarda el id (no la copia del envío) para que el diálogo refleje la versión
+  // actual del listado. El id se conserva al cerrar para que el contenido no
+  // desaparezca durante la animación de salida.
   const [detailSubmissionId, setDetailSubmissionId] = useState<string | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   // Si aún no hay selección (o el problema ya no existe), se muestra el primero.
   const selected =
@@ -171,7 +175,10 @@ export function ContestArenaPage() {
                     problemsById={problemsById}
                     isLoading={subs.isLoading}
                     error={subs.error}
-                    onSelect={(submissionId) => setDetailSubmissionId(submissionId)}
+                    onSelect={(submissionId) => {
+                      setDetailSubmissionId(submissionId)
+                      setDetailOpen(true)
+                    }}
                   />
                 </TabsContent>
 
@@ -187,10 +194,8 @@ export function ContestArenaPage() {
       <SubmissionDetailDialog
         submission={detailSubmission}
         problemLabel={detailLabel}
-        open={detailSubmission !== null}
-        onOpenChange={(open) => {
-          if (!open) setDetailSubmissionId(null)
-        }}
+        open={detailOpen && detailSubmission !== null}
+        onOpenChange={setDetailOpen}
       />
 
       <Footer />
