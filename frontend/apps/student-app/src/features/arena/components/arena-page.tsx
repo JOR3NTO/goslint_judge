@@ -17,6 +17,7 @@ import { ArenaHeader } from "./arena-header"
 import { ArenaMessage, ComingSoon } from "./arena-message"
 import { ClarificationsTab } from "./clarifications-tab"
 import { ProblemsTab } from "./problems-tab"
+import { RankingTab } from "./ranking-tab"
 import { SubmissionDetailDialog } from "./submission-detail-dialog"
 import { SubmissionsTab } from "./submissions-tab"
 
@@ -189,7 +190,11 @@ export function ContestArenaPage() {
                 </TabsContent>
 
                 <TabsContent value="ranking">
-                  <ComingSoon title="Ranking" />
+                  <RankingTab
+                    contestId={id}
+                    contestActive={contest.status === "ACTIVE"}
+                    myTeamId={teamId}
+                  />
                 </TabsContent>
               </Tabs>
             </section>
