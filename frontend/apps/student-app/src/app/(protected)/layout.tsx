@@ -48,5 +48,11 @@ export default function ProtectedLayout({
     )
   }
 
-  return <>{children}</>
+  // Columna de altura mínima de pantalla: la raíz de cada página (y su <main>) ocupa el
+  // espacio sobrante, así el footer de la página queda pegado al fondo aunque el contenido sea corto.
+  return (
+    <div className="flex min-h-screen flex-col [&>div]:flex [&>div]:flex-1 [&>div]:flex-col [&_main]:flex-1">
+      {children}
+    </div>
+  )
 }

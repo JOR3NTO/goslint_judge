@@ -176,12 +176,16 @@ export function MyTeamPanel({ contest, team, currentUserId, onTeamChanged, onTea
                 return (
                   <li key={member.id} className="flex items-center justify-between gap-3 px-3 py-2">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="font-medium text-foreground">
-                        {isMe ? "Tú" : "Integrante"}
-                      </span>
-                      <span className="font-mono text-xs text-muted-foreground" title={member.userId}>
-                        {shortId(member.userId)}
-                      </span>
+                      {isMe ? (
+                        <span className="font-medium text-foreground">Tú</span>
+                      ) : (
+                        <>
+                          <span className="font-medium text-foreground">Compañero</span>
+                          <span className="font-mono text-xs text-muted-foreground" title={member.userId}>
+                            {shortId(member.userId)}
+                          </span>
+                        </>
+                      )}
                       {isTeamCaptain && (
                         <Badge variant="outline" className="gap-1 border-primary/30 text-primary">
                           <Crown className="h-3 w-3" />
@@ -195,6 +199,7 @@ export function MyTeamPanel({ contest, team, currentUserId, onTeamChanged, onTea
                         variant="outline"
                         size="sm"
                         disabled={busy}
+                        aria-label={`Quitar a compañero ${shortId(member.userId)} del equipo`}
                         onClick={() => setMemberToRemove(member.userId)}
                         className="gap-2 border-border hover:border-destructive hover:bg-destructive/10"
                       >
@@ -278,7 +283,7 @@ export function MyTeamPanel({ contest, team, currentUserId, onTeamChanged, onTea
                     }}
                     disabled={!canEdit || busy}
                     aria-invalid={Boolean(nameError)}
-                    className="bg-input border-border focus:border-primary"
+                   
                   />
                   {nameError && <p className="text-sm text-destructive">{nameError}</p>}
                 </div>
@@ -328,7 +333,7 @@ export function MyTeamPanel({ contest, team, currentUserId, onTeamChanged, onTea
           <AlertDialogHeader>
             <AlertDialogTitle>¿Quitar integrante?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se quitará al integrante {memberToRemove ? shortId(memberToRemove) : ""} del equipo.
+              Este compañero dejará de formar parte del equipo.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
