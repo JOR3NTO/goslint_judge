@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { ContestApiError } from "../services/contests-service"
 import { createContestsService } from "../services/contests-api"
+import { applyTeamPositionUpdate, subscribeScoreboardStream } from "../services/scoreboard-stream"
 import type {
   ContestDTO,
   ContestProblemItem,
@@ -134,6 +135,15 @@ export function useContestDetail(contestId: string): UseContestDetailReturn {
       cancelled = true
     }
   }, [contestId, attempt])
+
+  useEffect(() => {
+    return subscribeScoreboardStream(contestId, {
+      onScoreboard: setScoreboard,
+      onTeamUpdate: (position, team) => {
+        setScoreboard((current) => applyTeamPositionUpdate(current, position, team))
+      },
+    })
+  }, [contestId])
 
   const reload = useCallback(() => setAttempt((n) => n + 1), [])
 

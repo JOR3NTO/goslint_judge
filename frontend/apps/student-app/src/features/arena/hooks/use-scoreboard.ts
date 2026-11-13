@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { env } from "@/core/config/env"
-import { createContestsService } from "@/features/contests"
+import {
+  createContestsService,
+  subscribeScoreboardStream,
+  applyTeamPositionUpdate,
+} from "@/features/contests"
 import type { TeamDTO } from "@/features/contests"
 
 /** Intervalo del refresco automático en modo mock, que no tiene stream. */
@@ -73,29 +77,26 @@ export function useScoreboard(contestId: string, autoRefresh: boolean): UseScore
 
   useEffect(() => {
     if (env.MOCK_ENABLED) return
-    const source = new EventSource(`${env.API_BASE_URL}/v1/contests/${contestId}/scoreboard/stream`)
     const received = () => {
       setUpdatedAt(Date.now())
       setError(null)
       setLoaded(true)
     }
-    source.onopen = () => setLive(true)
-    source.onerror = () => setLive(false)
-    source.addEventListener("frozen", (e) => setFrozen(JSON.parse((e as MessageEvent).data) === true))
-    source.addEventListener("scoreboard", (e) => {
-      setTeams(JSON.parse((e as MessageEvent).data) as TeamDTO[])
-      received()
-    })
-    source.addEventListener("team", (e) => {
-      const { position, team } = JSON.parse((e as MessageEvent).data) as { position: number; team: TeamDTO }
-      setTeams((current) => {
-        const rest = current.filter((t) => t.id !== team.id)
-        return [...rest.slice(0, position - 1), team, ...rest.slice(position - 1)]
-      })
-      received()
+    const close = subscribeScoreboardStream(contestId, {
+      onOpen: () => setLive(true),
+      onError: () => setLive(false),
+      onFrozen: setFrozen,
+      onScoreboard: (nextTeams) => {
+        setTeams(nextTeams)
+        received()
+      },
+      onTeamUpdate: (position, team) => {
+        setTeams((current) => applyTeamPositionUpdate(current, position, team))
+        received()
+      },
     })
     return () => {
-      source.close()
+      close()
       setLive(false)
     }
   }, [contestId])
