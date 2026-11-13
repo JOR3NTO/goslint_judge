@@ -30,3 +30,4 @@ export type {
 // Servicio y errores tipados (para otras features que necesiten consultar maratones)
 export { ContestsService, ContestApiError } from "./services/contests-service"
 export { createContestsService } from "./services/contests-api"
+export { subscribeScoreboardStream, applyTeamPositionUpdate } from "./services/scoreboard-stream"
