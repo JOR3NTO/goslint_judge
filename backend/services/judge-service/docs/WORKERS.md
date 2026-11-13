@@ -141,7 +141,7 @@ Validado en Manjaro x86_64 (kernel 6.18, 16 núcleos). Las primeras comprobacion
 | Programa que deja un hijo en segundo plano | No queda ningún proceso ni hoja al terminar la evaluación |
 | Worker colgado con tiempo máximo de 2 s | Abandonado a los 2,0 s; el otro worker sigue evaluando; sin residuos |
 | Apagado del pool | Desaparecen las ramas y los directorios de los workers |
-| Flujo completo por RabbitMQ (`submission-service`, cola, juez con 2 workers y WebSocket), con la página de prueba de workers | 8 envíos en los cuatro lenguajes y 12 con todos los veredictos: pico de 2 evaluaciones simultáneas, el resto en cola, veredictos correctos |
+| Flujo completo por RabbitMQ (`contest-platform`, cola, juez con 2 workers y WebSocket), con la página de prueba de workers | 8 envíos en los cuatro lenguajes y 12 con todos los veredictos: pico de 2 evaluaciones simultáneas, el resto en cola, veredictos correctos |
 | Lo mismo **dentro del contenedor**, con `JUDGE_WORKERS=2` | 12 envíos Java, 8 en los cuatro lenguajes y 12 con todos los veredictos: pico de 2, veredictos correctos, ningún worker reiniciado y sin hojas ni archivos residuales |
 
 Pendiente de validar:

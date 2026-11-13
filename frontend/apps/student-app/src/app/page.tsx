@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation"
+import { env } from "@/core/config/env"
 
 /**
  * Ruta raíz de student-app.
- * La landing pública vive en landing-app (localhost:3002).
- * Aquí redirigimos a /login directamente.
+ * El inicio como tal es la landing pública (landing-app), por eso redirigimos
+ * allí en lugar de a /login. La URL se configura con NEXT_PUBLIC_LANDING_URL.
  */
 export default function RootPage() {
-  redirect("/login")
+  redirect(env.LANDING_URL)
 }

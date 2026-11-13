@@ -2,7 +2,7 @@
  * LoginPage — Pantalla de inicio de sesión de la student-app.
  *
  * Diseño visual: sigue el estilo del prototipo .dc.html y de register-page.tsx
- * (dark theme con fondo #0a0e0c, card #101512, acento verde #2ee88a).
+ * (tema claro basado en tokens: fondo blanco, card bg-card, acento bg-primary).
  *
  * Integración con el backend:
  * - Usa `useLogin` hook → `AuthService` → `HttpApiAdapter` → `POST /api/v1/auth/login`.
@@ -31,11 +31,13 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useLogin } from "../hooks/use-login"
+import { env } from "@/core/config/env"
+import { DEMO_STUDENT_EMAIL, DEMO_STUDENT_PASSWORD } from "@/core/api/mock"
 import { Button } from "@/shared/ui/primitives/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
 import { Input } from "@/shared/ui/primitives/input"
 import { Label } from "@/shared/ui/primitives/label"
-import { Code2, Eye, EyeOff, Github, Mail, ArrowLeft, Loader2 } from "lucide-react"
+import { Code2, Eye, EyeOff, Github, Mail, ArrowLeft, Loader2, FlaskConical } from "lucide-react"
 
 export function LoginPage() {
   /** Toggle para mostrar/ocultar la contraseña en texto plano. */
@@ -48,14 +50,14 @@ export function LoginPage() {
     isLoading,
     handleChange,
     handleSubmit,
+    loginAsDemo,
   } = useLogin()
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative py-12">
       {/* Background Effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%2300ff88%22%20fill-opacity%3D%220.03%22%3E%3Ccircle%20cx%3D%221%22%20cy%3D%221%22%20r%3D%221%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50" />
-      
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
+
       <div className="relative w-full max-w-md">
         {/* Back to Home */}
         <Link 
@@ -66,7 +68,7 @@ export function LoginPage() {
           Volver al inicio
         </Link>
 
-        <Card className="border-border bg-card/80 backdrop-blur-xl shadow-2xl">
+        <Card className="border-border bg-card shadow-md">
           <CardHeader className="text-center pb-2">
             <div className="flex justify-center mb-4">
               <Link href="/" className="flex items-center gap-2 group">
@@ -85,7 +87,7 @@ export function LoginPage() {
 
           <CardContent className="space-y-4 pt-4">
             {serverError && (
-              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-500 text-sm text-center">
+              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm text-center">
                 {serverError}
               </div>
             )}
@@ -104,7 +106,7 @@ export function LoginPage() {
                     type="email"
                     placeholder="tu@email.com"
                     autoComplete="email"
-                    className="pl-10 bg-input border-border focus:border-primary focus:ring-primary"
+                    className="pl-10 bg-background border-input"
                     value={formData.email}
                     onChange={handleChange}
                     disabled={isLoading}
@@ -112,7 +114,7 @@ export function LoginPage() {
                   />
                 </div>
                 {errors.email && (
-                  <p className="text-xs text-red-400 mt-1">{errors.email}</p>
+                  <p className="text-xs text-destructive mt-1">{errors.email}</p>
                 )}
               </div>
 
@@ -135,7 +137,7 @@ export function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     autoComplete="current-password"
-                    className="pr-10 font-mono bg-input border-border focus:border-primary focus:ring-primary"
+                    className="pr-10 font-mono bg-background border-input"
                     value={formData.password}
                     onChange={handleChange}
                     disabled={isLoading}
@@ -154,7 +156,7 @@ export function LoginPage() {
                   </button>
                 </div>
                 {errors.password && (
-                  <p className="text-xs text-red-400 mt-1">{errors.password}</p>
+                  <p className="text-xs text-destructive mt-1">{errors.password}</p>
                 )}
               </div>
 
@@ -167,6 +169,28 @@ export function LoginPage() {
                 {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
               </Button>
             </form>
+
+            {/* Solo modo mock (fuera de producción): acceso directo con la cuenta demo. */}
+            {env.MOCK_ENABLED && (
+              <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full border-primary/50 text-primary hover:bg-primary/10"
+                  onClick={() => loginAsDemo()}
+                  disabled={isLoading}
+                >
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                  Entrar como estudiante demo
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  Datos simulados ·{" "}
+                  <span className="font-mono font-medium text-foreground">
+                    {DEMO_STUDENT_EMAIL} / {DEMO_STUDENT_PASSWORD}
+                  </span>
+                </p>
+              </div>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

@@ -3,18 +3,20 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { createHttpApi } from "@/core/api"
 import { Button } from "@/shared/ui/primitives/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
 import { Input } from "@/shared/ui/primitives/input"
 import { Label } from "@/shared/ui/primitives/label"
 import { Checkbox } from "@/shared/ui/primitives/checkbox"
-import { Code2, Eye, EyeOff, Github, Mail, User, ArrowLeft, Check } from "lucide-react"
+import { Building2, Code2, Eye, EyeOff, Github, Mail, User, ArrowLeft, Check } from "lucide-react"
 
 export function RegisterPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [institutionError, setInstitutionError] = useState<string | null>(null)
   const [acceptTerms, setAcceptTerms] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -22,6 +24,7 @@ export function RegisterPage() {
     lastName: "",
     username: "",
     email: "",
+    institution: "",
     password: "",
   })
 
@@ -29,12 +32,14 @@ export function RegisterPage() {
     const { id, value } = e.target
     setFormData(prev => ({ ...prev, [id]: value }))
     if (serverError) setServerError(null)
+    if (id === "institution" && institutionError) setInstitutionError(null)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setServerError(null)
+    setInstitutionError(null)
 
     if (!acceptTerms) {
       setServerError("Debes aceptar los Términos de Servicio y la Política de Privacidad para continuar.")
@@ -42,30 +47,36 @@ export function RegisterPage() {
       return
     }
 
+    // La institución es opcional: si queda vacía no se envía la clave (el backend la guarda como null).
+    const institution = formData.institution.trim()
+
     try {
-      const response = await fetch("/api/v1/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-          institution: "",
-        }),
+      const response = await createHttpApi().post<Record<string, unknown> | null>("/v1/auth/register", {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        ...(institution ? { institution } : {}),
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null)
+        const errorData = response.data
         console.error("Backend error response:", errorData)
-        setServerError(
-          errorData?.message || 
-          errorData?.error || 
-          (errorData ? JSON.stringify(errorData) : "Ocurrió un error al registrarse. Verifica tus datos.")
-        )
+        if (typeof errorData?.institution === "string") {
+          // Error de validación de campo: se muestra junto al campo institución.
+          setInstitutionError(errorData.institution)
+          const otherMessages = Object.entries(errorData)
+            .filter(([field, value]) => field !== "institution" && typeof value === "string")
+            .map(([, value]) => value as string)
+          setServerError(otherMessages.length > 0 ? otherMessages.join(" ") : null)
+        } else {
+          setServerError(
+            (typeof errorData?.message === "string" && errorData.message) ||
+            (typeof errorData?.error === "string" && errorData.error) ||
+            (errorData ? JSON.stringify(errorData) : "Ocurrió un error al registrarse. Verifica tus datos.")
+          )
+        }
         setIsLoading(false)
         return
       }
@@ -90,8 +101,7 @@ export function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative py-12">
       {/* Background Effects */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%2300ff88%22%20fill-opacity%3D%220.03%22%3E%3Ccircle%20cx%3D%221%22%20cy%3D%221%22%20r%3D%221%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
       
       <div className="relative w-full max-w-md">
         {/* Back to Home */}
@@ -103,7 +113,7 @@ export function RegisterPage() {
           Volver al inicio
         </Link>
 
-        <Card className="border-border bg-card/80 backdrop-blur-xl shadow-2xl">
+        <Card className="border-border bg-card shadow-md">
           <CardHeader className="text-center pb-2">
             <div className="flex justify-center mb-4">
               <Link href="/" className="flex items-center gap-2 group">
@@ -122,7 +132,7 @@ export function RegisterPage() {
 
           <CardContent className="space-y-4 pt-4">
             {serverError && (
-              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-500 text-sm text-center">
+              <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm text-center">
                 {serverError}
               </div>
             )}
@@ -137,7 +147,7 @@ export function RegisterPage() {
                     id="firstName"
                     type="text"
                     placeholder="Juan"
-                    className="bg-input border-border focus:border-primary focus:ring-primary"
+                    className="bg-background border-input"
                     value={formData.firstName}
                     onChange={handleChange}
                     required
@@ -151,7 +161,7 @@ export function RegisterPage() {
                     id="lastName"
                     type="text"
                     placeholder="Pérez"
-                    className="bg-input border-border focus:border-primary focus:ring-primary"
+                    className="bg-background border-input"
                     value={formData.lastName}
                     onChange={handleChange}
                     required
@@ -169,7 +179,7 @@ export function RegisterPage() {
                     id="username"
                     type="text"
                     placeholder="juanperez_dev"
-                    className="pl-10 bg-input border-border focus:border-primary focus:ring-primary"
+                    className="pl-10 bg-background border-input"
                     value={formData.username}
                     onChange={handleChange}
                     required
@@ -187,12 +197,37 @@ export function RegisterPage() {
                     id="email"
                     type="email"
                     placeholder="tu@email.com"
-                    className="pl-10 bg-input border-border focus:border-primary focus:ring-primary"
+                    className="pl-10 bg-background border-input"
                     value={formData.email}
                     onChange={handleChange}
                     required
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="institution" className="text-foreground">
+                  Institución <span className="text-muted-foreground font-normal">(opcional)</span>
+                </Label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="institution"
+                    type="text"
+                    maxLength={255}
+                    placeholder="Universidad, colegio u organización"
+                    className="pl-10 bg-background border-input"
+                    value={formData.institution}
+                    onChange={handleChange}
+                    aria-invalid={institutionError ? true : undefined}
+                    aria-describedby={institutionError ? "institution-error" : undefined}
+                  />
+                </div>
+                {institutionError && (
+                  <p id="institution-error" className="text-xs text-destructive">
+                    {institutionError}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -204,7 +239,7 @@ export function RegisterPage() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    className="pr-10 bg-input border-border focus:border-primary focus:ring-primary"
+                    className="pr-10 bg-background border-input"
                     value={formData.password}
                     onChange={handleChange}
                     required

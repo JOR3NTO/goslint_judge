@@ -13,22 +13,22 @@
  * 6. Redirección post-login a /contests.
  *
  * Diseño:
- * - El hook crea su propia instancia de AuthService + HttpApiAdapter.
- *   Cuando se implemente un Provider/Context global de API, se reemplazará
- *   la construcción directa por inyección desde contexto.
- * - Si `NEXT_PUBLIC_USE_MOCK=true`, se usaría MockApiAdapter (pendiente).
+ * - El adapter lo entrega `createHttpApi()`: con `NEXT_PUBLIC_USE_MOCK=true` (fuera de
+ *   producción) es el servidor mock, y en otro caso el backend real.
+ * - `loginAsDemo()` rellena las credenciales del estudiante demo y entra. Solo lo
+ *   muestra la pantalla de login cuando `env.MOCK_ENABLED` es true.
  *
  * Uso en el componente:
  * ```tsx
- * const { formData, errors, serverError, isLoading, handleChange, handleSubmit } = useLogin()
+ * const { formData, errors, serverError, isLoading, handleChange, handleSubmit, loginAsDemo } = useLogin()
  * ```
  */
 "use client"
 
 import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { HttpApiAdapter } from "@/core/api"
-import { env } from "@/core/config/env"
+import { createHttpApi } from "@/core/api"
+import { DEMO_STUDENT_EMAIL, DEMO_STUDENT_PASSWORD } from "@/core/api/mock"
 import { AuthService, AuthApiError } from "../services/auth-service"
 
 // ─── Estado del hook ─────────────────────────────────────────────────────────
@@ -56,6 +56,8 @@ interface UseLoginReturn {
   handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   /** Handler del submit del formulario. Valida, llama al backend, redirige. */
   handleSubmit: (e: React.FormEvent) => Promise<void>
+  /** Solo modo mock: rellena las credenciales del estudiante demo y entra. */
+  loginAsDemo: () => Promise<void>
 }
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -81,7 +83,7 @@ const POST_LOGIN_REDIRECT = "/contests"
 /**
  * Regex para validación básica de email.
  * No pretende cubrir el RFC 5322 completo — eso lo valida el backend con @Email.
- * Su propósito es dar feedback instantáneo al usuario antes de enviar.
+ * Su propósito es avisar al usuario de forma instantánea antes de enviar.
  */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -136,40 +138,28 @@ export function useLogin(): UseLoginReturn {
     [errors, serverError]
   )
 
-  // ── onSubmit handler ─────────────────────────────────────────────────────
+  // ── Llamada al backend (compartida por el submit y por el acceso demo) ────
 
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault()
-
-      // 1. Validación client-side
-      const validationErrors = validateForm(formData)
-      if (Object.keys(validationErrors).length > 0) {
-        setErrors(validationErrors)
-        return
-      }
-
-      // 2. Llamada al backend
+  const performLogin = useCallback(
+    async (credentials: LoginFormData) => {
       setIsLoading(true)
       setServerError(null)
       setErrors({})
 
       try {
-        // Construir el adapter y servicio.
         // TODO: Reemplazar por inyección desde un Provider/Context cuando exista.
-        const api = new HttpApiAdapter(env.API_BASE_URL)
-        const authService = new AuthService(api)
+        const authService = new AuthService(createHttpApi())
 
         const response = await authService.login({
-          email: formData.email.trim(),
-          password: formData.password,
+          email: credentials.email.trim(),
+          password: credentials.password,
         })
 
-        // 3. Login exitoso → guardar tokens
+        // Login exitoso → guardar tokens
         localStorage.setItem(AUTH_TOKEN_KEY, response.accessToken)
         localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken)
 
-        // 4. Redirigir a la página principal
+        // Redirigir a la página principal
         router.push(POST_LOGIN_REDIRECT)
       } catch (error: unknown) {
         if (error instanceof AuthApiError) {
@@ -212,8 +202,34 @@ export function useLogin(): UseLoginReturn {
         setIsLoading(false)
       }
     },
-    [formData, router]
+    [router]
   )
+
+  // ── onSubmit handler ─────────────────────────────────────────────────────
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+
+      // Validación client-side
+      const validationErrors = validateForm(formData)
+      if (Object.keys(validationErrors).length > 0) {
+        setErrors(validationErrors)
+        return
+      }
+
+      await performLogin(formData)
+    },
+    [formData, performLogin]
+  )
+
+  // ── Acceso demo (solo modo mock) ─────────────────────────────────────────
+
+  const loginAsDemo = useCallback(async () => {
+    const demo = { email: DEMO_STUDENT_EMAIL, password: DEMO_STUDENT_PASSWORD }
+    setFormData(demo)
+    await performLogin(demo)
+  }, [performLogin])
 
   return {
     formData,
@@ -222,5 +238,6 @@ export function useLogin(): UseLoginReturn {
     isLoading,
     handleChange,
     handleSubmit,
+    loginAsDemo,
   }
 }

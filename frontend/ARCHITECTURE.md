@@ -117,7 +117,7 @@ Dentro de una página, usa `dynamic()` de Next.js para componentes pesados (edit
 import dynamic from "next/dynamic"
 
 const CodeEditor = dynamic(
-  () => import("@/features/ai-feedback/components/code-editor"),
+  () => import("@/features/arena/components/code-editor"),
   { loading: () => <Skeleton className="h-96" />, ssr: false }
 )
 ```
@@ -131,7 +131,6 @@ Route (app)                    Size     First Load JS
 ┌ ○ /                          3.2 kB   87.4 kB
 ├ ○ /contests                  4.1 kB   91.2 kB
 ├ ○ /contests/[id]             8.3 kB   95.4 kB
-├ ○ /ai-feedback               12.1 kB  99.2 kB
 ```
 
 Si ves un bundle único muy grande, revisar que no haya imports circulares ni re-exports masivos desde `shared/`.
@@ -336,7 +335,6 @@ wsAdapter.simulateEvent("SUBMISSION_VERDICT", {
 - `auth` — login y registro
 - `contests` — listado, detalle con countdown + ranking, historial
 - `profile` — perfil del usuario autenticado (`/profile`) con avatar DiceBear derivado del `username`
-- `ai-feedback` — análisis de código con IA
 
 ### `admin-app`
 
@@ -348,8 +346,9 @@ wsAdapter.simulateEvent("SUBMISSION_VERDICT", {
 ### Qué queda pendiente (próxima etapa)
 
 - Implementar las pantallas de `admin-app` (dashboard, gestión de problemas, maratones, usuarios)
+- Actualizar los `rewrites` de `next.config.mjs` (student-app) para apuntar al único `contest-platform` (`:8080`)
 - Implementar features pendientes en `student-app`: `submissions`, `ranking` (standalone), `clarifications`, `teams`
-- `profile`: falta el endpoint `GET /api/v1/auth/me` en `auth-service`; mientras tanto el perfil degrada a los claims del JWT. Falta también el cierre de sesión en el front
+- `profile`: `GET /api/v1/auth/me` ya existe en `contest-platform`; si falla, el perfil degrada a los claims del JWT
 - Conectar `ContestsService`, `AuthService`, etc. con el backend real via `HttpApiAdapter`
 - Conectar `WebSocketAdapter` al endpoint WS del backend
 - Extraer `core/api` y `core/events` a `packages/api-client` y `packages/event-bus` cuando haya duplicación real entre las dos apps

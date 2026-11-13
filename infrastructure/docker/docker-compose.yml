@@ -279,6 +279,34 @@ services:
       retries: 12
       start_period: 40s
 
+  contest-service:
+    build:
+      context: ../../backend
+      dockerfile: docker/spring-service.Dockerfile
+      args:
+        SERVICE: contest-service
+    image: goslint-contest-service:dev
+    container_name: goslint-contest
+    restart: unless-stopped
+    ports:
+      - "${CONTEST_PORT:-8086}:8086"
+    environment:
+      <<: [*db-env, *jwt-env]
+      # problem-service corre en este mismo compose: se le llama por su nombre de servicio
+      # para verificar que un problema exista al asignarlo a un maraton.
+      PROBLEM_SERVICE_URL: http://problem-service:8082
+    depends_on:
+      postgres:
+        condition: service_healthy
+      problem-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8086'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
 volumes:
   postgres-data:
   rabbitmq-data:

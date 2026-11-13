@@ -1,7 +1,17 @@
 # Docker de Goslint Judge — guía paso a paso
 
+> ⚠️ **Desactualizado respecto al código.** El backend pasó a ser un monolito modular:
+> `auth`, `problem`, `contest` y `submission` viven ahora en un único servicio,
+> `contest-platform` (puerto 8080), que **no está declarado en `docker-compose.yml`**. Los bloques
+> `auth-service`, `problem-service`, `submission-service` y `contest-service` del compose apuntan a
+> módulos Gradle que ya no existen (el build fallaría). Mientras no se actualice el compose, usa
+> solo la infraestructura (`docker compose up -d postgres redis rabbitmq`) y corre
+> `./gradlew :services:contest-platform:bootRun` en el host. El perfil `sandbox` (`judge-service`)
+> sigue vigente, con `PROBLEM_SERVICE_URL=http://host.docker.internal:8080`.
+> Las secciones siguientes describen el compose tal como está escrito hoy.
+
 Levanta todo el backend con un solo comando: PostgreSQL, Redis, RabbitMQ y los servicios
-`auth-service`, `problem-service` y `submission-service`. El `judge-service` (el sandbox)
+`auth-service`, `problem-service` y `submission-service` (ver aviso). El `judge-service` (el sandbox)
 va aparte, en un perfil que **solo funciona en Linux** (ver [sección 6](#6-judge-service-solo-linux)).
 
 ## 1. Qué hay en el compose

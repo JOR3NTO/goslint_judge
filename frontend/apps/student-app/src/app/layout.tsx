@@ -15,13 +15,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Goslint Judge | Competitive Programming Platform',
-  description: 'The ultimate competitive programming judge platform. Join marathons, solve problems, and get AI-powered feedback to improve your coding skills.',
+  description: 'The ultimate competitive programming judge platform. Join marathons, solve problems, and get submission verdicts and rankings to improve your coding skills.',
   generator: 'Goslint Judge',
   keywords: ['competitive programming', 'coding contests', 'programming judge', 'algorithm challenges', 'ICPC', 'coding marathons'],
 }
 
 export const viewport: Viewport = {
-  themeColor: '#00ff88',
+  themeColor: '#ffffff',
+  colorScheme: 'light',
   width: 'device-width',
   initialScale: 1,
 }
@@ -32,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className="dark bg-background" suppressHydrationWarning>
+    <html lang="es" className="bg-background" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased min-h-screen`}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}

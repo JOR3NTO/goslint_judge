@@ -18,3 +18,4 @@ export { AuthService, AuthApiError } from "./services/auth-service"
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
 export { useLogin } from "./hooks/use-login"
+export { useLogout } from "./hooks/use-logout"

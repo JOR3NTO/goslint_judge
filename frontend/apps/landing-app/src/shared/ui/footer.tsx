@@ -1,107 +1,58 @@
-import { Code2, Github, Twitter, Mail } from "lucide-react"
+"use client"
+
+import { useEffect, useState } from "react"
+import { Code2 } from "lucide-react"
 import { env } from "@/core/config/env"
 
 export function Footer() {
+  // El año se calcula en cliente para evitar diferencias de hidratación entre servidor y navegador.
+  const [year, setYear] = useState<number | null>(null)
+  useEffect(() => {
+    setYear(new Date().getFullYear())
+  }, [])
+
   return (
-    <footer className="border-t border-border bg-card/50">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand */}
-          <div className="space-y-4">
-            <a href="/" className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/30">
-                <Code2 className="h-5 w-5 text-primary" />
-              </div>
-              <span className="text-xl font-bold text-foreground">
-                Goslint<span className="text-primary">Judge</span>
-              </span>
-            </a>
-            <p className="text-sm text-muted-foreground">
-              La plataforma de juez de programación competitiva con retroalimentación de IA.
-            </p>
-          </div>
-
-          {/* Plataforma — links a student-app */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-4">Plataforma</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <a href={`${env.APP_URL}/login`} className="hover:text-primary transition-colors">
-                  Maratones Activas
-                </a>
-              </li>
-              <li>
-                <a href={`${env.APP_URL}/login`} className="hover:text-primary transition-colors">
-                  Maratones Anteriores
-                </a>
-              </li>
-              <li>
-                <a href={`${env.APP_URL}/login`} className="hover:text-primary transition-colors">
-                  AI Feedback
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-foreground mb-4">Recursos</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Documentación
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Problemas de Práctica
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Ranking Global
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="font-semibold text-foreground mb-4">Legal</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Términos de Servicio
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Política de Privacidad
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-primary transition-colors">
-                  Código de Conducta
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+    <footer className="border-t border-border bg-muted/40">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 md:flex-row md:items-start md:justify-between lg:px-8">
+        <div className="max-w-sm space-y-3">
+          <a href="/" className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
+              <Code2 className="h-5 w-5 text-primary" aria-hidden="true" />
+            </div>
+            <span className="text-xl font-bold text-foreground">
+              Goslint<span className="text-primary">Judge</span>
+            </span>
+          </a>
           <p className="text-sm text-muted-foreground">
-            © 2026 Goslint Judge. Todos los derechos reservados.
+            Juez de programación competitiva para maratones de programación.
           </p>
-          <div className="flex items-center gap-4">
-            <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-              <Github className="h-5 w-5" />
-            </a>
-            <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-              <Twitter className="h-5 w-5" />
-            </a>
-            <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-              <Mail className="h-5 w-5" />
-            </a>
-          </div>
         </div>
+
+        <nav aria-label="Enlaces del pie de página">
+          <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+            <li>
+              <a href="#maratones" className="rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+                Maratones
+              </a>
+            </li>
+            <li>
+              <a href={`${env.APP_URL}/login`} className="rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+                Iniciar sesión
+              </a>
+            </li>
+            <li>
+              <a href={`${env.APP_URL}/register`} className="rounded-sm hover:text-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+                Registrarse
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+      <div className="border-t border-border">
+        <p className="mx-auto max-w-7xl px-4 py-4 text-center text-xs text-muted-foreground sm:px-6 lg:px-8">
+          {year !== null ? `© ${year} Goslint Judge · Semillero UCEVA` : "Goslint Judge · Semillero UCEVA"}
+        </p>
       </div>
     </footer>
   )
