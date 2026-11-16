@@ -26,6 +26,7 @@ jobs:
     steps:
       - name: Check variables
         run: |
+          test -n "${{ secrets.S3_ENDPOINT }}" || { echo "::error::Falta secrets.S3_ENDPOINT"; exit 1; }
           if [ "${{ github.ref_name }}" = "main" ]; then
             test -n "${{ vars.API_URL }}"                 || { echo "::error::Falta vars.API_URL"; exit 1; }
             test -n "${{ vars.STUDENT_APP_URL }}"         || { echo "::error::Falta vars.STUDENT_APP_URL"; exit 1; }
@@ -59,18 +60,41 @@ jobs:
         working-directory: ./frontend
         run: pnpm --filter @uceva-judge/landing-app build
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
-          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.S3_SECRET_KEY }}
-          aws-region: ${{ secrets.S3_REGION }}
+          name: landing-out
+          path: frontend/apps/landing-app/out
+          retention-days: 1
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      S3_BUCKET: ${{ github.ref_name == 'main' && secrets.LANDING_S3_BUCKET || secrets.LANDING_S3_BUCKET_DEV }}
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: landing-out
+          path: ./out
+
+      - name: Install AWS CLI
+        run: |
+          pip install awscli
+
+      # RustFS es compatible con S3: el CLI apunta a su endpoint y usa rutas /bucket/clave.
       # HTML y payloads RSC sin caché; _next/static lleva hash en el nombre y se cachea para siempre.
       # Orden: chunks nuevos → HTML nuevo → borrar chunks viejos, para que ningún HTML apunte a un chunk inexistente.
-      - name: Sync files to S3 bucket
-        working-directory: ./frontend/apps/landing-app/out
+      - name: Deploy to S3
+        working-directory: ./out
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.S3_REGION }}
+          S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
         run: |
-          aws s3 sync _next/static "s3://$S3_BUCKET/_next/static" --cache-control "public,max-age=31536000,immutable"
-          aws s3 sync . "s3://$S3_BUCKET" --delete --exclude "_next/static/*" --cache-control "no-cache"
-          aws s3 sync _next/static "s3://$S3_BUCKET/_next/static" --delete --cache-control "public,max-age=31536000,immutable"
+          aws configure set default.s3.addressing_style path
+          aws s3 sync _next/static "s3://$S3_BUCKET/_next/static" --endpoint-url "$S3_ENDPOINT" --cache-control "public,max-age=31536000,immutable"
+          aws s3 sync . "s3://$S3_BUCKET" --endpoint-url "$S3_ENDPOINT" --delete --exclude "_next/static/*" --cache-control "no-cache"
+          aws s3 sync _next/static "s3://$S3_BUCKET/_next/static" --endpoint-url "$S3_ENDPOINT" --delete --cache-control "public,max-age=31536000,immutable"
