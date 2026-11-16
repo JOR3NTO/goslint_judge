@@ -14,8 +14,8 @@ const FOOTER_LINKS = [
   { href: "/profile", label: "Mi perfil" },
 ] as const
 
-/** Arena de un concurso: /contests/{id}/arena. Ahí el footer se reduce a una línea para no quitar espacio al editor. */
-const ARENA_PATH = /^\/contests\/[^/]+\/arena(\/|$)/
+/** Arena de un concurso: /contests/arena?id=... Ahí el footer se reduce a una línea para no quitar espacio al editor. */
+const ARENA_PATH = /^\/contests\/([^/]+\/)?arena(\/|$)/
 
 const COPYRIGHT_TEXT = "Goslint Judge · Semillero UCEVA"
 

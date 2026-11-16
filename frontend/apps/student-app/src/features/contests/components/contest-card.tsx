@@ -86,7 +86,7 @@ export function ContestCard({ contest }: ContestCardProps) {
 
       <CardFooter className="relative mt-auto border-t border-border pt-3">
         <Button asChild variant={cta.variant} className="w-full gap-2">
-          <Link href={`/contests/${contest.id}`}>
+          <Link href={`/contests/detail?id=${contest.id}`}>
             {cta.label}
             <ArrowRight aria-hidden="true" className="h-4 w-4" />
             <span className="sr-only">({contest.title})</span>

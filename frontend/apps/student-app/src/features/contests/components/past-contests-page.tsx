@@ -284,7 +284,7 @@ function PastContestRow({ contest, participants, participantsLoading }: PastCont
       </TableCell>
       <TableCell className="text-right">
         <Button asChild variant="outline" size="sm">
-          <Link href={`/contests/${contest.id}`}>
+          <Link href={`/contests/detail?id=${contest.id}`}>
             <Trophy aria-hidden="true" className="h-4 w-4" />
             Ver resultados
             <span className="sr-only">({contest.title})</span>
@@ -318,7 +318,7 @@ function PastContestCard({ contest, participants, participantsLoading }: PastCon
         </span>
       </div>
       <Button asChild variant="outline" size="sm" className="mt-4 w-full">
-        <Link href={`/contests/${contest.id}`}>
+        <Link href={`/contests/detail?id=${contest.id}`}>
           <Trophy aria-hidden="true" className="h-4 w-4" />
           Ver resultados
           <span className="sr-only">({contest.title})</span>

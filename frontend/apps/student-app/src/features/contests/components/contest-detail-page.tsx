@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Navbar } from "@/shared/ui/navbar"
 import { Footer } from "@/shared/ui/footer"
 import { Badge } from "@/shared/ui/primitives/badge"
@@ -53,7 +53,8 @@ const statusLabels: Record<ContestStatus, string> = {
 }
 
 export function ContestDetailPage() {
-  const { id } = useParams<{ id: string }>()
+  const searchParams = useSearchParams()
+  const id = searchParams.get("id") ?? ""
   const router = useRouter()
   const {
     contest,
@@ -106,7 +107,7 @@ export function ContestDetailPage() {
           size="lg"
           className="h-12 w-full gap-2 bg-primary text-base text-primary-foreground shadow-sm hover:bg-primary/90 glow-green-sm"
         >
-          <Link href={`/contests/${contest.id}/arena`}>
+          <Link href={`/contests/arena?id=${contest.id}`}>
             <Swords aria-hidden="true" className="h-5 w-5" />
             {contest.status === "ACTIVE" ? "Entrar al maratón" : "Ver arena"}
           </Link>
