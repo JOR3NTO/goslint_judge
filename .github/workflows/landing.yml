@@ -1,0 +1,76 @@
+name: Deploy in AWS S3 Landing APP
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "frontend/apps/landing-app/**"
+      # Compartidos del workspace: cambian las dependencias instaladas
+      - "frontend/package.json"
+      - "frontend/pnpm-lock.yaml"
+      - "frontend/pnpm-workspace.yaml"
+      - "frontend/brand/**"
+      - ".github/workflows/landing.yml"
+
+# Un despliegue por rama a la vez; sin cancelar para no dejar un sync a medias
+concurrency:
+  group: landing-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: ${{ github.ref_name == 'main' && vars.API_URL         || vars.API_URL_DEV }}
+      NEXT_PUBLIC_APP_URL: ${{ github.ref_name == 'main' && vars.STUDENT_APP_URL || vars.STUDENT_APP_URL_DEV }}
+      S3_BUCKET: ${{ github.ref_name == 'main' && secrets.LANDING_S3_BUCKET || secrets.LANDING_S3_BUCKET_DEV }}
+    steps:
+      - name: Check variables
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            test -n "${{ vars.API_URL }}"                 || { echo "::error::Falta vars.API_URL"; exit 1; }
+            test -n "${{ vars.STUDENT_APP_URL }}"         || { echo "::error::Falta vars.STUDENT_APP_URL"; exit 1; }
+            test -n "${{ secrets.LANDING_S3_BUCKET }}"    || { echo "::error::Falta secrets.S3_BUCKET_LANDING"; exit 1; }
+          else
+            test -n "${{ vars.API_URL_DEV }}"              || { echo "::error::Falta vars.API_URL_DEV"; exit 1; }
+            test -n "${{ vars.STUDENT_APP_URL_DEV }}"      || { echo "::error::Falta vars.STUDENT_APP_URL_DEV"; exit 1; }
+            test -n "${{ secrets.LANDING_S3_BUCKET_DEV }}" || { echo "::error::Falta secrets.LANDING_S3_BUCKET_DEV"; exit 1; }
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the project
+        working-directory: ./frontend
+        run: pnpm --filter @uceva-judge/landing-app build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_KEY }}
+          aws-region: ${{ secrets.S3_REGION }}
+
+      # HTML y payloads RSC sin caché; _next/static lleva hash en el nombre y se cachea para siempre.
+      # Orden: chunks nuevos → HTML nuevo → borrar chunks viejos, para que ningún HTML apunte a un chunk inexistente.
+      - name: Sync files to S3 bucket
+        working-directory: ./frontend/apps/landing-app/out
+        run: |
+          aws s3 sync _next/static "s3://$S3_BUCKET/_next/static" --cache-control "public,max-age=31536000,immutable"
+          aws s3 sync . "s3://$S3_BUCKET" --delete --exclude "_next/static/*" --cache-control "no-cache"
+          aws s3 sync _next/static "s3://$S3_BUCKET/_next/static" --delete --cache-control "public,max-age=31536000,immutable"
