@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Navbar } from "@/shared/ui/navbar"
 import { Footer } from "@/shared/ui/footer"
 import { Button } from "@/shared/ui/primitives/button"
@@ -28,7 +28,8 @@ const tabTriggerClass =
 
 /** Página de la arena de una maratón: solo para equipos inscritos. */
 export function ContestArenaPage() {
-  const { id } = useParams<{ id: string }>()
+  const searchParams = useSearchParams()
+  const id = searchParams.get("id") ?? ""
   const arena = useArena(id)
   const teamId = arena.team?.id ?? null
   const subs = useSubmissions(teamId)
@@ -77,7 +78,7 @@ export function ContestArenaPage() {
       <main className="pt-16">
         <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
           <Link
-            href={`/contests/${id}`}
+            href={`/contests/detail?id=${id}`}
             className="inline-flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -111,7 +112,7 @@ export function ContestArenaPage() {
               title="No estás inscrito en esta maratón"
               description="Solo los equipos inscritos pueden entrar a la arena. Inscríbete desde el detalle de la maratón."
               actions={
-                <Link href={`/contests/${id}`}>
+                <Link href={`/contests/detail?id=${id}`}>
                   <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
                     Ir al detalle de la maratón
                   </Button>

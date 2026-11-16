@@ -131,7 +131,7 @@ function InvitationCard({ item, isBusy, anyBusy, actionError, onAccept, onReject
             </CardTitle>
             <CardDescription>
               {contest ? (
-                <Link href={`/contests/${contest.id}`} className="text-primary hover:underline">
+                <Link href={`/contests/detail?id=${contest.id}`} className="text-primary hover:underline">
                   {contest.title}
                 </Link>
               ) : (
@@ -193,7 +193,7 @@ function InvitationCard({ item, isBusy, anyBusy, actionError, onAccept, onReject
           )}
 
           {invitation.status === "ACCEPTED" && contest && (
-            <Link href={`/contests/${contest.id}`}>
+            <Link href={`/contests/detail?id=${contest.id}`}>
               <Button className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
                 Ir a la maratón
                 <ArrowRight className="h-4 w-4" />
