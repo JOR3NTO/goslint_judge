@@ -276,6 +276,9 @@ export function MyTeamPanel({ contest, team, currentUserId, onTeamChanged, onTea
                   </Label>
                   <Input
                     id="rename-team"
+                    autoComplete="off"
+                    data-1p-ignore
+                    data-lpignore="true"
                     value={newName}
                     onChange={(e) => {
                       setNewName(e.target.value)

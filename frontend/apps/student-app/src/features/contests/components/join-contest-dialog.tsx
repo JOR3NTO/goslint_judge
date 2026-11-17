@@ -131,6 +131,8 @@ export function JoinContestDialog({ open, onOpenChange, contestTitle, onJoin }: 
               onBlur={() => setTouched((t) => ({ ...t, team: true }))}
               placeholder="Ej: Los Algoritmos"
               autoComplete="off"
+              data-1p-ignore
+              data-lpignore="true"
               aria-invalid={Boolean(shownTeamError)}
               aria-describedby="team-name-help"
              
@@ -158,7 +160,10 @@ export function JoinContestDialog({ open, onOpenChange, contestTitle, onJoin }: 
                 clearFieldError(FIELD_PASSWORD)
               }}
               onBlur={() => setTouched((t) => ({ ...t, password: true }))}
-              autoComplete="off"
+              autoComplete="new-password"
+              data-1p-ignore
+              data-lpignore="true"
+              data-form-type="other"
               aria-invalid={Boolean(shownPasswordError)}
               aria-describedby="contest-password-help"
              
