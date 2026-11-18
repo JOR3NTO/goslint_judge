@@ -102,6 +102,7 @@ export function useArena(contestId: string): UseArenaReturn {
             alias: p.alias,
             orderIndex: p.orderIndex,
             points: p.points,
+            balloonColor: p.balloonColor,
             title: loaded?.title ?? null,
             difficulty: loaded?.difficult ?? null,
           }

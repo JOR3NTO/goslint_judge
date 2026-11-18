@@ -13,9 +13,14 @@ import {
   TableRow,
 } from "@/shared/ui/primitives/table"
 import { cn } from "@/shared/utils/cn"
-import { RefreshCw, Snowflake, Trophy } from "lucide-react"
+import { useMemo, useState, type CSSProperties } from "react"
+import { RefreshCw, Snowflake, Sparkles, Trophy } from "lucide-react"
+import { env } from "@/core/config/env"
 import type { TeamDTO } from "@/features/contests"
 import { useScoreboard, SCOREBOARD_REFRESH_MS } from "../hooks/use-scoreboard"
+import { useNewBalloons } from "../hooks/use-new-balloons"
+import type { ArenaProblem } from "../types/arena.types"
+import { BalloonCell } from "./balloon-cell"
 
 interface RankingTabProps {
   contestId: string
@@ -23,6 +28,15 @@ interface RankingTabProps {
   contestActive: boolean
   /** Id del equipo del usuario en esta maratón, para resaltarlo. */
   myTeamId: string | null
+  /** Problemas de la maratón (con color de globo), ordenados por `orderIndex`. */
+  problems: ArenaProblem[]
+  /**
+   * Problemas resueltos por el equipo del usuario según sus propios envíos aceptados. El backend real no envía
+   * `solvedProblemIds`, así que solo el equipo propio muestra globos; los demás solo si el campo llega (mock).
+   */
+  mySolvedProblemIds: readonly string[]
+  /** Los envíos propios ya cargaron (evita animar el historial como si fuera nuevo). */
+  submissionsReady: boolean
 }
 
 const timeFormatter = new Intl.DateTimeFormat("es-CO", {
@@ -54,11 +68,37 @@ function positionTone(position: number): string {
 }
 
 /** Pestaña Ranking: tabla de posiciones de la maratón con recarga manual y automática. */
-export function RankingTab({ contestId, contestActive, myTeamId }: RankingTabProps) {
-  const { teams, isLoading, isRefreshing, error, updatedAt, frozen, live, refresh } = useScoreboard(
+export function RankingTab({ contestId, contestActive, myTeamId, problems, mySolvedProblemIds, submissionsReady }: RankingTabProps) {
+  const { teams: fetchedTeams, isLoading, isRefreshing, error, updatedAt, frozen, live, refresh } = useScoreboard(
     contestId,
     contestActive
   )
+
+  // Solo en mock (sin SSE): globos simulados que se superponen a los datos del ranking.
+  const [demoSolved, setDemoSolved] = useState<Record<string, string[]>>({})
+  const teams = useMemo(
+    () =>
+      fetchedTeams.map((team) => {
+        const extra = [...(demoSolved[team.id] ?? []), ...(team.id === myTeamId ? mySolvedProblemIds : [])]
+        if (extra.length === 0) return team
+        const base = team.solvedProblemIds ?? []
+        return { ...team, solvedProblemIds: [...base, ...new Set(extra.filter((id) => !base.includes(id)))] }
+      }),
+    [fetchedTeams, demoSolved, myTeamId, mySolvedProblemIds]
+  )
+  const freshByTeam = useNewBalloons(teams, !isLoading && submissionsReady)
+  const problemColor = useMemo(() => new Map(problems.map((p) => [p.problemId, p.balloonColor])), [problems])
+
+  const simulateAccepted = () => {
+    const candidates = teams.flatMap((team) =>
+      problems
+        .filter((p) => !(team.solvedProblemIds ?? []).includes(p.problemId))
+        .map((p) => ({ teamId: team.id, problemId: p.problemId }))
+    )
+    if (candidates.length === 0) return
+    const pick = candidates[Math.floor(Math.random() * candidates.length)]
+    setDemoSolved((current) => ({ ...current, [pick.teamId]: [...(current[pick.teamId] ?? []), pick.problemId] }))
+  }
 
   const ranks = competitionRanks(teams)
   const allZero = teams.length > 0 && teams.every((team) => team.score === 0)
@@ -85,6 +125,12 @@ export function RankingTab({ contestId, contestActive, myTeamId }: RankingTabPro
           <CardDescription>{refreshNote}</CardDescription>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {env.MOCK_ENABLED && problems.length > 0 && (
+            <Button type="button" variant="ghost" size="sm" onClick={simulateAccepted} className="text-muted-foreground">
+              <Sparkles aria-hidden="true" />
+              Simular aceptado
+            </Button>
+          )}
           {updatedAt && (
             <span className="text-xs text-muted-foreground" role="status">
               Actualizado {timeFormatter.format(new Date(updatedAt))}
@@ -147,6 +193,7 @@ export function RankingTab({ contestId, contestActive, myTeamId }: RankingTabPro
                   <TableRow className="border-border hover:bg-transparent">
                     <TableHead className="w-16 text-muted-foreground">Pos.</TableHead>
                     <TableHead className="min-w-[10rem] text-muted-foreground">Equipo</TableHead>
+                    <TableHead className="min-w-[7rem] text-muted-foreground">Globos</TableHead>
                     <TableHead className="text-right text-muted-foreground">Puntos</TableHead>
                     <TableHead className="text-right text-muted-foreground">
                       Penalización <span className="text-xs">(min)</span>
@@ -157,12 +204,16 @@ export function RankingTab({ contestId, contestActive, myTeamId }: RankingTabPro
                   {teams.map((team, index) => {
                     const position = ranks[index]
                     const mine = team.id === myTeamId
+                    const freshIds = freshByTeam.get(team.id) ?? []
+                    const flashColor = freshIds.length > 0 ? problemColor.get(freshIds[freshIds.length - 1]) : undefined
                     return (
                       <TableRow
                         key={team.id}
                         aria-current={mine ? "true" : undefined}
+                        style={flashColor ? ({ "--flash-color": flashColor } as CSSProperties) : undefined}
                         className={cn(
                           "border-border",
+                          freshIds.length > 0 && "balloon-row-flash",
                           mine ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-secondary/50"
                         )}
                       >
@@ -188,6 +239,16 @@ export function RankingTab({ contestId, contestActive, myTeamId }: RankingTabPro
                           <span className="text-xs text-muted-foreground">
                             {team.members.length} {team.members.length === 1 ? "integrante" : "integrantes"}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          <BalloonCell
+                            solvedProblemIds={team.solvedProblemIds ?? []}
+                            problems={problems}
+                            freshIds={freshIds}
+                            celebrate={mine}
+                            teamName={team.teamName}
+                            unknown={!mine && fetchedTeams[index]?.solvedProblemIds === undefined}
+                          />
                         </TableCell>
                         <TableCell className="text-right font-mono font-semibold text-foreground">
                           {team.score}

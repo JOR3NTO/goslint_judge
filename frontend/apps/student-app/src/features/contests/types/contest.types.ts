@@ -58,6 +58,11 @@ export interface TeamDTO {
   penaltyTime: number
   createdAt: string
   members: TeamMemberDTO[]
+  /**
+   * Ids de problema (`ContestProblemDTO.problemId`, no `ContestProblemDTO.id`) con primer aceptado,
+   * en orden cronológico y sin repetidos. Opcional: si falta se asume [].
+   */
+  solvedProblemIds?: string[]
 }
 
 /** Body de `POST /v1/contests/{id}/teams`. */

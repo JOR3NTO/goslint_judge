@@ -10,8 +10,11 @@ import { Skeleton } from "@/shared/ui/primitives/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/primitives/tabs"
 import { ArrowLeft, FileCode2, History, Lock, MessageSquare, Trophy } from "lucide-react"
 import { useArena } from "../hooks/use-arena"
+import { useBalloonRain } from "../hooks/use-balloon-rain"
 import { useProblemDetail } from "../hooks/use-problem-detail"
+import { BalloonRain } from "./balloon-rain"
 import { useSubmissions } from "../hooks/use-submissions"
+import { ownSolvedProblemIds } from "../utils/own-solved"
 import { teamProblemStatus } from "../utils/verdict"
 import { ArenaHeader } from "./arena-header"
 import { ArenaMessage, ComingSoon } from "./arena-message"
@@ -56,6 +59,11 @@ export function ContestArenaPage() {
     (problemId: string) => teamProblemStatus(subs.submissions, problemId),
     [subs.submissions]
   )
+  const mySolvedProblemIds = useMemo(
+    () => ownSolvedProblemIds(subs.submissions, arena.problems),
+    [subs.submissions, arena.problems]
+  )
+  const rainBursts = useBalloonRain(subs.submissions, arena.problems, subs.loaded && !arena.isLoading)
   const accepted = arena.problems.filter((p) => statusOf(p.id).kind === "accepted").length
 
   const contest = arena.contest
@@ -196,6 +204,9 @@ export function ContestArenaPage() {
                     contestId={id}
                     contestActive={contest.status === "ACTIVE"}
                     myTeamId={teamId}
+                    problems={arena.problems}
+                    mySolvedProblemIds={mySolvedProblemIds}
+                    submissionsReady={!subs.isLoading}
                   />
                 </TabsContent>
               </Tabs>
@@ -212,6 +223,7 @@ export function ContestArenaPage() {
       />
 
       <Footer />
+      <BalloonRain bursts={rainBursts} />
     </div>
   )
 }

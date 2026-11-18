@@ -219,3 +219,104 @@
   animation: blink 1s infinite;
   color: oklch(0.52 0.14 150);
 }
+
+/* Globos del ranking: solo transform/opacity. El globo se infla desde la punta, sube con balanceo,
+   rebota al asentarse y suelta confeti; la fila recibe un destello. */
+.balloon-svg { display: block; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.18)); }
+.balloon-float { display: block; width: 100%; height: 100%; transform-origin: 50% 90%; }
+.balloon-cord { transform-origin: 20px 49px; }
+
+.balloon-new { z-index: 1; animation: balloon-grow 1.5s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: 50% 90%; }
+.balloon-new .balloon-float { animation: balloon-sway 2.4s ease-in-out 0.7s 1 both; }
+.balloon-new .balloon-cord { animation: balloon-cord 0.9s ease-in-out 0.3s 3 both; }
+.balloon-new--mine { animation-name: balloon-grow-mine; }
+
+@keyframes balloon-grow {
+  0%   { transform: translateY(22px) scale(0.05); opacity: 0; }
+  12%  { opacity: 1; }
+  45%  { transform: translateY(-9px) scale(1.28); animation-timing-function: ease-in-out; }
+  62%  { transform: translateY(2px) scale(0.93, 1.05); }
+  78%  { transform: translateY(-2px) scale(1.04, 0.98); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes balloon-grow-mine {
+  0%   { transform: translateY(26px) scale(0.05); opacity: 0; }
+  12%  { opacity: 1; }
+  45%  { transform: translateY(-14px) scale(1.55); animation-timing-function: ease-in-out; }
+  62%  { transform: translateY(3px) scale(0.92, 1.08); }
+  78%  { transform: translateY(-3px) scale(1.06, 0.97); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes balloon-sway {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(7deg); }
+  45% { transform: rotate(-5deg); }
+  70% { transform: rotate(3deg); }
+  85% { transform: rotate(-1.5deg); }
+}
+@keyframes balloon-cord {
+  0%, 100% { transform: skewX(0deg) scaleY(1); }
+  33% { transform: skewX(14deg) scaleY(0.96); }
+  66% { transform: skewX(-14deg) scaleY(1.03); }
+}
+
+.balloon-burst { position: absolute; left: 50%; top: 35%; width: 0; height: 0; pointer-events: none; }
+.balloon-burst i {
+  position: absolute; left: -2px; top: -2px; width: 5px; height: 5px; border-radius: 1px;
+  background: var(--balloon-color); opacity: 0;
+  animation: balloon-confetti 0.95s cubic-bezier(0.1, 0.8, 0.3, 1) 0.28s both;
+}
+.balloon-burst i:nth-child(3n) { width: 4px; height: 4px; border-radius: 50%; }
+.balloon-burst i:nth-child(3n + 1) { height: 7px; width: 3px; }
+.balloon-new--mine .balloon-burst i { width: 6px; height: 6px; }
+@keyframes balloon-confetti {
+  0%   { transform: translate(0, 0) scale(0.2) rotate(0deg); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 14px)) scale(1) rotate(260deg); opacity: 0; }
+}
+
+/* Destello suave de la fila con el color del globo nuevo. */
+.balloon-row-flash { position: relative; }
+.balloon-row-flash::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: var(--flash-color); opacity: 0;
+  animation: balloon-flash 1.8s ease-out both;
+}
+@keyframes balloon-flash {
+  0% { opacity: 0; }
+  15% { opacity: 0.28; }
+  100% { opacity: 0; }
+}
+
+@keyframes balloon-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes balloon-fade-flash { 0% { opacity: 0.2; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .balloon-new, .balloon-new--mine { animation: balloon-fade 0.4s ease-out both; }
+  .balloon-new .balloon-float, .balloon-new .balloon-cord { animation: none; }
+  .balloon-burst { display: none; }
+  .balloon-row-flash::after { animation: balloon-fade-flash 1.2s ease-out both; }
+}
+
+/* Lluvia de globos a pantalla completa al conseguir un aceptado: solo transform/opacity. */
+.balloon-rain-item {
+  position: absolute; bottom: 0;
+  animation: balloon-rise var(--rain-duration) cubic-bezier(0.25, 0.1, 0.35, 1) var(--rain-delay) both;
+  will-change: transform, opacity;
+}
+.balloon-rain-sway {
+  width: 100%; height: 100%; transform-origin: 50% 100%;
+  animation: balloon-rain-sway var(--rain-sway) ease-in-out infinite alternate;
+}
+@keyframes balloon-rise {
+  0% { transform: translate3d(0, 25vh, 0) scale(0.7); opacity: 0; }
+  8% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate3d(var(--rain-drift), -130vh, 0) scale(1); opacity: 0.9; }
+}
+@keyframes balloon-rain-sway {
+  from { transform: translateX(-12px) rotate(-6deg); }
+  to { transform: translateX(12px) rotate(6deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .balloon-rain { display: none; }
+}

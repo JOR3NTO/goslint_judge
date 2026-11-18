@@ -89,13 +89,14 @@ export function teamScore(
   state: MockState,
   team: TeamRecord,
   now: number
-): { score: number; penaltyTime: number } {
+): { score: number; penaltyTime: number; solvedProblemIds: string[] } {
   const contest = state.contests.find((c) => c.id === team.contestId)
-  if (!contest) return { score: 0, penaltyTime: 0 }
+  if (!contest) return { score: 0, penaltyTime: 0, solvedProblemIds: [] }
   const startMs = Date.parse(contest.startTime)
 
   let score = 0
   let penaltyTime = 0
+  const solved: { problemId: string; at: number }[] = []
 
   for (const cp of state.contestProblems.filter((p) => p.contestId === team.contestId)) {
     const problem = state.problems.find((p) => p.id === cp.problemId)
@@ -109,6 +110,7 @@ export function teamScore(
       if (resolved.status !== "JUDGED") continue
       if (resolved.verdict === "ACCEPTED") {
         score += cp.points
+        solved.push({ problemId: cp.problemId, at: Date.parse(attempt.submittedAt) })
         const minutes = Math.max(0, Math.floor((Date.parse(attempt.submittedAt) - startMs) / MIN_MS))
         penaltyTime += minutes + wrong * ICPC_WRONG_ATTEMPT_PENALTY_MIN
         break
@@ -117,11 +119,12 @@ export function teamScore(
     }
   }
 
-  return { score, penaltyTime }
+  solved.sort((a, b) => a.at - b.at)
+  return { score, penaltyTime, solvedProblemIds: solved.map((x) => x.problemId) }
 }
 
 export function toTeamDTO(state: MockState, team: TeamRecord, now: number): TeamDTO {
-  const { score, penaltyTime } = teamScore(state, team, now)
+  const { score, penaltyTime, solvedProblemIds } = teamScore(state, team, now)
   return {
     id: team.id,
     contestId: team.contestId,
@@ -131,6 +134,7 @@ export function toTeamDTO(state: MockState, team: TeamRecord, now: number): Team
     penaltyTime,
     createdAt: team.createdAt,
     members: team.members.map((m) => ({ ...m })),
+    solvedProblemIds,
   }
 }
 

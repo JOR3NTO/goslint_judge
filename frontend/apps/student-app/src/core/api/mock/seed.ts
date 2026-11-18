@@ -355,7 +355,7 @@ export function createSeedState(now: number): MockState {
     { contest: 4, problems: [3, 4, 6], points: [150, 200, 100] },
     { contest: 5, problems: [7, 8, 1], points: [100, 300, 150] },
   ]
-  const BALLOONS = ["red", "blue", "yellow", "green", "orange"]
+  const BALLOONS = ["#E53935", "#1E88E5", "#FDD835", "#43A047", "#FB8C00"]
   const LETTERS = ["A", "B", "C", "D", "E"]
 
   const contestProblems: ContestProblemRecord[] = []

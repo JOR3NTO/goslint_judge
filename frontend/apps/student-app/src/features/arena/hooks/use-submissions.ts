@@ -21,6 +21,8 @@ export interface UseSubmissionsReturn {
   /** Envíos del equipo, más reciente primero. */
   submissions: SubmissionDTO[]
   isLoading: boolean
+  /** El historial del equipo ya se cargó al menos una vez (`isLoading` arranca en false antes de pedirlo). */
+  loaded: boolean
   /** Error al cargar el historial. */
   error: string | null
   reload: () => void
@@ -54,6 +56,7 @@ function sortRecentFirst(list: SubmissionDTO[]): SubmissionDTO[] {
 export function useSubmissions(teamId: string | null): UseSubmissionsReturn {
   const [submissions, setSubmissions] = useState<SubmissionDTO[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
 
@@ -70,6 +73,7 @@ export function useSubmissions(teamId: string | null): UseSubmissionsReturn {
   useEffect(() => {
     if (!teamId) {
       setSubmissions([])
+      setLoaded(false)
       return
     }
     let cancelled = false
@@ -79,7 +83,10 @@ export function useSubmissions(teamId: string | null): UseSubmissionsReturn {
     service
       .getTeamSubmissions(teamId)
       .then((list) => {
-        if (!cancelled) setSubmissions(sortRecentFirst(list))
+        if (!cancelled) {
+          setSubmissions(sortRecentFirst(list))
+          setLoaded(true)
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "No se pudo cargar el historial.")
@@ -219,5 +226,5 @@ export function useSubmissions(teamId: string | null): UseSubmissionsReturn {
     [service, teamId]
   )
 
-  return { submissions, isLoading, error, reload, submit }
+  return { submissions, isLoading, loaded, error, reload, submit }
 }

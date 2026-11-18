@@ -81,6 +81,8 @@ export interface ArenaProblem {
   alias: string
   orderIndex: number
   points: number
+  /** Color del globo (hex #RRGGBB) tal como lo guarda el backend. */
+  balloonColor: string
   /** Título del problema; `null` si el problem-service no respondió. */
   title: string | null
   /** Valor crudo de `difficult` (800..3500, múltiplos de 100); `null` si no se cargó. */
