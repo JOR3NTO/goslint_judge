@@ -48,6 +48,7 @@ export function LoginPage() {
     formData,
     errors,
     serverError,
+    sessionNotice,
     isLoading,
     handleChange,
     handleSubmit,
@@ -85,6 +86,11 @@ export function LoginPage() {
           </CardHeader>
 
           <CardContent className="space-y-4 pt-4">
+            {sessionNotice && !serverError && (
+              <div role="status" className="p-3 rounded-md bg-warning/10 border border-warning/30 text-foreground text-sm text-center">
+                {sessionNotice}
+              </div>
+            )}
             {serverError && (
               <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30 text-destructive text-sm text-center">
                 {serverError}

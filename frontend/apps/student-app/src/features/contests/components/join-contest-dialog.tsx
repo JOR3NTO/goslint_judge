@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { sanitizeErrorMessage } from "@/core/api/sanitize-error"
 import { Alert, AlertDescription } from "@/shared/ui/primitives/alert"
 import { Button } from "@/shared/ui/primitives/button"
 import {
@@ -93,12 +94,20 @@ export function JoinContestDialog({ open, onOpenChange, contestTitle, onJoin }: 
     } catch (err: unknown) {
       if (err instanceof ContestApiError) {
         const fromBody = err.fieldErrors ?? {}
-        setFieldErrors(fromBody)
-        // Errores de campo que no tienen input en este formulario se muestran como mensaje general.
-        const unmapped = Object.entries(fromBody)
-          .filter(([key]) => key !== FIELD_TEAM && key !== FIELD_PASSWORD)
-          .map(([, msg]) => msg)
-        setServerError(err.serverMessage ?? (unmapped.length > 0 ? unmapped.join(" ") : null) ?? "No se pudo completar la inscripción.")
+        // Solo los campos de este formulario, con el texto saneado.
+        const mapped: Record<string, string> = {}
+        if (fromBody[FIELD_TEAM]) mapped[FIELD_TEAM] = sanitizeErrorMessage(fromBody[FIELD_TEAM], "Revisa el nombre del equipo.")
+        if (fromBody[FIELD_PASSWORD]) mapped[FIELD_PASSWORD] = sanitizeErrorMessage(fromBody[FIELD_PASSWORD], "Revisa la contraseña de la maratón.")
+        setFieldErrors(mapped)
+        // Campos sin input aquí: nunca se vuelcan; se muestra el mensaje del servidor saneado o uno genérico.
+        const hasUnmapped = Object.keys(fromBody).some((key) => key !== FIELD_TEAM && key !== FIELD_PASSWORD)
+        setServerError(
+          err.serverMessage
+            ? sanitizeErrorMessage(err.serverMessage, "No se pudo completar la inscripción.")
+            : hasUnmapped || Object.keys(mapped).length === 0
+              ? "No se pudo completar la inscripción. Revisa los datos."
+              : null
+        )
       } else {
         setServerError("No hay conexión con el servidor. Inténtalo de nuevo.")
       }

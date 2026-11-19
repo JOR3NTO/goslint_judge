@@ -10,6 +10,7 @@
  *   - `{ campo: "mensaje" }`  → `fieldErrors`
  */
 import type { IApiAdapter, ApiResponse } from "@/core/api"
+import { sanitizeErrorMessage } from "@/core/api/sanitize-error"
 import type {
   ContestDTO,
   ContestErrorBody,
@@ -32,7 +33,10 @@ export class ContestApiError extends Error {
   /** Mensaje genérico del backend (cuerpo `{ error: "msg" }`). */
   readonly serverMessage?: string
 
-  constructor(status: number, fieldErrors?: ContestFieldErrors, serverMessage?: string) {
+  constructor(status: number, fieldErrors?: ContestFieldErrors, rawServerMessage?: string) {
+    // Defensa en profundidad: el mensaje del servidor se sanea también aquí.
+    const serverMessage =
+      rawServerMessage === undefined ? undefined : sanitizeErrorMessage(rawServerMessage, "No se pudo completar la operación.")
     super(serverMessage ?? "No se pudo completar la operación.")
     this.name = "ContestApiError"
     this.status = status

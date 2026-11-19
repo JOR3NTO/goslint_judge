@@ -15,6 +15,7 @@
  *   HTTP 423 → { error: "Su cuenta ha sido bloqueada por 15 minutos..." }
  */
 import type { IApiAdapter } from "@/core/api"
+import { sanitizeErrorMessage } from "@/core/api/sanitize-error"
 import type { LoginRequest, LoginResponse, AuthErrorResponse, ValidationErrors } from "../types/auth.types"
 
 /**
@@ -29,7 +30,10 @@ export class AuthApiError extends Error {
     /** Mensaje de error genérico del backend (HTTP 401, 423) */
     readonly serverMessage?: string
 
-    constructor(status: number, fieldErrors?: ValidationErrors, serverMessage?: string) {
+    constructor(status: number, fieldErrors?: ValidationErrors, rawServerMessage?: string) {
+        // Defensa en profundidad: el mensaje del servidor se sanea también aquí.
+        const serverMessage =
+            rawServerMessage === undefined ? undefined : sanitizeErrorMessage(rawServerMessage, "Error de autenticación")
         super(serverMessage ?? "Error de autenticación")
         this.name = "AuthApiError"
         this.status = status

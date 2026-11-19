@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createHttpApi } from "@/core/api"
+import { genericMessageForStatus, sanitizeErrorMessage } from "@/core/api/sanitize-error"
 import { Logo } from "@/shared/ui/logo"
 import { Button } from "@/shared/ui/primitives/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/shared/ui/primitives/card"
@@ -12,12 +13,50 @@ import { Label } from "@/shared/ui/primitives/label"
 import { Checkbox } from "@/shared/ui/primitives/checkbox"
 import { Building2, Eye, EyeOff, Github, Mail, User, ArrowLeft, Check } from "lucide-react"
 
+/** Campos del formulario que pueden recibir un error de validación del backend (400). */
+const REGISTER_FIELDS = ["firstName", "lastName", "username", "email", "institution", "password"] as const
+type RegisterField = (typeof REGISTER_FIELDS)[number]
+type RegisterFieldErrors = Partial<Record<RegisterField, string>>
+
+/** Copia de ValidationRules.PASSWORD_PATTERN del backend. */
+const PASSWORD_PATTERN = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/
+
+const FIELD_FALLBACK: Record<RegisterField, string> = {
+  firstName: "Revisa el nombre.",
+  lastName: "Revisa el apellido.",
+  username: "Revisa el nombre de usuario.",
+  email: "Revisa el correo electrónico.",
+  institution: "Revisa la institución.",
+  password: "La contraseña debe tener al menos 8 caracteres, una mayúscula, un número y un carácter especial.",
+}
+
+/**
+ * Traduce el cuerpo de error del registro a mensajes para la UI. Nunca vuelca el cuerpo
+ * crudo: solo usa textos conocidos (`error`, `message` o un campo del formulario), ya
+ * saneados por el cliente HTTP y vueltos a sanear aquí.
+ */
+function readRegisterError(status: number, body: unknown): { fields: RegisterFieldErrors; general: string | null } {
+  const record = body && typeof body === "object" ? (body as Record<string, unknown>) : {}
+  const fields: RegisterFieldErrors = {}
+  for (const field of REGISTER_FIELDS) {
+    if (typeof record[field] === "string") fields[field] = sanitizeErrorMessage(record[field], FIELD_FALLBACK[field])
+  }
+  const generalRaw = record.error ?? record.message
+  const general =
+    typeof generalRaw === "string"
+      ? sanitizeErrorMessage(generalRaw, genericMessageForStatus(status))
+      : Object.keys(fields).length > 0
+        ? null
+        : "Ocurrió un error al registrarse. Verifica tus datos."
+  return { fields, general }
+}
+
 export function RegisterPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
-  const [institutionError, setInstitutionError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({})
   const [acceptTerms, setAcceptTerms] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -33,17 +72,30 @@ export function RegisterPage() {
     const { id, value } = e.target
     setFormData(prev => ({ ...prev, [id]: value }))
     if (serverError) setServerError(null)
-    if (id === "institution" && institutionError) setInstitutionError(null)
+    if (fieldErrors[id as RegisterField]) {
+      setFieldErrors(prev => {
+        const next = { ...prev }
+        delete next[id as RegisterField]
+        return next
+      })
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setServerError(null)
-    setInstitutionError(null)
+    setFieldErrors({})
 
     if (!acceptTerms) {
       setServerError("Debes aceptar los Términos de Servicio y la Política de Privacidad para continuar.")
+      setIsLoading(false)
+      return
+    }
+
+    // Misma regla que el backend (ValidationRules.PASSWORD_PATTERN): se avisa sin enviar nada.
+    if (!PASSWORD_PATTERN.test(formData.password)) {
+      setFieldErrors({ password: FIELD_FALLBACK.password })
       setIsLoading(false)
       return
     }
@@ -62,22 +114,10 @@ export function RegisterPage() {
       })
 
       if (!response.ok) {
-        const errorData = response.data
-        console.error("Backend error response:", errorData)
-        if (typeof errorData?.institution === "string") {
-          // Error de validación de campo: se muestra junto al campo institución.
-          setInstitutionError(errorData.institution)
-          const otherMessages = Object.entries(errorData)
-            .filter(([field, value]) => field !== "institution" && typeof value === "string")
-            .map(([, value]) => value as string)
-          setServerError(otherMessages.length > 0 ? otherMessages.join(" ") : null)
-        } else {
-          setServerError(
-            (typeof errorData?.message === "string" && errorData.message) ||
-            (typeof errorData?.error === "string" && errorData.error) ||
-            (errorData ? JSON.stringify(errorData) : "Ocurrió un error al registrarse. Verifica tus datos.")
-          )
-        }
+        // Errores por campo junto a su input; nada del cuerpo crudo llega a la UI.
+        const { fields, general } = readRegisterError(response.status, response.data)
+        setFieldErrors(fields)
+        setServerError(general)
         setIsLoading(false)
         return
       }
@@ -85,8 +125,7 @@ export function RegisterPage() {
       // Registro exitoso, redirigir al login
       setIsLoading(false)
       router.push("/login?registered=true")
-    } catch (error: any) {
-      console.error("Error en registro:", error)
+    } catch {
       setServerError("Hubo un error de conexión con el servidor. Por favor, intenta de nuevo.")
       setIsLoading(false)
     }
@@ -151,6 +190,7 @@ export function RegisterPage() {
                     onChange={handleChange}
                     required
                   />
+                  <FieldError id="firstName-error" message={fieldErrors.firstName} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName" className="text-foreground">
@@ -165,6 +205,7 @@ export function RegisterPage() {
                     onChange={handleChange}
                     required
                   />
+                  <FieldError id="lastName-error" message={fieldErrors.lastName} />
                 </div>
               </div>
 
@@ -184,6 +225,7 @@ export function RegisterPage() {
                     required
                   />
                 </div>
+                <FieldError id="username-error" message={fieldErrors.username} />
               </div>
 
               <div className="space-y-2">
@@ -202,6 +244,7 @@ export function RegisterPage() {
                     required
                   />
                 </div>
+                <FieldError id="email-error" message={fieldErrors.email} />
               </div>
 
               <div className="space-y-2">
@@ -218,15 +261,11 @@ export function RegisterPage() {
                     className="pl-10 bg-background border-input"
                     value={formData.institution}
                     onChange={handleChange}
-                    aria-invalid={institutionError ? true : undefined}
-                    aria-describedby={institutionError ? "institution-error" : undefined}
+                    aria-invalid={fieldErrors.institution ? true : undefined}
+                    aria-describedby={fieldErrors.institution ? "institution-error" : undefined}
                   />
                 </div>
-                {institutionError && (
-                  <p id="institution-error" className="text-xs text-destructive">
-                    {institutionError}
-                  </p>
-                )}
+                <FieldError id="institution-error" message={fieldErrors.institution} />
               </div>
 
               <div className="space-y-2">
@@ -255,6 +294,7 @@ export function RegisterPage() {
                     )}
                   </button>
                 </div>
+                <FieldError id="password-error" message={fieldErrors.password} />
                 {/* Password Requirements */}
                 {formData.password && (
                   <div className="grid grid-cols-2 gap-1 mt-2">
@@ -349,5 +389,14 @@ export function RegisterPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null
+  return (
+    <p id={id} role="alert" className="text-xs text-destructive">
+      {message}
+    </p>
   )
 }

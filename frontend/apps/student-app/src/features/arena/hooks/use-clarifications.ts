@@ -1,7 +1,8 @@
 "use client"
 
+import { errorToUserMessage } from "@/core/api/sanitize-error"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { createClarificationsService } from "../services/clarifications-service"
+import { createClarificationsService, isVisibleToStudent } from "../services/clarifications-service"
 import type { ClarificationDTO } from "../types/arena.types"
 
 export interface UseClarificationsReturn {
@@ -18,7 +19,10 @@ export interface UseClarificationsReturn {
   ask: (contestProblemId: string, question: string) => Promise<ClarificationDTO>
 }
 
-/** Aclaraciones de una maratón con alta de preguntas del equipo. */
+/**
+ * Aclaraciones visibles para el estudiante (PUBLIC y las de su equipo, según `mine`), de la
+ * más reciente a la más antigua, y alta de preguntas del equipo. El GET exige sesión.
+ */
 export function useClarifications(contestId: string): UseClarificationsReturn {
   const [items, setItems] = useState<ClarificationDTO[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -39,7 +43,7 @@ export function useClarifications(contestId: string): UseClarificationsReturn {
         }
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "No se pudieron cargar las aclaraciones.")
+        if (!cancelled) setError(errorToUserMessage(err, "No se pudieron cargar las aclaraciones."))
       })
       .finally(() => {
         if (!cancelled) setLoaded(true)
@@ -58,7 +62,10 @@ export function useClarifications(contestId: string): UseClarificationsReturn {
   const ask = useCallback(
     async (contestProblemId: string, question: string) => {
       const created = await service.ask(contestProblemId, question)
-      setItems((prev) => [created, ...prev.filter((item) => item.id !== created.id)])
+      // El POST devuelve PENDING, PRIVATE y mine:true; pasa por el mismo filtro que la lista.
+      if (isVisibleToStudent(created)) {
+        setItems((prev) => [created, ...prev.filter((item) => item.id !== created.id)])
+      }
       return created
     },
     [service]

@@ -18,10 +18,15 @@ import { registerSubmissionRoutes } from "./routes-submissions"
 import { clearStoredState, defaultStorage, loadState, saveState, type StorageLike } from "./db"
 import type { MockState } from "./model"
 import { sleep } from "./util"
-
-/** Claves de localStorage de los tokens (las mismas que escribe use-login). */
-const AUTH_TOKEN_KEY = "auth_token"
-const REFRESH_TOKEN_KEY = "refresh_token"
+import {
+  clearTokens,
+  expireSession,
+  getValidAccessToken,
+  isPublicAuthPath,
+  isSessionFailure,
+  recoverFromSessionFailure,
+} from "@/core/auth/session"
+import { genericMessageForStatus, sanitizeErrorBody, sanitizeErrorMessage } from "../sanitize-error"
 
 export interface MockServerOptions {
   /** Reloj inyectable (epoch ms). Por defecto `Date.now`. */
@@ -31,16 +36,6 @@ export interface MockServerOptions {
   /** Almacenamiento del estado. `null` = solo memoria. Por defecto sessionStorage. */
   storage?: StorageLike | null
 }
-
-/** Rutas que van sin token, igual que PUBLIC_AUTH_PATHS en http-client.ts. */
-const PUBLIC_AUTH_PATHS = [
-  "/v1/auth/login",
-  "/v1/auth/register",
-  "/v1/auth/refresh",
-  "/v1/auth/check-username",
-]
-
-const LOGIN_PATH = "/login"
 
 const STATUS_TEXT: Record<number, string> = {
   400: "Bad Request",
@@ -53,25 +48,6 @@ const STATUS_TEXT: Record<number, string> = {
   500: "Internal Server Error",
 }
 
-function readLocalToken(key: string): string | null {
-  if (typeof window === "undefined") return null
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-
-function clearLocalSession(): void {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.removeItem(AUTH_TOKEN_KEY)
-    localStorage.removeItem(REFRESH_TOKEN_KEY)
-  } catch {
-    // Almacenamiento bloqueado: nada que limpiar.
-  }
-}
-
 function errorText(body: unknown): string | undefined {
   if (!body || typeof body !== "object") return undefined
   const record = body as Record<string, unknown>
@@ -81,15 +57,17 @@ function errorText(body: unknown): string | undefined {
 }
 
 function toApiResponse<T>(response: MockResponse): ApiResponse<T> {
-  const data = (response.body ?? null) as T
   if (response.status >= 200 && response.status < 300) {
-    return { data, status: response.status, ok: true }
+    return { data: (response.body ?? null) as T, status: response.status, ok: true }
   }
+  // Mismo saneado que HttpApiAdapter: solo textos seguros de primer nivel.
+  const body = sanitizeErrorBody(response.body, response.status)
+  const fallback = STATUS_TEXT[response.status] ? genericMessageForStatus(response.status) : `Error ${response.status}`
   return {
-    data,
+    data: body as T,
     status: response.status,
     ok: false,
-    error: errorText(response.body) ?? STATUS_TEXT[response.status] ?? `Error ${response.status}`,
+    error: sanitizeErrorMessage(errorText(body), fallback),
   }
 }
 
@@ -134,7 +112,8 @@ export class MockServer implements IApiAdapter {
     method: HttpMethod,
     rawPath: string,
     body: unknown,
-    options?: RequestOptions
+    options?: RequestOptions,
+    retried = false
   ): Promise<ApiResponse<T>> {
     if (this.latency) {
       const { minMs, maxMs } = this.latency
@@ -145,8 +124,10 @@ export class MockServer implements IApiAdapter {
     const path = queryIndex === -1 ? rawPath : rawPath.slice(0, queryIndex)
     const query = new URLSearchParams(queryIndex === -1 ? "" : rawPath.slice(queryIndex + 1))
 
-    // Mismo criterio que HttpApiAdapter: el token guardado solo va en rutas no públicas.
-    const storedToken = PUBLIC_AUTH_PATHS.includes(path) ? null : readLocalToken(AUTH_TOKEN_KEY)
+    // Mismo criterio que HttpApiAdapter: el token guardado (comprobado su `exp` y renovado
+    // si hace falta) solo va en rutas no públicas y si el llamador no trae su cabecera.
+    const managed = !isPublicAuthPath(path) && !options?.headers?.Authorization
+    const storedToken = managed ? await getValidAccessToken() : null
     const headers: Record<string, string> = {
       ...(storedToken ? { Authorization: `Bearer ${storedToken}` } : {}),
       ...(options?.headers ?? {}),
@@ -156,10 +137,11 @@ export class MockServer implements IApiAdapter {
     const response = this.dispatch(method, path, query, body, authorization)
     saveState(this.storage, this.state)
 
-    // Sesión caducada o revocada con token: igual que HttpApiAdapter, se limpia y se va a login.
-    if (response.status === 401 && storedToken && typeof window !== "undefined") {
-      clearLocalSession()
-      window.location.assign(LOGIN_PATH)
+    // Sesión inválida: igual que HttpApiAdapter, se renueva una vez o se cierra con aviso.
+    if (storedToken && isSessionFailure(response.status, storedToken)) {
+      const fresh = retried ? null : await recoverFromSessionFailure(storedToken)
+      if (fresh) return this.request<T>(method, rawPath, body, options, true)
+      if (retried) expireSession()
     }
 
     return toApiResponse<T>(response)
@@ -213,6 +195,6 @@ export function getMockServer(): MockServer {
  */
 export function resetMockData(): void {
   clearStoredState(defaultStorage())
-  clearLocalSession()
+  clearTokens()
   sharedServer = null
 }

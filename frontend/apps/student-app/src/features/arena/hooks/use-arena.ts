@@ -1,5 +1,6 @@
 "use client"
 
+import { errorToUserMessage } from "@/core/api/sanitize-error"
 import { useCallback, useEffect, useState } from "react"
 import {
   createContestsService,
@@ -59,7 +60,7 @@ export function useArena(contestId: string): UseArenaReturn {
         base = await service.getById(contestId)
       } catch (err: unknown) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "No se pudo cargar la maratón.")
+          setError(errorToUserMessage(err, "No se pudo cargar la maratón."))
           setIsLoading(false)
         }
         return

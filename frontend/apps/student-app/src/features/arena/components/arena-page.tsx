@@ -173,7 +173,6 @@ export function ContestArenaPage() {
                   <ClarificationsTab
                     contestId={id}
                     problems={arena.problems}
-                    myTeamId={teamId}
                     initialProblemId={selected?.id ?? null}
                   />
                 </TabsContent>

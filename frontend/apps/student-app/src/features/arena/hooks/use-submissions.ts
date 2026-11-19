@@ -1,8 +1,9 @@
 "use client"
 
+import { errorToUserMessage } from "@/core/api/sanitize-error"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { env } from "@/core/config/env"
-import { readContestSession } from "@/features/contests"
+import { getValidAccessToken, hasRecoverableSession } from "@/core/auth/session"
 import { createArenaService } from "../services/arena-service"
 import type {
   SubmissionDTO,
@@ -82,7 +83,7 @@ export function useSubmissions(teamId: string | null): UseSubmissionsReturn {
         if (!cancelled) setSubmissions(sortRecentFirst(list))
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "No se pudo cargar el historial.")
+        if (!cancelled) setError(errorToUserMessage(err, "No se pudo cargar el historial."))
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)
@@ -98,8 +99,7 @@ export function useSubmissions(teamId: string | null): UseSubmissionsReturn {
   // WebSocket en tiempo real. En modo mock no se abre: el polling de abajo hace la misma función.
   useEffect(() => {
     if (!teamId || env.MOCK_ENABLED) return
-    const token = readContestSession()?.token
-    if (!token || typeof WebSocket === "undefined") return
+    if (!hasRecoverableSession() || typeof WebSocket === "undefined") return
 
     let disposed = false
     let socket: WebSocket | null = null
@@ -140,11 +140,16 @@ export function useSubmissions(teamId: string | null): UseSubmissionsReturn {
       if (disposed) return
       const delay = Math.min(WS_MAX_BACKOFF_MS, 1000 * 2 ** attemptsSinceOpen)
       attemptsSinceOpen += 1
-      retryTimer = setTimeout(connect, delay)
+      retryTimer = setTimeout(() => void connect(), delay)
     }
 
-    function connect() {
+    async function connect() {
       if (disposed) return
+      // Cada (re)conexión usa un token vigente: se mira `exp` y se renueva si caducó.
+      // Si la sesión no se puede renovar, getValidAccessToken la cierra (aviso + /login)
+      // y aquí simplemente no se reconecta.
+      const token = await getValidAccessToken()
+      if (disposed || !token) return
       try {
         socket = new WebSocket(env.SUBMISSION_WS_URL, [WS_SUBPROTOCOL, `bearer.${token}`])
       } catch {
@@ -166,7 +171,7 @@ export function useSubmissions(teamId: string | null): UseSubmissionsReturn {
       }
     }
 
-    connect()
+    void connect()
 
     return () => {
       disposed = true

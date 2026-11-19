@@ -1,5 +1,6 @@
 "use client"
 
+import { errorToUserMessage } from "@/core/api/sanitize-error"
 import { useCallback, useEffect, useState } from "react"
 import { ContestApiError } from "../services/contests-service"
 import { createContestsService } from "../services/contests-api"
@@ -47,7 +48,7 @@ function describeError(err: unknown): string {
   if (err instanceof ContestApiError && err.status === 404) {
     return "Esta maratón no existe o ya no está disponible."
   }
-  return err instanceof Error ? err.message : "No se pudo cargar la maratón."
+  return errorToUserMessage(err, "No se pudo cargar la maratón.")
 }
 
 /**

@@ -1,5 +1,6 @@
 "use client"
 
+import { errorToUserMessage } from "@/core/api/sanitize-error"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { createContestsService } from "@/features/contests"
 import type { ProblemDTO } from "@/features/contests"
@@ -47,11 +48,7 @@ export function useProblemDetail(problemId: string | null): UseProblemDetailRetu
       if (problemRes.status === "rejected") {
         setProblem(null)
         setSamples([])
-        setError(
-          problemRes.reason instanceof Error
-            ? problemRes.reason.message
-            : "No se pudo cargar el problema."
-        )
+        setError(errorToUserMessage(problemRes.reason, "No se pudo cargar el problema."))
       } else {
         setProblem(problemRes.value)
         setSamples(

@@ -1,5 +1,6 @@
 "use client"
 
+import { errorToUserMessage } from "@/core/api/sanitize-error"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { env } from "@/core/config/env"
 import {
@@ -62,7 +63,7 @@ export function useScoreboard(contestId: string, autoRefresh: boolean): UseScore
         setUpdatedAt(Date.now())
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "No se pudo cargar el ranking.")
+        if (!cancelled) setError(errorToUserMessage(err, "No se pudo cargar el ranking."))
       })
       .finally(() => {
         if (cancelled) return

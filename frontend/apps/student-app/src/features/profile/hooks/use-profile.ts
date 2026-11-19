@@ -1,8 +1,9 @@
 "use client"
 
+import { errorToUserMessage } from "@/core/api/sanitize-error"
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { AUTH_TOKEN_KEY } from "@/shared/hooks/use-session"
+import { clearTokens, readAccessToken } from "@/core/auth/session"
 import { createProfileApi } from "../services/profile-api"
 import { ProfileApiError, ProfileService } from "../services/profile-service"
 import type { ProfileResult } from "../types/profile.types"
@@ -27,7 +28,7 @@ export function useProfile(): UseProfileReturn {
 
   useEffect(() => {
     let cancelled = false
-    const token = localStorage.getItem(AUTH_TOKEN_KEY)
+    const token = readAccessToken()
 
     if (!token) {
       router.replace("/login")
@@ -45,12 +46,11 @@ export function useProfile(): UseProfileReturn {
       .catch((err: unknown) => {
         if (cancelled) return
         if (err instanceof ProfileApiError && err.isUnauthorized) {
-          localStorage.removeItem(AUTH_TOKEN_KEY)
-          localStorage.removeItem("refresh_token")
+          clearTokens()
           router.replace("/login")
           return
         }
-        setError(err instanceof Error ? err.message : "No se pudo cargar tu perfil.")
+        setError(errorToUserMessage(err, "No se pudo cargar tu perfil."))
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)

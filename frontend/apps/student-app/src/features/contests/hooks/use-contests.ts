@@ -1,5 +1,6 @@
 "use client"
 
+import { errorToUserMessage } from "@/core/api/sanitize-error"
 import { useCallback, useEffect, useState } from "react"
 import { createContestsService } from "../services/contests-api"
 import type { ContestDTO, ContestListItem } from "../types/contest.types"
@@ -39,7 +40,7 @@ export function useContests(): UseContestsReturn {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "No se pudieron cargar las maratones.")
+          setError(errorToUserMessage(err, "No se pudieron cargar las maratones."))
         }
       })
       .finally(() => {

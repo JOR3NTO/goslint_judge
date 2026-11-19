@@ -1,6 +1,6 @@
 "use client"
 
-import { AUTH_TOKEN_KEY } from "@/shared/hooks/use-session"
+import { hasRecoverableSession, readAccessToken } from "@/core/auth/session"
 
 export interface ContestSession {
   token: string
@@ -9,20 +9,22 @@ export interface ContestSession {
 }
 
 /**
- * Lee la sesión guardada por use-login. Devuelve `null` si no hay token,
- * si localStorage no está disponible o si el JWT está mal formado.
+ * Lee la sesión guardada por use-login. Devuelve `null` si no hay token, si
+ * localStorage no está disponible, si el JWT está mal formado o si ya caducó y no
+ * hay refresh token con el que renovarlo (sesión irrecuperable).
+ *
+ * Si el access token caducó pero hay refresh token, se devuelve igual: `userId` no
+ * cambia al renovar, y quien llame al backend debe pedir el token con
+ * `getValidAccessToken()` (core/auth/session), que lo renueva. No uses `token` de aquí
+ * para abrir conexiones: puede estar caducado.
  *
  * La firma NO se verifica: solo se usa para pedir datos al backend, que
  * es quien autoriza. Misma lógica que features/profile/utils/decode-jwt.ts
  * (no se importa desde allí para respetar el encapsulamiento de la feature).
  */
 export function readContestSession(): ContestSession | null {
-  let token: string | null = null
-  try {
-    token = localStorage.getItem(AUTH_TOKEN_KEY)
-  } catch {
-    return null
-  }
+  if (!hasRecoverableSession()) return null
+  const token = readAccessToken()
   if (!token) return null
 
   const userId = readSubClaim(token)

@@ -11,31 +11,11 @@
 import { useCallback, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createHttpApi } from "@/core/api"
+import { clearTokens, readAccessToken } from "@/core/auth/session"
 import { AuthService } from "../services/auth-service"
-
-/** Claves de localStorage. Deben coincidir con use-login.ts y use-session.ts. */
-const AUTH_TOKEN_KEY = "auth_token"
-const REFRESH_TOKEN_KEY = "refresh_token"
 
 /** Ruta de destino tras cerrar sesión. */
 const POST_LOGOUT_REDIRECT = "/login"
-
-function readToken(): string | null {
-  try {
-    return localStorage.getItem(AUTH_TOKEN_KEY)
-  } catch {
-    return null
-  }
-}
-
-function clearTokens(): void {
-  try {
-    localStorage.removeItem(AUTH_TOKEN_KEY)
-    localStorage.removeItem(REFRESH_TOKEN_KEY)
-  } catch {
-    // Almacenamiento no disponible: no hay nada que borrar.
-  }
-}
 
 export function useLogout() {
   const router = useRouter()
@@ -45,7 +25,7 @@ export function useLogout() {
     if (isLoggingOut) return
     setIsLoggingOut(true)
 
-    const token = readToken()
+    const token = readAccessToken()
     try {
       if (token) {
         await new AuthService(createHttpApi()).logout(token)

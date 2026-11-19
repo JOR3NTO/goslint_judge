@@ -11,7 +11,7 @@ import { uid } from "./util"
 
 /** Clave versionada de sessionStorage. Si cambia el esquema, subir la versión. */
 export const MOCK_STORAGE_KEY = "goslint:mock-db:v1"
-export const MOCK_SCHEMA_VERSION = 1
+export const MOCK_SCHEMA_VERSION = 2
 
 /** Estudiante demo: credenciales documentadas en frontend/README.md. */
 export const DEMO_STUDENT_EMAIL = "estudiante@uceva.edu.co"
@@ -100,12 +100,18 @@ export interface SubmissionRecord {
 
 export interface ClarificationRecord {
   id: string
-  /** Id de `ContestProblemRecord` (la ruta del backend usa el id de la relación). */
-  contestProblemId: string
-  teamId: string
-  question: string
+  contestId: string
+  /** Id de `ContestProblemRecord` (la ruta del backend usa el id de la relación). `null` en anuncios generales. */
+  contestProblemId: string | null
+  /** Equipo que preguntó (dato interno del mock). `null` en anuncios del juez. */
+  teamId: string | null
+  kind: "QUESTION" | "ANNOUNCEMENT"
+  /** `null` en anuncios. */
+  question: string | null
+  /** Respuesta, o el texto del anuncio. */
   answer: string | null
   status: "PENDING" | "ANSWERED"
+  visibility: "PRIVATE" | "PUBLIC"
   createdAt: string
   answeredAt: string | null
 }

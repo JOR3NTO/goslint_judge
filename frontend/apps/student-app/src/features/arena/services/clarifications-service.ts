@@ -30,12 +30,22 @@ function toError(response: ApiResponse<unknown>): ArenaApiError {
   return new ArenaApiError(response.status, serverMessage)
 }
 
+/** Regla ICPC: el estudiante ve las públicas y las de su equipo; nada más. */
+export function isVisibleToStudent(item: ClarificationDTO): boolean {
+  return item.visibility === "PUBLIC" || item.mine === true
+}
+
 export class ClarificationsService {
   constructor(private api: IApiAdapter) {}
 
-  /** `GET /v1/contests/{contestId}/clarifications` — todas las aclaraciones de la maratón (pública), más reciente primero. */
+  /**
+   * `GET /v1/contests/{contestId}/clarifications` — exige token. El servidor devuelve las
+   * PUBLIC y las del equipo del usuario, más reciente primero. Aun así se filtra aquí
+   * (defensa en el cliente): nunca se entrega una privada que no sea `mine`.
+   */
   async getByContest(contestId: string): Promise<ClarificationDTO[]> {
-    return this.unwrap(await this.api.get<ClarificationDTO[]>(`/v1/contests/${contestId}/clarifications`))
+    const list = this.unwrap(await this.api.get<ClarificationDTO[]>(`/v1/contests/${contestId}/clarifications`))
+    return Array.isArray(list) ? list.filter(isVisibleToStudent) : []
   }
 
   /**

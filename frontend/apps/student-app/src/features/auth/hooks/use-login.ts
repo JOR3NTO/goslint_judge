@@ -25,9 +25,11 @@
  */
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { createHttpApi } from "@/core/api"
+import { sanitizeErrorMessage } from "@/core/api/sanitize-error"
+import { consumeSessionNotice, storeTokens } from "@/core/auth/session"
 import { DEMO_STUDENT_EMAIL, DEMO_STUDENT_PASSWORD } from "@/core/api/mock"
 import { AuthService, AuthApiError } from "../services/auth-service"
 
@@ -50,6 +52,8 @@ interface UseLoginReturn {
   errors: LoginFormErrors
   /** Error global del servidor (credenciales incorrectas, cuenta bloqueada, red). */
   serverError: string | null
+  /** Aviso informativo, p. ej. "Tu sesión expiró, vuelve a iniciar sesión". */
+  sessionNotice: string | null
   /** Indica si hay una petición en curso al backend. */
   isLoading: boolean
   /** Handler genérico para inputs controlados. Usa el atributo `name` del input. */
@@ -61,19 +65,6 @@ interface UseLoginReturn {
 }
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
-
-/**
- * Clave de localStorage donde se guarda el access token.
- * El HttpApiAdapter (core/api/http-client.ts) ya lee de esta misma clave
- * para adjuntar el header Authorization: Bearer <token> en cada request.
- */
-const AUTH_TOKEN_KEY = "auth_token"
-
-/**
- * Clave de localStorage donde se guarda el refresh token.
- * Se usará cuando se implemente el endpoint de refresh en el backend.
- */
-const REFRESH_TOKEN_KEY = "refresh_token"
 
 /** Ruta de destino después de un login exitoso. */
 const POST_LOGIN_REDIRECT = "/contests"
@@ -115,6 +106,12 @@ export function useLogin(): UseLoginReturn {
   const [errors, setErrors] = useState<LoginFormErrors>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null)
+
+  // Aviso que deja la app al cerrar una sesión caducada (se lee una sola vez).
+  useEffect(() => {
+    setSessionNotice(consumeSessionNotice())
+  }, [])
 
   // ── onChange handler ──────────────────────────────────────────────────────
 
@@ -144,6 +141,7 @@ export function useLogin(): UseLoginReturn {
     async (credentials: LoginFormData) => {
       setIsLoading(true)
       setServerError(null)
+      setSessionNotice(null)
       setErrors({})
 
       try {
@@ -155,9 +153,8 @@ export function useLogin(): UseLoginReturn {
           password: credentials.password,
         })
 
-        // Login exitoso → guardar tokens
-        localStorage.setItem(AUTH_TOKEN_KEY, response.accessToken)
-        localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken)
+        // Login exitoso → guardar tokens (core/auth/session es el único que los toca)
+        storeTokens(response.accessToken, response.refreshToken)
 
         // Redirigir a la página principal
         router.push(POST_LOGIN_REDIRECT)
@@ -167,24 +164,32 @@ export function useLogin(): UseLoginReturn {
             // HTTP 400 — Errores de validación del backend
             case 400:
               if (error.fieldErrors) {
-                setErrors(error.fieldErrors as LoginFormErrors)
+                // Solo los campos del formulario, con el texto saneado.
+                const fe = error.fieldErrors
+                const mapped: LoginFormErrors = {}
+                if (fe.email) mapped.email = sanitizeErrorMessage(fe.email, "Revisa el correo electrónico.")
+                if (fe.password) mapped.password = sanitizeErrorMessage(fe.password, "Revisa la contraseña.")
+                setErrors(mapped)
+                if (!mapped.email && !mapped.password) setServerError("Datos inválidos.")
               } else {
-                setServerError(error.serverMessage ?? "Datos inválidos.")
+                setServerError(sanitizeErrorMessage(error.serverMessage, "Datos inválidos."))
               }
               break
 
             // HTTP 401 — Credenciales incorrectas
             case 401:
               setServerError(
-                error.serverMessage ?? "Correo electrónico o contraseña incorrectos."
+                sanitizeErrorMessage(error.serverMessage, "Correo electrónico o contraseña incorrectos.")
               )
               break
 
             // HTTP 423 — Cuenta bloqueada por intentos fallidos
             case 423:
               setServerError(
-                error.serverMessage ??
+                sanitizeErrorMessage(
+                  error.serverMessage,
                   "Tu cuenta ha sido bloqueada temporalmente por múltiples intentos fallidos."
+                )
               )
               break
 
@@ -235,6 +240,7 @@ export function useLogin(): UseLoginReturn {
     formData,
     errors,
     serverError,
+    sessionNotice,
     isLoading,
     handleChange,
     handleSubmit,

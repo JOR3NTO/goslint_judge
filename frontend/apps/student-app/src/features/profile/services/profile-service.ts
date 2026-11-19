@@ -12,6 +12,7 @@
  * (id, email y rol) y se marca `isComplete: false`.
  */
 import type { IApiAdapter } from "@/core/api"
+import { sanitizeErrorMessage } from "@/core/api/sanitize-error"
 import type { ProfileResult, UserProfile } from "../types/profile.types"
 import { decodeJwt } from "../utils/decode-jwt"
 
@@ -19,7 +20,7 @@ export class ProfileApiError extends Error {
   readonly status: number
 
   constructor(status: number, message: string) {
-    super(message)
+    super(sanitizeErrorMessage(message, "No se pudo cargar tu perfil."))
     this.name = "ProfileApiError"
     this.status = status
   }

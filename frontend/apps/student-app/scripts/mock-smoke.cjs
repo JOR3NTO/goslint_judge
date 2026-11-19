@@ -325,13 +325,62 @@ async function main() {
     assert.equal(clash.status, 409)
   })
 
-  await step("aclaraciones: la maratón ACTIVE lista 2 y el equipo puede preguntar (201)", async () => {
+  await step("aclaraciones: el GET exige token y filtra como el servidor (PUBLIC + las del equipo)", async () => {
     const c1 = byTitle("Maratón de Programación UCEVA 2026-II")
-    const list = await server.get(`/v1/contests/${c1.id}/clarifications`)
-    assert.equal(list.data.length, 2)
+    const anonymous = await server.get(`/v1/contests/${c1.id}/clarifications`)
+    assert.equal(anonymous.status, 401)
+
+    const list = await server.get(`/v1/contests/${c1.id}/clarifications`, withToken(token))
+    assert.equal(list.status, 200)
+    const ids = list.data.map((c) => c.id)
+    assert.equal(list.data.length, 4, `ids: ${ids.join(",")}`)
+    assert.ok(!ids.includes(uid(10, 3)), "la privada de otro equipo no debe llegar")
+    for (const c of list.data) assert.ok(c.visibility === "PUBLIC" || c.mine, `visible indebida: ${c.id}`)
+    const sorted = [...list.data].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    assert.deepEqual(ids, sorted.map((c) => c.id), "más reciente primero")
+
+    const announcement = list.data.find((c) => c.kind === "ANNOUNCEMENT")
+    assert.ok(announcement, "falta el anuncio general")
+    assert.equal(announcement.problemId, null)
+    assert.equal(announcement.teamId, null)
+    assert.equal(announcement.question, null)
+    assert.equal(announcement.mine, false)
+
+    const otherPublic = list.data.find((c) => c.id === uid(10, 1))
+    assert.equal(otherPublic.visibility, "PUBLIC")
+    assert.equal(otherPublic.mine, false)
+    assert.equal(otherPublic.teamId, null, "no se expone el equipo de otra pregunta pública")
+
+    const myPending = list.data.find((c) => c.id === uid(10, 2))
+    assert.equal(myPending.mine, true)
+    assert.equal(myPending.status, "PENDING")
+    assert.equal(myPending.visibility, "PRIVATE")
+  })
+
+  await step("aclaraciones: el equipo puede preguntar (201, PENDING, PRIVATE, mine)", async () => {
     const ask = await server.post(`/v1/contest-problems/${CP_A_C1}/clarifications`, { question: "¿Se admiten entradas vacías?" }, withToken(token))
     assert.equal(ask.status, 201)
     assert.equal(ask.data.status, "PENDING")
+    assert.equal(ask.data.visibility, "PRIVATE")
+    assert.equal(ask.data.mine, true)
+    assert.equal(ask.data.kind, "QUESTION")
+  })
+
+  await step("aclaraciones: el servicio del front descarta privadas ajenas aunque el servidor las mande", async () => {
+    const { ClarificationsService } = require(path.join(SRC, "features", "arena", "services", "clarifications-service.ts"))
+    const base = { contestId: "c", problemId: null, teamId: null, kind: "QUESTION", question: "q", answer: "a", status: "ANSWERED", createdAt: "2026-01-01T00:00:00Z", answeredAt: null }
+    const fakeApi = {
+      get: async () => ({
+        ok: true, status: 200,
+        data: [
+          { ...base, id: "pub", visibility: "PUBLIC", mine: false },
+          { ...base, id: "mine", visibility: "PRIVATE", mine: true },
+          { ...base, id: "leak", visibility: "PRIVATE", mine: false },
+        ],
+      }),
+    }
+    const list = await new ClarificationsService(fakeApi).getByContest("c")
+    assert.deepEqual(list.map((c) => c.id), ["pub", "mine"])
   })
 
   await step("un integrante ausente en el equipo no puede ser quitado (404)", async () => {

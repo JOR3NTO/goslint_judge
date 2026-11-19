@@ -97,17 +97,36 @@ export type TeamProblemStatus =
 /** Estado de una aclaración (`ClarificationStatus` del backend). */
 export type ClarificationStatus = "PENDING" | "ANSWERED"
 
+/** Pregunta de un equipo o anuncio del juez. */
+export type ClarificationKind = "QUESTION" | "ANNOUNCEMENT"
+
+/** `PUBLIC`: la ven todos los equipos. `PRIVATE`: solo el equipo que preguntó. */
+export type ClarificationVisibility = "PRIVATE" | "PUBLIC"
+
 /**
- * `ClarificationDTO` de `GET /v1/contests/{id}/clarifications` y `POST /v1/contest-problems/{id}/clarifications` (201).
- * `problemId` es el id de la relación contest-problem (`ArenaProblem.id`), NO el `problemId` del problem-service.
+ * `ClarificationDTO` de `GET /v1/contests/{id}/clarifications` (exige token; el servidor ya
+ * filtra: PUBLIC + las del equipo del usuario) y `POST /v1/contest-problems/{id}/clarifications` (201).
+ * `problemId` es el id de la relación contest-problem (`ArenaProblem.id`), NO el `problemId` del
+ * problem-service; `null` en un anuncio general.
  */
 export interface ClarificationDTO {
   id: string
-  problemId: string
-  teamId: string
-  question: string
+  contestId: string
+  problemId: string | null
+  /**
+   * `null` en anuncios y en las públicas de otros equipos.
+   * NO sirve para saber si es del propio equipo: usar `mine`.
+   */
+  teamId: string | null
+  kind: ClarificationKind
+  /** `null` en anuncios. */
+  question: string | null
+  /** Respuesta del organizador, o el texto del anuncio. */
   answer: string | null
   status: ClarificationStatus
+  visibility: ClarificationVisibility
+  /** `true` si la preguntó el equipo del usuario (lo calcula el servidor). */
+  mine: boolean
   /** ISO-8601 (Instant). */
   createdAt: string
   /** ISO-8601 (Instant); `null` mientras esté pendiente. */

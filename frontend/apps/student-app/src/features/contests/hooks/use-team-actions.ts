@@ -1,5 +1,6 @@
 "use client"
 
+import { errorToUserMessage } from "@/core/api/sanitize-error"
 import { useCallback, useState } from "react"
 import { createContestsService } from "../services/contests-api"
 import { ContestApiError } from "../services/contests-service"
@@ -39,9 +40,7 @@ export function describeTeamError(err: unknown): string {
   }
   return err instanceof TypeError
     ? "No hay conexión con el servidor. Inténtalo de nuevo."
-    : err instanceof Error && err.message
-      ? err.message
-      : "No se pudo completar la operación. Inténtalo de nuevo."
+    : errorToUserMessage(err, "No se pudo completar la operación. Inténtalo de nuevo.")
 }
 
 /**

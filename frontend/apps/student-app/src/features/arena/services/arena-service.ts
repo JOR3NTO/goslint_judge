@@ -7,6 +7,7 @@
  */
 import { createHttpApi } from "@/core/api"
 import type { ApiResponse, IApiAdapter } from "@/core/api"
+import { sanitizeErrorMessage } from "@/core/api/sanitize-error"
 import type {
   SampleDTO,
   SubmissionDTO,
@@ -19,7 +20,10 @@ export class ArenaApiError extends Error {
   /** Mensaje del backend (cuerpo `{ error: "msg" }`), si existe. */
   readonly serverMessage?: string
 
-  constructor(status: number, serverMessage?: string) {
+  constructor(status: number, rawServerMessage?: string) {
+    // Defensa en profundidad: el mensaje del servidor se sanea también aquí.
+    const serverMessage =
+      rawServerMessage === undefined ? undefined : sanitizeErrorMessage(rawServerMessage, "No se pudo completar la operación.")
     super(serverMessage ?? `No se pudo completar la operación (HTTP ${status}).`)
     this.name = "ArenaApiError"
     this.status = status

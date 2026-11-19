@@ -88,28 +88,39 @@ function joinContest(req: MockRequest, ctx: MockContext) {
   return created(toTeamDTO(state, team, now))
 }
 
-function toClarificationDTO(c: ClarificationRecord) {
+/**
+ * DTO del contrato: `teamId` solo se expone en las aclaraciones del propio equipo
+ * (`null` en anuncios y en las públicas de otros equipos); `mine` lo calcula el servidor.
+ */
+function toClarificationDTO(c: ClarificationRecord, myTeamId: string | null) {
+  const mine = c.kind === "QUESTION" && myTeamId !== null && c.teamId === myTeamId
   return {
     id: c.id,
+    contestId: c.contestId,
     problemId: c.contestProblemId,
-    teamId: c.teamId,
-    question: c.question,
+    teamId: mine ? c.teamId : null,
+    kind: c.kind,
+    question: c.kind === "ANNOUNCEMENT" ? null : c.question,
     answer: c.answer,
     status: c.status,
+    visibility: c.visibility,
+    mine,
     createdAt: c.createdAt,
     answeredAt: c.answeredAt,
   }
 }
 
+/** `GET /v1/contests/{id}/clarifications`: exige token; el estudiante recibe las PUBLIC y las de su equipo. */
 function listClarifications(req: MockRequest, ctx: MockContext) {
-  const contest = findContest(ctx.state, req.params.id)
-  const contestProblemIds = new Set(
-    ctx.state.contestProblems.filter((p) => p.contestId === contest.id).map((p) => p.id)
-  )
-  const list = ctx.state.clarifications
-    .filter((c) => contestProblemIds.has(c.contestProblemId))
+  const { state, now } = ctx
+  const user = authenticate(state, req.authorization, now)
+  const contest = findContest(state, req.params.id)
+  const myTeamId = teamOfUserInContest(state, contest.id, user.id)?.id ?? null
+  const list = state.clarifications
+    .filter((c) => c.contestId === contest.id)
+    .filter((c) => c.visibility === "PUBLIC" || (myTeamId !== null && c.teamId === myTeamId))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-    .map(toClarificationDTO)
+    .map((c) => toClarificationDTO(c, myTeamId))
   return ok(list)
 }
 
@@ -134,16 +145,19 @@ function askClarification(req: MockRequest, ctx: MockContext) {
 
   const record: ClarificationRecord = {
     id: newId(),
+    contestId: contestProblem.contestId,
     contestProblemId: contestProblem.id,
     teamId: team.id,
+    kind: "QUESTION",
     question,
     answer: null,
     status: "PENDING",
+    visibility: "PRIVATE",
     createdAt: isoAt(now),
     answeredAt: null,
   }
   state.clarifications.push(record)
-  return created(toClarificationDTO(record))
+  return created(toClarificationDTO(record, team.id))
 }
 
 export function registerContestRoutes(router: ApiRouter): void {
